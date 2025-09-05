@@ -15,6 +15,7 @@ A modern command-line stock monitoring tool built with Go, featuring a smooth te
 - Support for arrow keys, WASD, and vim-style navigation
 
 ✅ **Portfolio Management**
+- View stock list: Table display of monitored stock basic information
 - Add/remove stocks to/from portfolio
 - Automatic stock name retrieval - just input code, cost, and quantity
 - 3-decimal precision for price display
@@ -53,11 +54,18 @@ go build -o stock-monitor main.go
 - `Ctrl+C` - Force quit program
 
 **Main Menu Options:**
-- `► Add Stock` - Add new stock to portfolio
+- `► View Stock List` - View monitored stock basic information
+- `  Add Stock` - Add new stock to portfolio
 - `  Remove Stock` - Remove stock from portfolio  
 - `  Start Monitoring` - Launch real-time monitoring
 - `  Debug Mode: Off` - Toggle debug information display
 - `  Exit` - Save and exit program
+
+**View Stock List:**
+1. Use arrow keys to select "View Stock List" and press Enter
+2. System displays table containing: Serial Number, Stock Code, Stock Name, Quantity, Cost Price
+3. Shows portfolio total stock count statistics
+4. Press ESC or Q to return to main menu
 
 **Add Stock (Real-time Input):**
 1. Use arrow keys to select "Add Stock" and press Enter
@@ -166,6 +174,12 @@ If encountering stock data showing as 0 or unable to fetch:
 - **API failures**: System automatically generates mock data for demonstration
 
 ## Changelog
+
+**v2.1 - Stock List View Feature**
+- ✅ Added stock list view function with table display of stock basic information
+- ✅ Display serial number, stock code, stock name, quantity, cost price
+- ✅ Portfolio statistics information display
+- ✅ Optimized main menu structure and user interaction experience
 
 **v2.0 - Bubble Tea Refactored Version**
 - ✅ Integrated Bubble Tea framework for modern terminal interface
