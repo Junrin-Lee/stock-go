@@ -23,7 +23,8 @@ A modern command-line stock monitoring tool built with Go, featuring a smooth te
 
 ✅ **Real-time Monitoring**  
 - 5-second interval real-time price updates
-- Display current price, daily change, and percentage change
+- Display current price, open price, high price, and low price
+- Real-time today's change calculation: based on opening price fluctuation
 - Calculate daily profit/loss and total profit/loss
 - Show profit rate and market value
 
@@ -32,6 +33,7 @@ A modern command-line stock monitoring tool built with Go, featuring a smooth te
 - Perfect Chinese character width alignment
 - Profit numbers in red, loss numbers in green
 - Stock separators for improved readability
+- 13-column detailed data: Code, Name, Price, Open, High, Low, Cost, Quantity, Today's Change, Daily P&L, Total P&L, P&L Rate, Market Value
 
 ## Usage
 
@@ -83,8 +85,10 @@ go build -o stock-monitor main.go
 **Start Monitoring:**
 1. Use arrow keys to select "Start Monitoring" and press Enter
 2. System updates data every 5 seconds automatically
-3. Table displays profits in red, losses in green
-4. Press ESC or Q to return to main menu
+3. 13-column detailed display: Stock Code, Name, Price, Open, High, Low, Cost, Quantity, Today's Change, Daily P&L, Total P&L, P&L Rate, Market Value
+4. Today's change calculated based on opening price: (Current Price - Open Price) / Open Price × 100%
+5. Table displays profits in red, losses in green
+6. Press ESC or Q to return to main menu
 
 **Debug Mode:**
 - Debug information is disabled in Bubble Tea mode (for clean interface)
@@ -108,9 +112,9 @@ The system supports multiple input formats and automatically converts to correct
 Multi-source data strategy ensures reliability:
 
 **Primary Sources** (by priority):
-1. **Tencent Finance API** - Primary source for Chinese stocks (A-shares), fast and stable
+1. **Tencent Finance API** - Primary source for Chinese stocks (A-shares), provides complete data including open, high, low prices
 2. **Finnhub API** - Primary source for US stocks and international markets
-3. **Mock Data** - Provides demo data when all APIs are unavailable
+3. **Mock Data** - Provides complete demo data including open, high, low prices when all APIs are unavailable
 
 **Backup Sources**:
 - Alpha Vantage API
@@ -174,6 +178,13 @@ If encountering stock data showing as 0 or unable to fetch:
 - **API failures**: System automatically generates mock data for demonstration
 
 ## Changelog
+
+**v2.2 - Stock Monitoring Data Enhancement**
+- ✅ Added open price, high price, low price display
+- ✅ Real-time today's change calculation: based on opening price fluctuation
+- ✅ Upgraded monitoring table to 13-column detailed data display
+- ✅ Optimized table column order: Today's change positioned left of daily P&L
+- ✅ Tencent API and mock data support complete price data
 
 **v2.1 - Stock List View Feature**
 - ✅ Added stock list view function with table display of stock basic information
