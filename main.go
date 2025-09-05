@@ -51,6 +51,7 @@ const (
 	MainMenu AppState = iota
 	AddingStock
 	RemovingStock
+	ViewingStocks
 	Monitoring
 )
 
@@ -83,7 +84,7 @@ func main() {
 	m := Model{
 		state:           MainMenu,
 		currentMenuItem: 0,
-		menuItems:       []string{"添加股票", "删除股票", "开始监控", "调试模式", "退出"},
+		menuItems:       []string{"查看股票列表", "添加股票", "删除股票", "开始监控", "调试模式", "退出"},
 		portfolio:       portfolio,
 		debugMode:       false,
 	}
@@ -109,6 +110,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleAddingStock(msg)
 		case RemovingStock:
 			return m.handleRemovingStock(msg)
+		case ViewingStocks:
+			return m.handleViewingStocks(msg)
 		case Monitoring:
 			return m.handleMonitoring(msg)
 		}
@@ -129,6 +132,8 @@ func (m *Model) View() string {
 		return m.viewAddingStock()
 	case RemovingStock:
 		return m.viewRemovingStock()
+	case ViewingStocks:
+		return m.viewViewingStocks()
 	case Monitoring:
 		return m.viewMonitoring()
 	}
@@ -156,17 +161,20 @@ func (m *Model) handleMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 	switch m.currentMenuItem {
-	case 0: // 添加股票
+	case 0: // 查看股票列表
+		m.state = ViewingStocks
+		return m, nil
+	case 1: // 添加股票
 		m.state = AddingStock
 		m.addingStep = 0
 		m.input = ""
 		m.message = ""
 		return m, nil
-	case 1: // 删除股票
+	case 2: // 删除股票
 		m.state = RemovingStock
 		m.cursor = 0
 		return m, nil
-	case 2: // 开始监控
+	case 3: // 开始监控
 		if len(m.portfolio.Stocks) == 0 {
 			m.message = "请先添加股票到投资组合"
 			return m, nil
@@ -174,10 +182,10 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		m.state = Monitoring
 		m.lastUpdate = time.Now()
 		return m, m.tickCmd()
-	case 3: // 调试模式
+	case 4: // 调试模式
 		m.debugMode = !m.debugMode
 		return m, nil
-	case 4: // 退出
+	case 5: // 退出
 		m.savePortfolio()
 		return m, tea.Quit
 	}
@@ -193,7 +201,7 @@ func (m *Model) viewMainMenu() string {
 			prefix = "► "
 		}
 
-		if i == 3 {
+		if i == 4 {
 			debugStatus := "关闭"
 			if m.debugMode {
 				debugStatus = "开启"
@@ -377,6 +385,46 @@ func (m *Model) viewRemovingStock() string {
 	}
 
 	s += "\n使用方向键选择，回车确认，ESC或Q键返回\n"
+	return s
+}
+
+func (m *Model) handleViewingStocks(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q":
+		m.state = MainMenu
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m *Model) viewViewingStocks() string {
+	s := "=== 股票列表 ===\n\n"
+
+	if len(m.portfolio.Stocks) == 0 {
+		s += "投资组合为空\n\n"
+		s += "请先添加股票到投资组合\n\n"
+		s += "ESC或Q键返回主菜单\n"
+		return s
+	}
+
+	t := table.NewWriter()
+	t.SetStyle(table.StyleLight)
+	t.AppendHeader(table.Row{"序号", "股票代码", "股票名称", "持股数量", "成本价"})
+
+	for i, stock := range m.portfolio.Stocks {
+		t.AppendRow(table.Row{
+			i + 1,
+			stock.Code,
+			stock.Name,
+			stock.Quantity,
+			fmt.Sprintf("%.3f", stock.CostPrice),
+		})
+	}
+
+	s += t.Render() + "\n"
+	s += fmt.Sprintf("\n总共 %d 只股票\n", len(m.portfolio.Stocks))
+	s += "\nESC或Q键返回主菜单\n"
+
 	return s
 }
 
