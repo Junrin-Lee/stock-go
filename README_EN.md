@@ -31,7 +31,7 @@ A modern command-line stock monitoring tool built with Go, featuring a smooth te
 ✅ **Professional Table Display**
 - Professional table layout using go-pretty library
 - Perfect Chinese character width alignment
-- Profit numbers in red, loss numbers in green
+- Smart color system: Red for profit/gain, green for loss/decline, white for neutral (0 values)
 - Stock separators for improved readability
 - 13-column detailed data: Code, Name, Price, Open, High, Low, Cost, Quantity, Today's Change, Daily P&L, Total P&L, P&L Rate, Market Value
 
@@ -87,7 +87,10 @@ go build -o stock-monitor main.go
 2. System updates data every 5 seconds automatically
 3. 13-column detailed display: Stock Code, Name, Price, Open, High, Low, Cost, Quantity, Today's Change, Daily P&L, Total P&L, P&L Rate, Market Value
 4. Today's change calculated based on opening price: (Current Price - Open Price) / Open Price × 100%
-5. Table displays profits in red, losses in green
+5. Smart color system:
+   - Red: Profit/gain values (> 0.001)
+   - Green: Loss/decline values (< -0.001)
+   - White: Neutral values (≈ 0), such as 0% today's change, $0 daily P&L, etc.
 6. Press ESC or Q to return to main menu
 
 **Debug Mode:**
@@ -169,6 +172,7 @@ If encountering stock data showing as 0 or unable to fetch:
 **Interface Related:**
 - **Chinese character alignment issues**: Solved using go-pretty library for proper Chinese character width calculation
 - **Color display problems**: Ensure terminal supports ANSI color codes
+- **Color display logic**: Red for profit/gain, green for loss/decline, white for neutral (0 values)
 - **Keyboard response delay**: Bubble Tea framework provides real-time response without confirmation waiting
 
 **Data Fetching:**
@@ -178,6 +182,12 @@ If encountering stock data showing as 0 or unable to fetch:
 - **API failures**: System automatically generates mock data for demonstration
 
 ## Changelog
+
+**v2.3 - Smart Color Display System**
+- ✅ Smart color judgment: Each value determines color based on its own value
+- ✅ White neutral display: Zero values shown in white (e.g., 0% today's change, $0 daily P&L)
+- ✅ Precise floating-point comparison: Uses epsilon values to avoid precision issues
+- ✅ Professional stock software color standards: Red up, green down, white flat
 
 **v2.2 - Stock Monitoring Data Enhancement**
 - ✅ Added open price, high price, low price display

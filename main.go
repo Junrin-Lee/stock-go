@@ -481,7 +481,7 @@ func (m *Model) viewMonitoring() string {
 			var todayChangeStr string
 			if stock.OpenPrice > 0 {
 				todayChangePercent = ((stock.Price - stock.OpenPrice) / stock.OpenPrice) * 100
-				todayChangeStr = formatProfitRateWithColor(todayChangePercent)
+				todayChangeStr = formatProfitRateWithColorZero(todayChangePercent)
 			} else {
 				todayChangeStr = "-"
 			}
@@ -490,10 +490,10 @@ func (m *Model) viewMonitoring() string {
 			totalCost += cost
 			totalDailyProfit += dailyProfit
 
-			// 根据总盈亏设置颜色
-			dailyProfitStr := formatProfitWithColor(dailyProfit)
-			totalProfitStr := formatProfitWithColor(totalProfit)
-			profitRateStr := formatProfitRateWithColor(profitRate)
+			// 根据数值本身设置颜色：0时显示白色，正数红色，负数绿色
+			dailyProfitStr := formatProfitWithColorZero(dailyProfit)
+			totalProfitStr := formatProfitWithColorZero(totalProfit)
+			profitRateStr := formatProfitRateWithColorZero(profitRate)
 
 			t.AppendRow(table.Row{
 				stock.Code,
@@ -587,6 +587,33 @@ func formatProfitRateWithColor(rate float64) string {
 		return text.FgRed.Sprintf("+%.2f%%", rate)
 	}
 	return text.FgGreen.Sprintf("%.2f%%", rate)
+}
+
+// 根据数值本身判断颜色显示：0时显示白色，正数红色，负数绿色
+func formatProfitWithColorZero(profit float64) string {
+	// 当数值接近0时（考虑浮点数精度），显示白色（无颜色）
+	if abs(profit) < 0.001 {
+		return fmt.Sprintf("%.2f", profit)
+	}
+	// 否则使用原有颜色逻辑
+	return formatProfitWithColor(profit)
+}
+
+func formatProfitRateWithColorZero(rate float64) string {
+	// 当数值接近0时（考虑浮点数精度），显示白色（无颜色）
+	if abs(rate) < 0.001 {
+		return fmt.Sprintf("%.2f%%", rate)
+	}
+	// 否则使用原有颜色逻辑
+	return formatProfitRateWithColor(rate)
+}
+
+// 辅助函数：计算浮点数绝对值
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func getStockInfo(symbol string) *StockData {
@@ -840,11 +867,36 @@ func generateMockData(symbol string) *StockData {
 
 	now := time.Now()
 	variation := float64((now.Hour()*60+now.Minute())%100) / 100.0
-	change := (variation - 0.5) * 4.0
+	
+	// 有一定概率生成0变化，用于测试白色显示
+	var change float64
+	if now.Second()%10 == 0 {
+		// 10%概率无变化
+		change = 0
+	} else {
+		change = (variation - 0.5) * 4.0
+	}
+	
 	price := basePrice + change
 
 	// 生成模拟的开盘价、最高价、最低价
-	openPrice := basePrice + (variation-0.5)*2.0
+	// 生成不同场景用于测试颜色显示
+	var openPrice float64
+	switch now.Second() % 4 {
+	case 0:
+		// 平盘情况：开盘价等于现价（今日涨幅为0%）
+		openPrice = price
+	case 1:
+		// 略微上涨
+		openPrice = price - 0.5
+	case 2:
+		// 略微下跌  
+		openPrice = price + 0.5
+	default:
+		// 正常波动
+		openPrice = basePrice + (variation-0.5)*2.0
+	}
+	
 	highPrice := price + float64((now.Second()%10))/10.0*2.0
 	lowPrice := price - float64((now.Second()%8))/10.0*1.5
 
@@ -854,6 +906,17 @@ func generateMockData(symbol string) *StockData {
 	}
 	if lowPrice > price {
 		lowPrice = price - 0.5
+	}
+	
+	// 平盘情况特殊处理：开盘价=现价时，最高最低价也应该合理
+	if openPrice == price {
+		// 平盘时，最高价稍高于现价，最低价稍低于现价
+		if highPrice == price {
+			highPrice = price + 0.1
+		}
+		if lowPrice == price {
+			lowPrice = price - 0.1
+		}
 	}
 
 	changePercent := (change / basePrice) * 100
