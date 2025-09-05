@@ -1,31 +1,3 @@
 {
-  "stocks": [
-    {
-      "code": "SH601138",
-      "name": "工业富联",
-      "price": 53.13,
-      "cost_price": 52.138,
-      "quantity": 600,
-      "change": -1.1099999999999994,
-      "change_percent": -2.0464601769911495
-    },
-    {
-      "code": "SH600410",
-      "name": "华胜天成",
-      "price": 19.53,
-      "cost_price": 25.889,
-      "quantity": 600,
-      "change": -2.169999999999998,
-      "change_percent": -9.999999999999993
-    },
-    {
-      "code": "SH513180",
-      "name": "恒生科技指数ETF",
-      "price": 0.753,
-      "cost_price": 0.554,
-      "quantity": 11800,
-      "change": -0.015000000000000013,
-      "change_percent": -1.9531250000000018
-    }
-  ]
+  "stocks": []
 }
