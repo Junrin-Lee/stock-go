@@ -400,6 +400,7 @@ func (m *Model) viewMonitoring() string {
 
 	var totalMarketValue float64
 	var totalCost float64
+	var totalDailyProfit float64
 
 	for i := range m.portfolio.Stocks {
 		stock := &m.portfolio.Stocks[i]
@@ -420,6 +421,7 @@ func (m *Model) viewMonitoring() string {
 
 			totalMarketValue += marketValue
 			totalCost += cost
+			totalDailyProfit += dailyProfit
 
 			// 根据总盈亏设置颜色
 			dailyProfitStr := formatProfitWithColor(dailyProfit)
@@ -458,7 +460,7 @@ func (m *Model) viewMonitoring() string {
 		"",
 		"",
 		"",
-		"",
+		formatProfitWithColor(totalDailyProfit),
 		formatProfitWithColor(totalPortfolioProfit),
 		formatProfitRateWithColor(totalProfitRate),
 		fmt.Sprintf("%.2f", totalMarketValue),
