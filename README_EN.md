@@ -15,8 +15,9 @@ A modern command-line stock monitoring tool built with Go, featuring a smooth te
 - Support for arrow keys, WASD, and vim-style navigation
 
 ✅ **Portfolio Management**
-- View stock list: Table display of monitored stock basic information
+- View stock list: Real-time price fetching with detailed display of today's change, daily P&L, total P&L, P&L rate, and market value
 - Add/remove stocks to/from portfolio
+- Edit stocks: Modify cost price and quantity of existing stocks through interactive interface
 - Automatic stock name retrieval - just input code, cost, and quantity
 - 3-decimal precision for price display
 - Persistent local data storage
@@ -39,12 +40,12 @@ A modern command-line stock monitoring tool built with Go, featuring a smooth te
 
 ### 1. Build the Program
 ```bash
-go build -o stock-monitor main.go
+go build -o stock-go main.go
 ```
 
 ### 2. Run the Program
 ```bash
-./stock-monitor
+./stock-go
 ```
 
 ### 3. Operating Instructions
@@ -56,8 +57,9 @@ go build -o stock-monitor main.go
 - `Ctrl+C` - Force quit program
 
 **Main Menu Options:**
-- `► View Stock List` - View monitored stock basic information
+- `► View Stock List` - View detailed information of monitored stocks (with real-time P&L data)
 - `  Add Stock` - Add new stock to portfolio
+- `  Edit Stock` - Modify cost price and quantity of existing stocks
 - `  Remove Stock` - Remove stock from portfolio  
 - `  Start Monitoring` - Launch real-time monitoring
 - `  Debug Mode: Off` - Toggle debug information display
@@ -65,9 +67,10 @@ go build -o stock-monitor main.go
 
 **View Stock List:**
 1. Use arrow keys to select "View Stock List" and press Enter
-2. System displays table containing: Serial Number, Stock Code, Stock Name, Quantity, Cost Price
-3. Shows portfolio total stock count statistics
-4. Press ESC or Q to return to main menu
+2. System fetches real-time prices and displays detailed table containing: Serial Number, Stock Code, Stock Name, Current Price, Cost Price, Quantity, Today's Change, Daily P&L, Total P&L, P&L Rate, Market Value
+3. Smart color display: Red for profit/gain, green for loss/decline, white for neutral
+4. Shows portfolio summary data: Total Daily P&L, Total P&L, Total P&L Rate, Total Market Value
+5. Press ESC or Q to return to main menu
 
 **Add Stock (Real-time Input):**
 1. Use arrow keys to select "Add Stock" and press Enter
@@ -76,6 +79,15 @@ go build -o stock-monitor main.go
 4. Type purchase cost price in real-time, press Enter to confirm
 5. Type quantity in real-time, press Enter to complete addition
 6. Press ESC or Q to return to main menu anytime
+
+**Edit Stock:**
+1. Use arrow keys to select "Edit Stock" and press Enter
+2. Use arrow keys to select the stock to modify (shows current cost price and quantity)
+3. Press Enter to confirm selection and enter cost price modification
+4. Type new cost price in real-time, press Enter to confirm
+5. Type new quantity in real-time, press Enter to complete modification
+6. System automatically saves changes and returns to main menu
+7. Press ESC or Q to return to main menu anytime
 
 **Remove Stock:**
 1. Use arrow keys to select stock to remove
@@ -132,7 +144,7 @@ Multi-source data strategy ensures reliability:
 
 - `main.go` - Main program file
 - `portfolio.json` - Portfolio data file (auto-generated)
-- `stock-monitor` - Compiled executable file
+- `stock-go` - Compiled executable file
 
 ## Technical Architecture
 
@@ -182,6 +194,13 @@ If encountering stock data showing as 0 or unable to fetch:
 - **API failures**: System automatically generates mock data for demonstration
 
 ## Changelog
+
+**v2.4 - Stock Editing & Enhanced Stock List View**
+- ✅ New stock editing feature: Modify cost price and quantity of existing stocks through interactive interface
+- ✅ Enhanced stock list view: Real-time price fetching with display of today's change, daily P&L, total P&L, P&L rate, and market value
+- ✅ Unified color display logic: Stock list view uses same color scheme as monitoring interface
+- ✅ Portfolio summary: Stock list view shows overall P&L statistics at bottom
+- ✅ Interaction optimization: Pre-fill current values when editing stocks for better user experience
 
 **v2.3 - Smart Color Display System**
 - ✅ Smart color judgment: Each value determines color based on its own value
