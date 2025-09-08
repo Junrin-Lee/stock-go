@@ -59,6 +59,7 @@ const (
 	RemovingStock
 	ViewingStocks
 	Monitoring
+	EditingStock
 )
 
 type Model struct {
@@ -78,6 +79,11 @@ type Model struct {
 	tempQuantity string
 	stockInfo    *StockData
 
+	// For stock editing
+	editingStep        int
+	editingIndex       int
+	selectedStockIndex int
+
 	// For monitoring
 	lastUpdate time.Time
 }
@@ -90,7 +96,7 @@ func main() {
 	m := Model{
 		state:           MainMenu,
 		currentMenuItem: 0,
-		menuItems:       []string{"查看股票列表", "添加股票", "删除股票", "开始监控", "调试模式", "退出"},
+		menuItems:       []string{"查看股票列表", "添加股票", "修改股票", "删除股票", "开始监控", "调试模式", "退出"},
 		portfolio:       portfolio,
 		debugMode:       false,
 	}
@@ -120,6 +126,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleViewingStocks(msg)
 		case Monitoring:
 			return m.handleMonitoring(msg)
+		case EditingStock:
+			return m.handleEditingStock(msg)
 		}
 	case tickMsg:
 		if m.state == Monitoring {
@@ -142,6 +150,8 @@ func (m *Model) View() string {
 		return m.viewViewingStocks()
 	case Monitoring:
 		return m.viewMonitoring()
+	case EditingStock:
+		return m.viewEditingStock()
 	}
 	return ""
 }
@@ -176,11 +186,22 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		m.input = ""
 		m.message = ""
 		return m, nil
-	case 2: // 删除股票
+	case 2: // 修改股票
+		if len(m.portfolio.Stocks) == 0 {
+			m.message = "投资组合为空，无法修改股票"
+			return m, nil
+		}
+		m.state = EditingStock
+		m.editingStep = 0
+		m.cursor = 0
+		m.input = ""
+		m.message = ""
+		return m, nil
+	case 3: // 删除股票
 		m.state = RemovingStock
 		m.cursor = 0
 		return m, nil
-	case 3: // 开始监控
+	case 4: // 开始监控
 		if len(m.portfolio.Stocks) == 0 {
 			m.message = "请先添加股票到投资组合"
 			return m, nil
@@ -188,10 +209,10 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		m.state = Monitoring
 		m.lastUpdate = time.Now()
 		return m, m.tickCmd()
-	case 4: // 调试模式
+	case 5: // 调试模式
 		m.debugMode = !m.debugMode
 		return m, nil
-	case 5: // 退出
+	case 6: // 退出
 		m.savePortfolio()
 		return m, tea.Quit
 	}
@@ -207,7 +228,7 @@ func (m *Model) viewMainMenu() string {
 			prefix = "► "
 		}
 
-		if i == 4 {
+		if i == 5 {
 			debugStatus := "关闭"
 			if m.debugMode {
 				debugStatus = "开启"
@@ -946,6 +967,117 @@ func min(a, b int) int {
 func debugPrint(format string, args ...any) {
 	// Debug output is disabled in Bubble Tea mode for clean interface
 	// If debug mode is needed, could write to a log file instead
+}
+
+func (m *Model) handleEditingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q":
+		m.state = MainMenu
+		m.message = ""
+		return m, nil
+	case "up", "k", "w":
+		if m.editingStep == 0 && m.cursor > 0 {
+			m.cursor--
+		}
+	case "down", "j", "s":
+		if m.editingStep == 0 && m.cursor < len(m.portfolio.Stocks)-1 {
+			m.cursor++
+		}
+	case "enter", " ":
+		return m.processEditingStep()
+	case "backspace":
+		if len(m.input) > 0 {
+			m.input = m.input[:len(m.input)-1]
+		}
+	default:
+		if len(msg.String()) == 1 && msg.String() != "\n" && msg.String() != "\r" {
+			m.input += msg.String()
+		}
+	}
+	return m, nil
+}
+
+func (m *Model) processEditingStep() (tea.Model, tea.Cmd) {
+	switch m.editingStep {
+	case 0: // 选择股票
+		if len(m.portfolio.Stocks) > 0 {
+			m.selectedStockIndex = m.cursor
+			m.editingStep = 1
+			m.input = fmt.Sprintf("%.3f", m.portfolio.Stocks[m.selectedStockIndex].CostPrice)
+		}
+	case 1: // 修改成本价
+		if m.input == "" {
+			m.message = "成本价不能为空"
+			return m, nil
+		}
+		if newCost, err := strconv.ParseFloat(m.input, 64); err != nil {
+			m.message = "无效的价格格式"
+			m.input = ""
+			return m, nil
+		} else {
+			m.portfolio.Stocks[m.selectedStockIndex].CostPrice = newCost
+			m.editingStep = 2
+			m.input = fmt.Sprintf("%d", m.portfolio.Stocks[m.selectedStockIndex].Quantity)
+			m.message = ""
+		}
+	case 2: // 修改数量
+		if m.input == "" {
+			m.message = "数量不能为空"
+			return m, nil
+		}
+		if newQuantity, err := strconv.Atoi(m.input); err != nil {
+			m.message = "无效的数量格式"
+			m.input = ""
+			return m, nil
+		} else {
+			m.portfolio.Stocks[m.selectedStockIndex].Quantity = newQuantity
+			m.savePortfolio()
+
+			stockName := m.portfolio.Stocks[m.selectedStockIndex].Name
+			m.state = MainMenu
+			m.message = fmt.Sprintf("成功修改股票 %s 的成本价和数量", stockName)
+			m.editingStep = 0
+			m.input = ""
+		}
+	}
+	return m, nil
+}
+
+func (m *Model) viewEditingStock() string {
+	s := "=== 修改股票 ===\n\n"
+
+	switch m.editingStep {
+	case 0:
+		s += "选择要修改的股票:\n\n"
+		for i, stock := range m.portfolio.Stocks {
+			prefix := "  "
+			if i == m.cursor {
+				prefix = "► "
+			}
+			s += fmt.Sprintf("%s%d. %s (%s) - 成本价: %.3f, 数量: %d\n",
+				prefix, i+1, stock.Name, stock.Code, stock.CostPrice, stock.Quantity)
+		}
+		s += "\n使用方向键选择，回车确认，ESC或Q键返回\n"
+	case 1:
+		stock := m.portfolio.Stocks[m.selectedStockIndex]
+		s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
+		s += fmt.Sprintf("当前成本价: %.3f\n\n", stock.CostPrice)
+		s += "请输入新的成本价: " + m.input + "_\n"
+		s += "\n回车确认，ESC或Q键返回主菜单\n"
+	case 2:
+		stock := m.portfolio.Stocks[m.selectedStockIndex]
+		s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
+		s += fmt.Sprintf("新成本价: %.3f\n", stock.CostPrice)
+		s += fmt.Sprintf("当前数量: %d\n\n", stock.Quantity)
+		s += "请输入新的数量: " + m.input + "_\n"
+		s += "\n回车确认，ESC或Q键返回主菜单\n"
+	}
+
+	if m.message != "" {
+		s += "\n" + m.message + "\n"
+	}
+
+	return s
 }
 
 func gbkToUtf8(data []byte) (string, error) {
