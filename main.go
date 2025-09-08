@@ -26,9 +26,9 @@ type Stock struct {
 	Quantity      int     `json:"quantity"`
 	Change        float64 `json:"change"`
 	ChangePercent float64 `json:"change_percent"`
-	OpenPrice     float64 `json:"open_price"`
-	HighPrice     float64 `json:"high_price"`
-	LowPrice      float64 `json:"low_price"`
+	StartPrice    float64 `json:"start_price"`
+	MaxPrice      float64 `json:"max_price"`
+	MinPrice      float64 `json:"min_price"`
 }
 
 type StockData struct {
@@ -37,9 +37,9 @@ type StockData struct {
 	Price         float64 `json:"price"`
 	Change        float64 `json:"change"`
 	ChangePercent float64 `json:"change_percent"`
-	OpenPrice     float64 `json:"open_price"`
-	HighPrice     float64 `json:"high_price"`
-	LowPrice      float64 `json:"low_price"`
+	StartPrice    float64 `json:"start_price"`
+	MaxPrice      float64 `json:"max_price"`
+	MinPrice      float64 `json:"min_price"`
 }
 
 type Portfolio struct {
@@ -464,9 +464,9 @@ func (m *Model) viewMonitoring() string {
 			stock.Price = stockData.Price
 			stock.Change = stockData.Change
 			stock.ChangePercent = stockData.ChangePercent
-			stock.OpenPrice = stockData.OpenPrice
-			stock.HighPrice = stockData.HighPrice
-			stock.LowPrice = stockData.LowPrice
+			stock.StartPrice = stockData.StartPrice
+			stock.MaxPrice = stockData.MaxPrice
+			stock.MinPrice = stockData.MaxPrice
 		}
 
 		if stock.Price > 0 {
@@ -479,8 +479,8 @@ func (m *Model) viewMonitoring() string {
 			// 计算今日涨幅：(当前价 - 开盘价) / 开盘价 * 100%
 			var todayChangePercent float64
 			var todayChangeStr string
-			if stock.OpenPrice > 0 {
-				todayChangePercent = ((stock.Price - stock.OpenPrice) / stock.OpenPrice) * 100
+			if stock.StartPrice > 0 {
+				todayChangePercent = ((stock.Price - stock.StartPrice) / stock.StartPrice) * 100
 				todayChangeStr = formatProfitRateWithColorZero(todayChangePercent)
 			} else {
 				todayChangeStr = "-"
@@ -499,9 +499,9 @@ func (m *Model) viewMonitoring() string {
 				stock.Code,
 				stock.Name,
 				fmt.Sprintf("%.3f", stock.Price),
-				fmt.Sprintf("%.3f", stock.OpenPrice),
-				fmt.Sprintf("%.3f", stock.HighPrice),
-				fmt.Sprintf("%.3f", stock.LowPrice),
+				fmt.Sprintf("%.3f", stock.StartPrice),
+				fmt.Sprintf("%.3f", stock.MaxPrice),
+				fmt.Sprintf("%.3f", stock.MinPrice),
 				fmt.Sprintf("%.3f", stock.CostPrice),
 				stock.Quantity,
 				todayChangeStr,
@@ -698,24 +698,24 @@ func tryTencentAPI(symbol string) *StockData {
 	}
 
 	// 解析开盘价、最高价、最低价
-	var openPrice, highPrice, lowPrice float64
+	var openPrice, maxPrice, minPrice float64
 
 	// 腾讯API字段位置：fields[5]=开盘价, fields[33]=最高价, fields[34]=最低价
 	if len(fields) > 5 {
 		openPrice, _ = strconv.ParseFloat(fields[5], 64)
 	}
 	if len(fields) > 33 {
-		highPrice, _ = strconv.ParseFloat(fields[33], 64)
+		maxPrice, _ = strconv.ParseFloat(fields[33], 64)
 	}
 	if len(fields) > 34 {
-		lowPrice, _ = strconv.ParseFloat(fields[34], 64)
+		minPrice, _ = strconv.ParseFloat(fields[34], 64)
 	}
 
 	change := price - previousClose
 	changePercent := (change / previousClose) * 100
 
 	debugPrint("[调试] 腾讯API获取成功 - 名称: %s, 价格: %.2f, 涨跌: %.2f (%.2f%%), 开: %.2f, 高: %.2f, 低: %.2f\n",
-		stockName, price, change, changePercent, openPrice, highPrice, lowPrice)
+		stockName, price, change, changePercent, openPrice, maxPrice, minPrice)
 
 	return &StockData{
 		Symbol:        symbol,
@@ -723,9 +723,9 @@ func tryTencentAPI(symbol string) *StockData {
 		Price:         price,
 		Change:        change,
 		ChangePercent: changePercent,
-		OpenPrice:     openPrice,
-		HighPrice:     highPrice,
-		LowPrice:      lowPrice,
+		StartPrice:    openPrice,
+		MaxPrice:      maxPrice,
+		MinPrice:      minPrice,
 	}
 }
 
@@ -867,7 +867,7 @@ func generateMockData(symbol string) *StockData {
 
 	now := time.Now()
 	variation := float64((now.Hour()*60+now.Minute())%100) / 100.0
-	
+
 	// 有一定概率生成0变化，用于测试白色显示
 	var change float64
 	if now.Second()%10 == 0 {
@@ -876,7 +876,7 @@ func generateMockData(symbol string) *StockData {
 	} else {
 		change = (variation - 0.5) * 4.0
 	}
-	
+
 	price := basePrice + change
 
 	// 生成模拟的开盘价、最高价、最低价
@@ -890,39 +890,39 @@ func generateMockData(symbol string) *StockData {
 		// 略微上涨
 		openPrice = price - 0.5
 	case 2:
-		// 略微下跌  
+		// 略微下跌
 		openPrice = price + 0.5
 	default:
 		// 正常波动
 		openPrice = basePrice + (variation-0.5)*2.0
 	}
-	
-	highPrice := price + float64((now.Second()%10))/10.0*2.0
-	lowPrice := price - float64((now.Second()%8))/10.0*1.5
+
+	maxPrice := price + float64((now.Second()%10))/10.0*2.0
+	minPrice := price - float64((now.Second()%8))/10.0*1.5
 
 	// 确保最高价 >= 当前价 >= 最低价
-	if highPrice < price {
-		highPrice = price + 0.5
+	if maxPrice < price {
+		maxPrice = price + 0.5
 	}
-	if lowPrice > price {
-		lowPrice = price - 0.5
+	if minPrice > price {
+		minPrice = price - 0.5
 	}
-	
+
 	// 平盘情况特殊处理：开盘价=现价时，最高最低价也应该合理
 	if openPrice == price {
 		// 平盘时，最高价稍高于现价，最低价稍低于现价
-		if highPrice == price {
-			highPrice = price + 0.1
+		if maxPrice == price {
+			maxPrice = price + 0.1
 		}
-		if lowPrice == price {
-			lowPrice = price - 0.1
+		if minPrice == price {
+			minPrice = price - 0.1
 		}
 	}
 
 	changePercent := (change / basePrice) * 100
 
 	debugPrint("[调试] 模拟数据生成 - 名称: %s, 价格: %.2f, 涨跌: %.2f (%.2f%%), 开: %.2f, 高: %.2f, 低: %.2f\n",
-		mockName, price, change, changePercent, openPrice, highPrice, lowPrice)
+		mockName, price, change, changePercent, openPrice, maxPrice, minPrice)
 
 	return &StockData{
 		Symbol:        symbol,
@@ -930,9 +930,9 @@ func generateMockData(symbol string) *StockData {
 		Price:         price,
 		Change:        change,
 		ChangePercent: changePercent,
-		OpenPrice:     openPrice,
-		HighPrice:     highPrice,
-		LowPrice:      lowPrice,
+		StartPrice:    openPrice,
+		MaxPrice:      maxPrice,
+		MinPrice:      minPrice,
 	}
 }
 
