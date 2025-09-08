@@ -436,17 +436,107 @@ func (m *Model) viewViewingStocks() string {
 
 	t := table.NewWriter()
 	t.SetStyle(table.StyleLight)
-	t.AppendHeader(table.Row{"序号", "股票代码", "股票名称", "持股数量", "成本价"})
+	t.AppendHeader(table.Row{"序号", "股票代码", "股票名称", "现价", "成本价", "持股数", "今日涨幅", "当日盈亏", "总盈亏", "盈亏率", "市值"})
 
-	for i, stock := range m.portfolio.Stocks {
-		t.AppendRow(table.Row{
-			i + 1,
-			stock.Code,
-			stock.Name,
-			stock.Quantity,
-			fmt.Sprintf("%.3f", stock.CostPrice),
-		})
+	var totalMarketValue float64
+	var totalCost float64
+	var totalDailyProfit float64
+
+	for i := range m.portfolio.Stocks {
+		stock := &m.portfolio.Stocks[i]
+
+		// 获取实时股价数据
+		stockData := getStockPrice(stock.Code)
+		if stockData != nil {
+			stock.Price = stockData.Price
+			stock.Change = stockData.Change
+			stock.ChangePercent = stockData.ChangePercent
+			stock.StartPrice = stockData.StartPrice
+			stock.MaxPrice = stockData.MaxPrice
+			stock.MinPrice = stockData.MinPrice
+		}
+
+		if stock.Price > 0 {
+			dailyProfit := stock.Change * float64(stock.Quantity)
+			totalProfit := (stock.Price - stock.CostPrice) * float64(stock.Quantity)
+			profitRate := ((stock.Price - stock.CostPrice) / stock.CostPrice) * 100
+			marketValue := stock.Price * float64(stock.Quantity)
+			cost := stock.CostPrice * float64(stock.Quantity)
+
+			// 计算今日涨幅
+			var todayChangePercent float64
+			var todayChangeStr string
+			if stock.StartPrice > 0 {
+				todayChangePercent = ((stock.Price - stock.StartPrice) / stock.StartPrice) * 100
+				todayChangeStr = formatProfitRateWithColorZero(todayChangePercent)
+			} else {
+				todayChangeStr = "-"
+			}
+
+			totalMarketValue += marketValue
+			totalCost += cost
+			totalDailyProfit += dailyProfit
+
+			// 根据数值本身设置颜色
+			dailyProfitStr := formatProfitWithColorZero(dailyProfit)
+			totalProfitStr := formatProfitWithColorZero(totalProfit)
+			profitRateStr := formatProfitRateWithColorZero(profitRate)
+
+			t.AppendRow(table.Row{
+				i + 1,
+				stock.Code,
+				stock.Name,
+				fmt.Sprintf("%.3f", stock.Price),
+				fmt.Sprintf("%.3f", stock.CostPrice),
+				stock.Quantity,
+				todayChangeStr,
+				dailyProfitStr,
+				totalProfitStr,
+				profitRateStr,
+				fmt.Sprintf("%.2f", marketValue),
+			})
+		} else {
+			// 如果无法获取股价，显示基础信息
+			cost := stock.CostPrice * float64(stock.Quantity)
+			totalCost += cost
+
+			t.AppendRow(table.Row{
+				i + 1,
+				stock.Code,
+				stock.Name,
+				"-",
+				fmt.Sprintf("%.3f", stock.CostPrice),
+				stock.Quantity,
+				"-",
+				"-",
+				"-",
+				"-",
+				"-",
+			})
+		}
 	}
+
+	// 添加总计行
+	totalPortfolioProfit := totalMarketValue - totalCost
+	totalProfitRate := 0.0
+	if totalCost > 0 {
+		totalProfitRate = (totalPortfolioProfit / totalCost) * 100
+	}
+
+	t.AppendSeparator()
+	t.AppendRow(table.Row{
+		"",
+		"",
+		"总计",
+		"",
+		"",
+		"",
+		"",
+		formatProfitWithColor(totalDailyProfit),
+		formatProfitWithColor(totalPortfolioProfit),
+		formatProfitRateWithColor(totalProfitRate),
+		fmt.Sprintf("%.2f", totalMarketValue),
+	})
 
 	s += t.Render() + "\n"
 	s += fmt.Sprintf("\n总共 %d 只股票\n", len(m.portfolio.Stocks))
