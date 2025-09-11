@@ -463,11 +463,12 @@ func (m *Model) viewViewingStocks() string {
 			marketValue := stock.Price * float64(stock.Quantity)
 			cost := stock.CostPrice * float64(stock.Quantity)
 
-			// 计算今日涨幅
+			// 计算今日涨幅：应该基于昨收价，而不是开盘价
 			var todayChangePercent float64
 			var todayChangeStr string
-			if stock.StartPrice > 0 {
-				todayChangePercent = ((stock.Price - stock.StartPrice) / stock.StartPrice) * 100
+			// 使用change_percent字段，这是基于昨收价计算的涨跌幅
+			if stock.ChangePercent != 0 {
+				todayChangePercent = stock.ChangePercent
 				todayChangeStr = formatProfitRateWithColorZero(todayChangePercent)
 			} else {
 				todayChangeStr = "-"
@@ -577,7 +578,7 @@ func (m *Model) viewMonitoring() string {
 			stock.ChangePercent = stockData.ChangePercent
 			stock.StartPrice = stockData.StartPrice
 			stock.MaxPrice = stockData.MaxPrice
-			stock.MinPrice = stockData.MaxPrice
+			stock.MinPrice = stockData.MinPrice
 		}
 
 		if stock.Price > 0 {
@@ -587,11 +588,12 @@ func (m *Model) viewMonitoring() string {
 			marketValue := stock.Price * float64(stock.Quantity)
 			cost := stock.CostPrice * float64(stock.Quantity)
 
-			// 计算今日涨幅：(当前价 - 开盘价) / 开盘价 * 100%
+			// 计算今日涨幅：应该基于昨收价，而不是开盘价
 			var todayChangePercent float64
 			var todayChangeStr string
-			if stock.StartPrice > 0 {
-				todayChangePercent = ((stock.Price - stock.StartPrice) / stock.StartPrice) * 100
+			// 使用change_percent字段，这是基于昨收价计算的涨跌幅
+			if stock.ChangePercent != 0 {
+				todayChangePercent = stock.ChangePercent
 				todayChangeStr = formatProfitRateWithColorZero(todayChangePercent)
 			} else {
 				todayChangeStr = "-"
