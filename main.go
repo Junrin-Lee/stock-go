@@ -57,7 +57,6 @@ const (
 	MainMenu AppState = iota
 	AddingStock
 	RemovingStock
-	ViewingStocks
 	Monitoring
 	EditingStock
 )
@@ -93,12 +92,21 @@ type tickMsg struct{}
 func main() {
 	portfolio := loadPortfolio()
 
+	// 根据是否有股票数据决定初始状态
+	initialState := MainMenu
+	var lastUpdate time.Time
+	if len(portfolio.Stocks) > 0 {
+		initialState = Monitoring
+		lastUpdate = time.Now()
+	}
+
 	m := Model{
-		state:           MainMenu,
+		state:           initialState,
 		currentMenuItem: 0,
-		menuItems:       []string{"查看股票列表", "添加股票", "修改股票", "删除股票", "开始监控", "调试模式", "退出"},
+		menuItems:       []string{"股票列表", "添加股票", "修改股票", "删除股票", "调试模式", "退出"},
 		portfolio:       portfolio,
 		debugMode:       false,
+		lastUpdate:      lastUpdate,
 	}
 
 	p := tea.NewProgram(&m, tea.WithAltScreen())
@@ -109,6 +117,9 @@ func main() {
 }
 
 func (m *Model) Init() tea.Cmd {
+	if m.state == Monitoring {
+		return m.tickCmd()
+	}
 	return nil
 }
 
@@ -122,8 +133,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleAddingStock(msg)
 		case RemovingStock:
 			return m.handleRemovingStock(msg)
-		case ViewingStocks:
-			return m.handleViewingStocks(msg)
 		case Monitoring:
 			return m.handleMonitoring(msg)
 		case EditingStock:
@@ -146,8 +155,6 @@ func (m *Model) View() string {
 		return m.viewAddingStock()
 	case RemovingStock:
 		return m.viewRemovingStock()
-	case ViewingStocks:
-		return m.viewViewingStocks()
 	case Monitoring:
 		return m.viewMonitoring()
 	case EditingStock:
@@ -179,9 +186,10 @@ func (m *Model) handleMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 	switch m.currentMenuItem {
-	case 0: // 查看股票列表
-		m.state = ViewingStocks
-		return m, nil
+	case 0: // 股票列表
+		m.state = Monitoring
+		m.lastUpdate = time.Now()
+		return m, m.tickCmd()
 	case 1: // 添加股票
 		m.state = AddingStock
 		m.addingStep = 0
@@ -203,18 +211,10 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		m.state = RemovingStock
 		m.cursor = 0
 		return m, nil
-	case 4: // 开始监控
-		if len(m.portfolio.Stocks) == 0 {
-			m.message = "请先添加股票到投资组合"
-			return m, nil
-		}
-		m.state = Monitoring
-		m.lastUpdate = time.Now()
-		return m, m.tickCmd()
-	case 5: // 调试模式
+	case 4: // 调试模式
 		m.debugMode = !m.debugMode
 		return m, nil
-	case 6: // 退出
+	case 5: // 退出
 		m.savePortfolio()
 		return m, tea.Quit
 	}
@@ -230,7 +230,7 @@ func (m *Model) viewMainMenu() string {
 			prefix = "► "
 		}
 
-		if i == 5 {
+		if i == 4 {
 			debugStatus := "关闭"
 			if m.debugMode {
 				debugStatus = "开启"
@@ -417,140 +417,9 @@ func (m *Model) viewRemovingStock() string {
 	return s
 }
 
-func (m *Model) handleViewingStocks(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "q":
-		m.state = MainMenu
-		return m, nil
-	}
-	return m, nil
-}
-
-func (m *Model) viewViewingStocks() string {
-	s := "=== 股票列表 ===\n\n"
-
-	if len(m.portfolio.Stocks) == 0 {
-		s += "投资组合为空\n\n"
-		s += "请先添加股票到投资组合\n\n"
-		s += "ESC或Q键返回主菜单\n"
-		return s
-	}
-
-	t := table.NewWriter()
-	t.SetStyle(table.StyleLight)
-	t.AppendHeader(table.Row{"序号", "股票代码", "股票名称", "现价", "成本价", "持股数", "今日涨幅", "当日盈亏", "总盈亏", "盈亏率", "市值"})
-
-	var totalMarketValue float64
-	var totalCost float64
-	var totalDailyProfit float64
-
-	for i := range m.portfolio.Stocks {
-		stock := &m.portfolio.Stocks[i]
-
-		// 获取实时股价数据
-		stockData := getStockPrice(stock.Code)
-		if stockData != nil {
-			stock.Price = stockData.Price
-			stock.Change = stockData.Change
-			stock.ChangePercent = stockData.ChangePercent
-			stock.StartPrice = stockData.StartPrice
-			stock.MaxPrice = stockData.MaxPrice
-			stock.MinPrice = stockData.MinPrice
-		}
-
-		if stock.Price > 0 {
-			dailyProfit := stock.Change * float64(stock.Quantity)
-			totalProfit := (stock.Price - stock.CostPrice) * float64(stock.Quantity)
-			profitRate := ((stock.Price - stock.CostPrice) / stock.CostPrice) * 100
-			marketValue := stock.Price * float64(stock.Quantity)
-			cost := stock.CostPrice * float64(stock.Quantity)
-
-			// 计算今日涨幅：应该基于昨收价，而不是开盘价
-			var todayChangePercent float64
-			var todayChangeStr string
-			// 使用change_percent字段，这是基于昨收价计算的涨跌幅
-			if stock.ChangePercent != 0 {
-				todayChangePercent = stock.ChangePercent
-				todayChangeStr = formatProfitRateWithColorZero(todayChangePercent)
-			} else {
-				todayChangeStr = "-"
-			}
-
-			totalMarketValue += marketValue
-			totalCost += cost
-			totalDailyProfit += dailyProfit
-
-			// 根据数值本身设置颜色
-			dailyProfitStr := formatProfitWithColorZero(dailyProfit)
-			totalProfitStr := formatProfitWithColorZero(totalProfit)
-			profitRateStr := formatProfitRateWithColorZero(profitRate)
-
-			t.AppendRow(table.Row{
-				i + 1,
-				stock.Code,
-				stock.Name,
-				fmt.Sprintf("%.3f", stock.Price),
-				fmt.Sprintf("%.3f", stock.CostPrice),
-				stock.Quantity,
-				todayChangeStr,
-				dailyProfitStr,
-				totalProfitStr,
-				profitRateStr,
-				fmt.Sprintf("%.2f", marketValue),
-			})
-		} else {
-			// 如果无法获取股价，显示基础信息
-			cost := stock.CostPrice * float64(stock.Quantity)
-			totalCost += cost
-
-			t.AppendRow(table.Row{
-				i + 1,
-				stock.Code,
-				stock.Name,
-				"-",
-				fmt.Sprintf("%.3f", stock.CostPrice),
-				stock.Quantity,
-				"-",
-				"-",
-				"-",
-				"-",
-				"-",
-			})
-		}
-	}
-
-	// 添加总计行
-	totalPortfolioProfit := totalMarketValue - totalCost
-	totalProfitRate := 0.0
-	if totalCost > 0 {
-		totalProfitRate = (totalPortfolioProfit / totalCost) * 100
-	}
-
-	t.AppendSeparator()
-	t.AppendRow(table.Row{
-		"",
-		"",
-		"总计",
-		"",
-		"",
-		"",
-		"",
-		formatProfitWithColor(totalDailyProfit),
-		formatProfitWithColor(totalPortfolioProfit),
-		formatProfitRateWithColor(totalProfitRate),
-		fmt.Sprintf("%.2f", totalMarketValue),
-	})
-
-	s += t.Render() + "\n"
-	s += fmt.Sprintf("\n总共 %d 只股票\n", len(m.portfolio.Stocks))
-	s += "\nESC或Q键返回主菜单\n"
-
-	return s
-}
-
 func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "q":
+	case "esc", "q", "m":
 		m.state = MainMenu
 		return m, nil
 	}
@@ -559,8 +428,15 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) viewMonitoring() string {
 	s := "=== 股票实时监控 ===\n"
-	s += fmt.Sprintf("更新时间: %s\n", m.lastUpdate.Format("2006-01-02 15:04:05"))
+	s += fmt.Sprintf("更新时间(5s): %s\n", m.lastUpdate.Format("2006-01-02 15:04:05"))
 	s += "\n"
+
+	if len(m.portfolio.Stocks) == 0 {
+		s += "投资组合为空\n\n"
+		s += "请先添加股票到投资组合\n\n"
+		s += "ESC、Q键或M键返回主菜单\n"
+		return s
+	}
 
 	t := table.NewWriter()
 	t.SetStyle(table.StyleLight)
@@ -657,7 +533,7 @@ func (m *Model) viewMonitoring() string {
 	})
 
 	s += t.Render() + "\n"
-	s += "\nESC或Q键返回主菜单\n"
+	s += "\nESC、Q键或M键返回主菜单\n"
 
 	return s
 }
