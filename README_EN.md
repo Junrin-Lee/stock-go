@@ -107,18 +107,14 @@ go build -o stock-go main.go
 
 Once in monitoring mode, the system displays professional stock data tables:
 
-```
 === Real-time Stock Monitor ===
 Update Time(5s): 2024-01-01 15:30:25
 
-┌─────────┬──────────┬───────┬─────────┬──────┬──────┬──────┬──────┬────────┬───────┬────────┬────────┬────────┬────────┐
-│  Code   │   Name   │ Price │PrevClose│ Open │ High │ Low  │ Cost │Quantity│Today% │DailyP&L│TotalP&L│P&LRate │ Value  │
-├─────────┼──────────┼───────┼─────────┼──────┼──────┼──────┼──────┼────────┼───────┼────────┼────────┼────────┼────────┤
-│SH601138 │Industrial│ 61.900│  59.040 │58.880│63.100│58.030│47.963│   400  │+4.84% │+1144.00│+5574.80│+29.19% │24760.00│
-└─────────┴──────────┴───────┴─────────┴──────┴──────┴──────┴──────┴────────┴───────┴────────┴────────┴────────┴────────┘
+| Code | Name | Price | PrevClose | Open | High | Low | Cost | Quantity | Today% | DailyP&L | TotalP&L | P&LRate | Value |
+|------|------|-------|-----------|------|------|-----|------|----------|--------|----------|----------|---------|-------|
+| SH601138 | Industrial | 61.900 | 59.040 | 58.880 | 63.100 | 58.030 | 47.963 | 400 | +4.84% | +1144.00 | +5574.80 | +29.19% | 24760.00 |
 
 ESC, Q or M to return to main menu
-```
 
 **Table Features**:
 - **Smart Colors**: Red for profit/gains, green for loss/declines, white for neutral
