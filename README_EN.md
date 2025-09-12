@@ -16,7 +16,9 @@ Stock Monitor is a command-line terminal stock monitoring tool designed for inve
 - **🎨 Smart Display** - Professional stock software color standards: red for gains, green for losses, white for neutral
 - **💼 Portfolio Management** - Complete position management with add, edit, and delete stock operations
 - **🌐 Global Markets** - Support for A-shares, US stocks, Hong Kong stocks and other major market code formats
-- **💾 Data Persistence** - Local JSON storage, investment portfolio data is never lost
+- **🌏 Multi-language Support** - Complete Chinese and English bilingual interface with cultural color adaptation
+- **⚙️ Configuration File** - YAML format configuration file for customizable system parameters
+- **💾 Data Persistence** - Local storage for both portfolio data and system configuration, never lose data
 
 ## ✨ Features
 
@@ -100,6 +102,45 @@ go build -o stock-go main.go
 #### 💡 Smart Startup
 - **With Portfolio Data**: Program automatically enters monitoring mode
 - **No Portfolio Data**: Shows main menu, guides user to add stocks
+
+## ⚙️ Configuration File
+
+### 📄 Configuration Guide
+
+The system provides a `config.yaml` configuration file that users can edit to customize system startup parameters:
+
+#### 🔧 Configuration Options
+
+| Setting | Default | Description | Possible Values |
+|---------|---------|-------------|-----------------|
+| `system.language` | `"en"` | Default system language | `"zh"` (Chinese), `"en"` (English) |
+| `system.auto_start` | `true` | Auto enter monitoring mode when data exists | `true`, `false` |
+| `system.debug_mode` | `false` | Debug mode switch | `true`, `false` |
+| `display.color_scheme` | `"professional"` | Color scheme | `"professional"`, `"simple"` |
+| `display.decimal_places` | `3` | Price decimal places | `1-4` |
+| `display.table_style` | `"light"` | Table style | `"light"`, `"bold"`, `"simple"` |
+| `update.refresh_interval` | `5` | Data refresh interval (seconds) | Any positive integer |
+| `update.auto_update` | `true` | Enable auto update | `true`, `false` |
+
+#### 💡 Configuration Features
+
+- **Auto Creation**: Default configuration file is automatically created on first run
+- **Real-time Save**: Settings changed through the interface (like language, debug mode) are automatically saved
+- **Error Handling**: Automatically uses default configuration when config file has errors
+- **Bilingual Comments**: Configuration file includes both Chinese and English comments
+
+#### 🛠️ Manual Configuration Editing
+
+You can directly edit the `config.yaml` file to modify settings:
+
+```bash
+# Edit config file with any text editor
+nano config.yaml
+# or
+vim config.yaml
+```
+
+**Note**: Restart the program after modifying the configuration file for changes to take effect.
 
 ## 📊 Features Overview
 
@@ -243,6 +284,7 @@ stock-go/
 ├── go.mod               # 📦 Go module dependencies
 ├── go.sum               # 🔒 Dependency version lock file
 │
+├── config.yaml          # ⚙️ System configuration file (user editable)
 ├── portfolio.json       # 📊 Portfolio data (auto-generated)
 ├── stock-go             # ⚙️ Compiled executable
 │
@@ -251,6 +293,24 @@ stock-go/
 ```
 
 ### 💾 Data Storage
+
+**config.yaml** configuration file example:
+```yaml
+# Stock Monitor System Configuration File
+system:
+    language: en          # Default language: "zh" (Chinese) or "en" (English)
+    auto_start: true      # Auto enter monitoring mode when data exists
+    debug_mode: false     # Debug mode switch
+
+display:
+    color_scheme: professional   # Color scheme: "professional", "simple"
+    decimal_places: 3           # Price decimal places (1-4)
+    table_style: light          # Table style: "light", "bold", "simple"
+
+update:
+    refresh_interval: 5   # Refresh interval (seconds)
+    auto_update: true     # Enable auto update
+```
 
 **portfolio.json** example:
 ```json
@@ -280,7 +340,7 @@ stock-go/
      │
      ├─ 📡 Data Fetching ← HTTP Client + Encoding Conversion
      │
-     └─ 💾 Data Storage ← JSON Files
+     └─ 💾 Data Storage ← JSON Files + YAML Config
 ```
 
 ### 📦 Dependency Details
@@ -290,6 +350,7 @@ stock-go/
 | **Bubble Tea** | `v1.3.6` | Terminal UI Framework | • Responsive interaction<br>• Real-time event handling<br>• Modern experience |
 | **Go-Pretty** | `v6.6.8` | Table Layout Library | • Chinese character alignment<br>• Rich style support<br>• Out-of-the-box |
 | **Golang Text** | `v0.28.0` | Encoding Conversion | • GBK to UTF-8<br>• Multi-language support<br>• Official library |
+| **YAML v3** | `v3.0.1` | Configuration File Handling | • YAML format support<br>• Structured configuration<br>• User-friendly |
 
 ### ⚙️ Install Dependencies
 
@@ -301,6 +362,7 @@ go mod download
 go get github.com/charmbracelet/bubbletea@v1.3.6
 go get github.com/jedib0t/go-pretty/v6@v6.6.8
 go get golang.org/x/text@v0.28.0
+go get gopkg.in/yaml.v3
 ```
 
 ## System Requirements
@@ -371,23 +433,38 @@ System adopts professional stock software color standards:
 
 ## 📈 Version History
 
-### 🎉 v2.5 - Interface Logic Optimization 🆕
+### 🎉 v3.0 - Configuration System & Comprehensive Multi-language Support 🆕
 
-**New Features**:
-- ✨ **Smart Startup**: Auto-enter monitoring mode when portfolio data exists
-- 🎯 **One-click Access**: Main menu "Stock List" directly enters real-time monitoring
-- ⏪ **Multi-key Return**: Support ESC, Q, M keys for multiple return methods
+**Major Updates**:
+- ⚙️ **YAML Configuration File**: New `config.yaml` system configuration file for customizable startup parameters
+- 🌏 **Complete Multi-language Support**: Full support for Chinese and English interfaces, including all menus and interactions
+- 🎨 **Cultural Color Adaptation**: Chinese interface (red=gain/green=loss) vs English interface (green=gain/red=loss)
+- 🔧 **Secondary Language Selection**: Dedicated language selection page for better user experience
 
-**Experience Improvements**:
-- 🧹 **Streamlined Menu**: Remove duplicate functions, cleaner menu
-- 💬 **Message Management**: Fix persistent success message issues
+**Configuration Features**:
+- 📝 **Configurable Options**: Default language, auto-start mode, debug switch, display settings, update intervals, etc.
+- 💾 **Real-time Save**: Settings modified through interface (language, debug mode) automatically saved to config file
+- 🛡️ **Error Handling**: Automatically uses default configuration when config file is missing or has format errors
+- 📖 **Bilingual Comments**: Configuration file includes detailed Chinese and English explanations
+
+**Multi-language Enhancements**:
+- 🔄 **Interface Localization**: All user interface text completely localized
+- 🎯 **Smart Adaptation**: Automatically adjusts color display standards based on language
+- 📱 **Consistent Experience**: All modules (monitoring, adding, editing, searching, deleting) unified multi-language support
 
 ---
 
 ### 📅 Historical Versions
 
 <details>
-<summary>🔽 Click to view more version info</summary>
+<summary>🔽 Click to view historical version details</summary>
+
+**v2.5 - Interface Logic Optimization**
+- ✨ **Smart Startup**: Auto-enter monitoring mode when portfolio data exists
+- 🎯 **One-click Access**: Main menu "Stock List" directly enters real-time monitoring
+- ⏪ **Multi-key Return**: Support ESC, Q, M keys for multiple return methods
+- 🧹 **Streamlined Menu**: Remove duplicate functions, cleaner menu
+- 💬 **Message Management**: Fix persistent success message issues
 
 **v2.4 - Stock Editing & Enhanced Stock List View**
 - ✅ New stock editing feature: Modify cost price and quantity of existing stocks through interactive interface

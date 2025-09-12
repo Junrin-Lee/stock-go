@@ -1,0 +1,11 @@
+system:
+    language: zh
+    auto_start: true
+    debug_mode: false
+display:
+    color_scheme: professional
+    decimal_places: 3
+    table_style: light
+update:
+    refresh_interval: 5
+    auto_update: true
