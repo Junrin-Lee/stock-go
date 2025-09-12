@@ -162,10 +162,12 @@ func (m *Model) handleMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.currentMenuItem > 0 {
 			m.currentMenuItem--
 		}
+		m.message = "" // 清除消息
 	case "down", "j", "s":
 		if m.currentMenuItem < len(m.menuItems)-1 {
 			m.currentMenuItem++
 		}
+		m.message = "" // 清除消息
 	case "enter", " ":
 		return m.executeMenuItem()
 	case "q", "ctrl+c":
