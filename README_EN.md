@@ -48,6 +48,10 @@ go build -o stock-go main.go
 ./stock-go
 ```
 
+**Initial Launch**:
+- If no local stock data exists, program shows main menu
+- If local stock data exists, program automatically enters monitoring mode with real-time updates
+
 ### 3. Operating Instructions
 
 **Keyboard Controls**:
@@ -57,20 +61,20 @@ go build -o stock-go main.go
 - `Ctrl+C` - Force quit program
 
 **Main Menu Options:**
-- `► View Stock List` - View detailed information of monitored stocks (with real-time P&L data)
+- `► Stock List` - Enter monitoring interface (real-time display of prices, P&L, and detailed data)
 - `  Add Stock` - Add new stock to portfolio
 - `  Edit Stock` - Modify cost price and quantity of existing stocks
 - `  Remove Stock` - Remove stock from portfolio  
-- `  Start Monitoring` - Launch real-time monitoring
 - `  Debug Mode: Off` - Toggle debug information display
 - `  Exit` - Save and exit program
 
-**View Stock List:**
-1. Use arrow keys to select "View Stock List" and press Enter
-2. System fetches real-time prices and displays detailed table containing: Serial Number, Stock Code, Stock Name, Current Price, Cost Price, Quantity, Today's Change, Daily P&L, Total P&L, P&L Rate, Market Value
-3. Smart color display: Red for profit/gain, green for loss/decline, white for neutral
-4. Shows portfolio summary data: Total Daily P&L, Total P&L, Total P&L Rate, Total Market Value
-5. Press ESC or Q to return to main menu
+**Stock Monitoring Interface:**
+1. Auto-enters on startup if stock data exists, or select "Stock List" from main menu
+2. System updates stock price data every 5 seconds, real-time display of 13-column detailed information
+3. Display content: Stock Code, Stock Name, Price, Open, High, Low, Cost, Quantity, Today's Change, Daily P&L, Total P&L, P&L Rate, Market Value
+4. Smart color display: Red for profit/gain, green for loss/decline, white for neutral
+5. Shows portfolio summary data: Total Daily P&L, Total P&L, Total P&L Rate, Total Market Value
+6. Press ESC, Q, or M to return to main menu
 
 **Add Stock (Real-time Input):**
 1. Use arrow keys to select "Add Stock" and press Enter
@@ -94,16 +98,11 @@ go build -o stock-go main.go
 2. Press Enter to confirm deletion
 3. Press ESC or Q to return to main menu
 
-**Start Monitoring:**
-1. Use arrow keys to select "Start Monitoring" and press Enter
-2. System updates data every 5 seconds automatically
-3. 13-column detailed display: Stock Code, Name, Price, Open, High, Low, Cost, Quantity, Today's Change, Daily P&L, Total P&L, P&L Rate, Market Value
-4. Today's change calculated based on opening price: (Current Price - Open Price) / Open Price × 100%
-5. Smart color system:
-   - Red: Profit/gain values (> 0.001)
-   - Green: Loss/decline values (< -0.001)
-   - White: Neutral values (≈ 0), such as 0% today's change, $0 daily P&L, etc.
-6. Press ESC or Q to return to main menu
+**Smart Color System:**
+- Red: Profit/gain values (> 0.001)
+- Green: Loss/decline values (< -0.001)
+- White: Neutral values (≈ 0), such as 0% today's change, $0 daily P&L, etc.
+- Today's change calculated based on previous close: (Current Price - Previous Close) / Previous Close × 100%
 
 **Debug Mode:**
 - Debug information is disabled in Bubble Tea mode (for clean interface)
@@ -194,6 +193,13 @@ If encountering stock data showing as 0 or unable to fetch:
 - **API failures**: System automatically generates mock data for demonstration
 
 ## Changelog
+
+**v2.5 - Interface Logic Optimization**
+- ✅ Smart startup: Auto-enters monitoring mode when stock data exists, improving user experience
+- ✅ Interface integration: Main menu "Stock List" directly enters monitoring interface, simplifying workflow
+- ✅ Enhanced navigation: Monitoring interface supports ESC, Q, and M keys for returning to main menu
+- ✅ Remove redundancy: Streamlined menu options, removed duplicate "View Stock List" functionality  
+- ✅ Message cleanup: Fixed issue of operation success messages displaying persistently
 
 **v2.4 - Stock Editing & Enhanced Stock List View**
 - ✅ New stock editing feature: Modify cost price and quantity of existing stocks through interactive interface
