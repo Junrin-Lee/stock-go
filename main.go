@@ -143,7 +143,8 @@ var texts = map[Language]TextMap{
 		"keyHelpWin":          "使用 W/S 键选择，回车确认，Q键退出",
 		"returnToMenu":        "ESC、Q键或M键返回主菜单",
 		"returnToMenuShort":   "ESC或Q键返回主菜单",
-		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票",
+		"returnEscOnly":       "ESC键返回",
+		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票，A键添加股票",
 		"watchlistHelp":       "ESC、Q键或M键返回主菜单，D键删除股票，S键搜索股票",
 		"monitoringTitle":     "=== 股票实时监控 ===",
 		"updateTime":          "更新时间(5s): %s",
@@ -182,7 +183,7 @@ var texts = map[Language]TextMap{
 		"searchTitle":         "=== 股票搜索 ===",
 		"enterSearch":         "请输入股票代码或名称: ",
 		"searchFormats":       "支持格式:\n• 中文名称: 贵州茅台, 苹果, 腾讯, 阿里巴巴 等\n• 中国股票: SH601138, 000001, SZ000002 等\n• 美股: AAPL, TSLA, MSFT 等\n• 港股: HK00700 等\n\n💡 提示: 中文检索成功率较低，建议优先使用股票代码检索",
-		"searchHelp":          "回车搜索，ESC或Q键返回主菜单",
+		"searchHelp":          "回车搜索，ESC键返回主菜单",
 		"searching":           "正在搜索股票信息...",
 		"searchNotFound":      "无法找到股票 %s 的信息，请检查输入是否正确",
 		"detailTitle":         "=== 股票详情信息 ===",
@@ -223,7 +224,8 @@ var texts = map[Language]TextMap{
 		"keyHelpWin":          "Use W/S keys to select, Enter to confirm, Q to exit",
 		"returnToMenu":        "ESC, Q or M to return to main menu",
 		"returnToMenuShort":   "ESC or Q to return to main menu",
-		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock",
+		"returnEscOnly":       "ESC to return",
+		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock, A to add stock",
 		"watchlistHelp":       "ESC, Q or M to return to main menu, D to delete stock, S to search stock",
 		"monitoringTitle":     "=== Real-time Stock Monitor ===",
 		"updateTime":          "Update Time(5s): %s",
@@ -262,7 +264,7 @@ var texts = map[Language]TextMap{
 		"searchTitle":         "=== Stock Search ===",
 		"enterSearch":         "Enter stock code or name: ",
 		"searchFormats":       "Supported formats:\n• Chinese names: 贵州茅台, Apple, Tencent, Alibaba, etc.\n• Chinese stocks: SH601138, 000001, SZ000002, etc.\n• US stocks: AAPL, TSLA, MSFT, etc.\n• Hong Kong stocks: HK00700, etc.\n\n💡 Tip: Chinese name searches have lower success rates, recommend using stock codes",
-		"searchHelp":          "Press Enter to search, ESC or Q to return to main menu",
+		"searchHelp":          "Press Enter to search, ESC to return to main menu",
 		"searching":           "Searching stock information...",
 		"searchNotFound":      "Unable to find information for stock %s, please check your input is correct",
 		"detailTitle":         "=== Stock Detail Information ===",
@@ -645,10 +647,16 @@ func (m *Model) viewMainMenu() string {
 
 func (m *Model) handleAddingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "q":
+	case "esc":
 		// 根据来源决定返回目标
 		if m.fromSearch {
-			m.state = SearchResultWithActions
+			// 从持股列表或搜索结果进入，返回相应页面
+			if m.previousState == Monitoring {
+				m.state = Monitoring
+				m.lastUpdate = time.Now()
+			} else {
+				m.state = SearchResultWithActions
+			}
 			m.fromSearch = false // 重置标志
 		} else {
 			m.state = MainMenu
@@ -677,19 +685,30 @@ func (m *Model) handleAddingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 	switch m.addingStep {
-	case 0: // 输入股票代码
+	case 0: // 搜索股票
 		if m.input == "" {
 			m.message = m.getText("codeRequired")
 			return m, nil
 		}
-		m.tempCode = m.input
-		m.message = m.getText("fetchingInfo")
-		m.stockInfo = getStockInfo(m.input)
-		if m.stockInfo == nil || m.stockInfo.Name == "" {
-			m.message = fmt.Sprintf(m.getText("stockNotFound"), m.input)
+		m.message = m.getText("searching")
+
+		// 使用搜索功能
+		var stockData *StockData
+		if containsChineseChars(m.input) {
+			stockData = searchChineseStock(m.input)
+		} else {
+			stockData = getStockPrice(m.input)
+		}
+
+		if stockData == nil || stockData.Name == "" {
+			m.message = fmt.Sprintf(m.getText("searchNotFound"), m.input)
 			m.input = ""
 			return m, nil
 		}
+
+		// 保存搜索结果并转到输入成本价步骤
+		m.stockInfo = stockData
+		m.tempCode = stockData.Symbol
 		m.addingStep = 1
 		m.input = ""
 		m.message = ""
@@ -760,8 +779,8 @@ func (m *Model) viewAddingStock() string {
 
 	switch m.addingStep {
 	case 0:
-		s += m.getText("enterCode") + m.input + "_\n"
-		s += "\n" + m.getText("codeFormat") + "\n"
+		s += m.getText("enterSearch") + m.input + "_\n"
+		s += "\n" + m.getText("searchFormats") + "\n"
 	case 1:
 		s += fmt.Sprintf(m.getText("stockCode"), m.tempCode) + "\n"
 		s += fmt.Sprintf(m.getText("stockName"), m.stockInfo.Name) + "\n"
@@ -775,7 +794,7 @@ func (m *Model) viewAddingStock() string {
 		s += m.getText("enterQuantity") + m.input + "_\n"
 	}
 
-	s += "\n" + m.getText("returnToMenuShort") + "\n"
+	s += "\n" + m.getText("returnEscOnly") + "\n"
 
 	if m.message != "" {
 		s += "\n" + m.message + "\n"
@@ -875,6 +894,20 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.message = ""
 		return m, nil
+	case "a":
+		// 跳转到添加股票页面
+		m.logUserAction("从持股列表跳转到添加股票页面")
+		m.previousState = m.state // 记录当前状态
+		m.state = AddingStock
+		m.addingStep = 0
+		m.tempCode = ""
+		m.tempCost = ""
+		m.tempQuantity = ""
+		m.stockInfo = nil
+		m.input = ""
+		m.message = ""
+		m.fromSearch = true // 设置标志，表示从持股列表进入，完成后应该回到监控页面
+		return m, nil
 	}
 	return m, nil
 }
@@ -896,14 +929,14 @@ func (m *Model) viewMonitoring() string {
 
 	// 获取本地化的表头
 	if m.language == Chinese {
-		t.AppendHeader(table.Row{"代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "成本价", "持股数", "今日涨幅", "当日盈亏", "总盈亏", "盈亏率", "市值"})
+		t.AppendHeader(table.Row{"代码", "名称", "昨收价", "现价", "成本价", "开盘", "最高", "最低", "持股数", "今日涨幅", "今日盈亏", "持仓盈亏", "盈亏率", "市值"})
 	} else {
-		t.AppendHeader(table.Row{"Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Cost", "Quantity", "Today%", "DailyP&L", "TotalP&L", "P&LRate", "Value"})
+		t.AppendHeader(table.Row{"Code", "Name", "PrevClose", "Price", "Cost", "Open", "High", "Low", "Quantity", "Today%", "TodayP&L", "PositionP&L", "P&LRate", "Value"})
 	}
 
 	var totalMarketValue float64
 	var totalCost float64
-	var totalDailyProfit float64
+	var totalTodayProfit float64
 
 	for i := range m.portfolio.Stocks {
 		stock := &m.portfolio.Stocks[i]
@@ -920,8 +953,10 @@ func (m *Model) viewMonitoring() string {
 		}
 
 		if stock.Price > 0 {
-			dailyProfit := stock.Change * float64(stock.Quantity)
-			totalProfit := (stock.Price - stock.CostPrice) * float64(stock.Quantity)
+			// 今日盈亏：今日价格变化带来的盈亏 = (现价 - 昨收价) × 持股数
+			todayProfit := stock.Change * float64(stock.Quantity)
+			// 持仓盈亏：基于成本价的实时盈亏状态
+			positionProfit := (stock.Price - stock.CostPrice) * float64(stock.Quantity)
 			profitRate := ((stock.Price - stock.CostPrice) / stock.CostPrice) * 100
 			marketValue := stock.Price * float64(stock.Quantity)
 			cost := stock.CostPrice * float64(stock.Quantity)
@@ -937,26 +972,26 @@ func (m *Model) viewMonitoring() string {
 
 			totalMarketValue += marketValue
 			totalCost += cost
-			totalDailyProfit += dailyProfit
+			totalTodayProfit += todayProfit
 
 			// 使用多语言颜色显示函数
-			dailyProfitStr := m.formatProfitWithColorZeroLang(dailyProfit)
-			totalProfitStr := m.formatProfitWithColorZeroLang(totalProfit)
+			todayProfitStr := m.formatProfitWithColorZeroLang(todayProfit)
+			positionProfitStr := m.formatProfitWithColorZeroLang(positionProfit)
 			profitRateStr := m.formatProfitRateWithColorZeroLang(profitRate)
 
 			t.AppendRow(table.Row{
 				stock.Code,
 				stock.Name,
-				m.formatPriceWithColorLang(stock.Price, stock.PrevClose),
-				fmt.Sprintf("%.3f", stock.PrevClose),
-				m.formatPriceWithColorLang(stock.StartPrice, stock.PrevClose),
-				m.formatPriceWithColorLang(stock.MaxPrice, stock.PrevClose),
-				m.formatPriceWithColorLang(stock.MinPrice, stock.PrevClose),
-				m.formatPriceWithColorLang(stock.CostPrice, stock.PrevClose),
+				fmt.Sprintf("%.3f", stock.PrevClose), // 昨收价（无颜色）
+				m.formatPriceWithColorLang(stock.Price, stock.PrevClose),      // 现价（有颜色）
+				fmt.Sprintf("%.3f", stock.CostPrice),                          // 成本价（无颜色）
+				m.formatPriceWithColorLang(stock.StartPrice, stock.PrevClose), // 开盘
+				m.formatPriceWithColorLang(stock.MaxPrice, stock.PrevClose),   // 最高
+				m.formatPriceWithColorLang(stock.MinPrice, stock.PrevClose),   // 最低
 				stock.Quantity,
 				todayChangeStr,
-				dailyProfitStr,
-				totalProfitStr,
+				todayProfitStr,    // 今日盈亏（基于今日价格变化）
+				positionProfitStr, // 持仓盈亏（基于成本价）
 				profitRateStr,
 				fmt.Sprintf("%.2f", marketValue),
 			})
@@ -998,20 +1033,20 @@ func (m *Model) viewMonitoring() string {
 
 	t.AppendSeparator()
 	t.AppendRow(table.Row{
-		"",
-		m.getText("total"),
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		m.formatProfitWithColorLang(totalDailyProfit),
-		m.formatProfitWithColorLang(totalPortfolioProfit),
-		m.formatProfitRateWithColorLang(totalProfitRate),
-		fmt.Sprintf("%.2f", totalMarketValue),
+		"",                 // 代码
+		m.getText("total"), // 名称 -> 总计
+		"",                 // 昨收价
+		"",                 // 现价
+		"",                 // 成本价
+		"",                 // 开盘
+		"",                 // 最高
+		"",                 // 最低
+		"",                 // 持股数
+		"",                 // 今日涨幅
+		m.formatProfitWithColorLang(totalTodayProfit),     // 今日盈亏（总今日盈亏）
+		m.formatProfitWithColorLang(totalPortfolioProfit), // 持仓盈亏（总持仓盈亏）
+		m.formatProfitRateWithColorLang(totalProfitRate),  // 盈亏率（总盈亏率）
+		fmt.Sprintf("%.2f", totalMarketValue),             // 市值（总市值）
 	})
 
 	s += t.Render() + "\n"
@@ -2284,7 +2319,7 @@ func (m *Model) viewEditingStock() string {
 
 func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "q":
+	case "esc":
 		m.state = MainMenu
 		m.message = ""
 		return m, nil
@@ -2325,7 +2360,7 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleSearchResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "q":
+	case "esc":
 		m.state = MainMenu
 		m.message = ""
 		return m, nil
@@ -2628,7 +2663,7 @@ func (m *Model) removeFromWatchlist(index int) {
 
 func (m *Model) handleSearchResultWithActions(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "q":
+	case "esc":
 		m.state = MainMenu
 		m.message = ""
 		return m, nil

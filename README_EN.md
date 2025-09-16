@@ -9,12 +9,10 @@
 
 Stock Monitor is a command-line terminal stock monitoring tool designed for investors.
 
-**🚀 Current Version: v4.1** - Watchlist Enhancement and User Experience Optimization Update
-
 ### 🎯 Core Features
 
 - **🔄 Real-time Monitoring** - 5-second interval automatic price refresh, capture every trading moment
-- **📊 Professional Analysis** - 13-column detailed data display including OHLC, P&L analysis, and market value statistics
+- **📊 Professional Analysis** - 14-column detailed data display including OHLC, today's P&L, position P&L, P&L rate analysis, and market value statistics
 - **🎨 Smart Display** - Professional stock software color standards: red for gains, green for losses, white for neutral
 - **💼 Portfolio Management** - Complete position management with add, edit, and delete stock operations
 - **🌐 Global Markets** - Support for A-shares, US stocks, Hong Kong stocks and other major market code formats
@@ -32,7 +30,7 @@ Stock Monitor is a command-line terminal stock monitoring tool designed for inve
 - **Auto Updates**: Refresh stock price data every 5 seconds
 - **Multi-dimensional Data**: Current price, open price, high price, low price, previous close
 - **Change Analysis**: Precise change percentage based on previous close
-- **P&L Statistics**: Real-time calculation of daily P&L, total P&L, and P&L rate
+- **P&L Statistics**: Real-time calculation of today's P&L, position P&L, and P&L rate
 
 ### 💼 Portfolio Management
 - **Stock Search**: Support stock code or Chinese name search ⭐ v4.0 Perfect Fix
@@ -44,7 +42,7 @@ Stock Monitor is a command-line terminal stock monitoring tool designed for inve
 - Professional table layout using go-pretty library
 - Perfect Chinese character width alignment
 - Smart color system: red (profit/gain), green (loss/decline), white (neutral)
-- 13-column detailed data display covering all key investment indicators
+- 14-column detailed data display covering all key investment indicators
 
 ## 🚀 Quick Start
 
@@ -200,9 +198,9 @@ Once in monitoring mode, the system displays professional stock data tables:
 === Real-time Stock Monitor ===
 Update Time(5s): 2024-01-01 15:30:25
 
-| Code | Name | Price | PrevClose | Open | High | Low | Cost | Quantity | Today% | DailyP&L | TotalP&L | P&LRate | Value |
-|------|------|-------|-----------|------|------|-----|------|----------|--------|----------|----------|---------|-------|
-| SH601138 | Industrial | 61.900 | 59.040 | 58.880 | 63.100 | 58.030 | 47.963 | 400 | +4.84% | +1144.00 | +5574.80 | +29.19% | 24760.00 |
+| Code | Name | PrevClose | Price | Cost | Open | High | Low | Quantity | Today% | TodayP&L | PositionP&L | P&LRate | Value |
+|------|------|-----------|-------|------|------|------|------|----------|--------|----------|-------------|---------|-------|
+| SH601138 | Industrial | 59.040 | 61.900 | 47.963 | 58.880 | 63.100 | 58.030 | 400 | +4.84% | +1144.00 | +5574.80 | +29.19% | 24760.00 |
 
 ESC, Q or M to return to main menu
 
@@ -508,12 +506,52 @@ System adopts professional stock software color standards:
 ### 📊 Precise Calculations
 
 - **Today's Change**: Based on previous close `(Current Price - Previous Close) / Previous Close × 100%`
-- **P&L Statistics**: Real-time calculation of daily P&L, total P&L, P&L rate
+- **P&L Statistics**: Real-time calculation of today's P&L, position P&L, P&L rate
 - **Market Value**: Current Price × Share Quantity
 
 ## 📈 Version History
 
-### 🌟 v4.1 - Watchlist Enhancement and User Experience Optimization 🚀 **Feature Update**
+### 🌟 v4.2 - Portfolio Data Optimization and P&L Analysis Enhancement 🚀 **Data Optimization Update**
+
+**📊 P&L Calculation Logic Optimization**:
+- ✅ **Position P&L Correction**: Fixed position P&L calculation logic to ensure correct display based on cost price
+- ✅ **Today's P&L Addition**: Added "Today's P&L" column showing P&L amount from daily price changes
+- ✅ **Enhanced P&L Analysis**: Provides three-dimensional analysis: Today's Change% (percentage), Today's P&L (amount), Position P&L (total P&L)
+
+**📋 Table Layout Optimization**:
+- ✅ **Header Order Adjustment**: Optimized to logical sequence `PrevClose | Price | Cost` for better price comparison
+- ✅ **Cost Price Display Optimization**: Removed color display from cost price column as neutral reference price
+- ✅ **Data Column Expansion**: Portfolio expanded from 13 to 14 columns providing more detailed P&L analysis
+
+**🧮 Calculation Formula Enhancement**:
+- ✅ **Today's P&L**: `(Current Price - Previous Close) × Quantity` - reflects P&L from daily price changes
+- ✅ **Position P&L**: `(Current Price - Cost Price) × Quantity` - reflects overall investment P&L status
+- ✅ **P&L Rate**: `(Current Price - Cost Price) / Cost Price × 100%` - investment return rate
+
+**🎯 User Experience Enhancement**:
+- 🔧 **Data Alignment Correction**: Fixed total row data misalignment issues, ensuring correct column data correspondence
+- 📱 **Display Logic Optimization**: Simplified redundant data columns, highlighted core P&L indicators
+- 🌈 **Rational Color Display**: Cost price no longer displays color, highlighting price change importance
+
+**📋 Current Portfolio Display**:
+```
+Code | Name | PrevClose | Price | Cost | Open | High | Low | Quantity | Today% | TodayP&L | PositionP&L | P&LRate | Value
+```
+
+**💡 Example Illustration** (ZhaoWei Motor):
+- Current Price: 142.47, Cost Price: 145.962, Previous Close: 137.19
+- Today's Change: +3.85% (price change relative to yesterday)
+- Today's P&L: +528 yuan (profit from today's price change)
+- Position P&L: -349.2 yuan (still in loss relative to cost price)
+
+---
+
+### 📅 Historical Versions
+
+<details>
+<summary>🔽 Click to view historical version details</summary>
+
+**🌟 v4.1 - Watchlist Enhancement and User Experience Optimization 🚀**
 
 **📊 Watchlist Data Enhancement**:
 - ✅ **Removed Change Amount Display**: Simplified watchlist interface by removing redundant change amount column
@@ -530,33 +568,6 @@ System adopts professional stock software color standards:
 - ✅ **Configurable Startup Module**: New `startup_module` configuration option to choose which module to enter on startup
 - ✅ **Portfolio Mode**: Configure `startup_module: "portfolio"` to prioritize entering holdings monitoring page on startup
 - ✅ **Watchlist Mode**: Configure `startup_module: "watchlist"` to prioritize entering watchlist viewing page on startup
-- ✅ **Smart Startup Logic**: Automatically select the most suitable startup page based on configuration and data availability
-
-**🎯 User Experience Improvements**:
-- 🔧 **Configuration Template Update**: `config_demo.yaml` added startup module configuration instructions
-- 📱 **Interface Consistency**: Ensure consistent functionality and interaction experience between watchlist and holdings list
-- 🌐 **Complete Multi-language Support**: All new features support both Chinese and English interfaces
-
-**📋 Current Watchlist Display**:
-```
-Code | Name | Price | PrevClose | Open | High | Low | Today% | Turnover | Volume
-```
-
-**⚙️ Configuration Example**:
-```yaml
-system:
-    language: en
-    auto_start: true
-    startup_module: watchlist  # Start with watchlist module
-    debug_mode: false
-```
-
----
-
-### 📅 Historical Versions
-
-<details>
-<summary>🔽 Click to view historical version details</summary>
 
 **🎉 v4.0 - Chinese Stock Search Core Fix 🚀**
 
