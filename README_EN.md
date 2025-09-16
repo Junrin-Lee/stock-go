@@ -68,12 +68,12 @@ go mod download
 
 #### 3️⃣ Build Program
 ```bash
-go build -o stock-monitor main.go
+go build -o cmd/stock-monitor main.go
 ```
 
 #### 4️⃣ Run Program
 ```bash
-./stock-monitor
+./cmd/stock-monitor
 ```
 
 ### 🎮 User Guide

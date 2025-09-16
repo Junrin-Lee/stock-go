@@ -68,12 +68,12 @@ go mod download
 
 #### 3️⃣ 编译程序
 ```bash
-go build -o stock-monitor main.go
+go build -o cmd/stock-monitor main.go
 ```
 
 #### 4️⃣ 运行程序
 ```bash
-./stock-monitor
+./cmd/stock-monitor
 ```
 
 ### 🎮 操作指南
