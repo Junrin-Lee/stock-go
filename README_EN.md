@@ -9,7 +9,7 @@
 
 Stock Monitor is a command-line terminal stock monitoring tool designed for investors.
 
-**🚀 Current Version: v4.0** - Chinese Stock Search Core Fix Major Update
+**🚀 Current Version: v4.1** - Watchlist Enhancement and User Experience Optimization Update
 
 ### 🎯 Core Features
 
@@ -117,6 +117,7 @@ The system provides a `config.yaml` configuration file that users can edit to cu
 |---------|---------|-------------|-----------------|
 | `system.language` | `"en"` | Default system language | `"zh"` (Chinese), `"en"` (English) |
 | `system.auto_start` | `true` | Auto enter monitoring mode when data exists | `true`, `false` |
+| `system.startup_module` | `"portfolio"` | Default module to enter on startup ⭐ v4.1 New | `"portfolio"` (holdings), `"watchlist"` (favorites) |
 | `system.debug_mode` | `false` | Debug mode switch | `true`, `false` |
 | `display.color_scheme` | `"professional"` | Color scheme | `"professional"`, `"simple"` |
 | `display.decimal_places` | `3` | Price decimal places | `1-4` |
@@ -153,7 +154,7 @@ The watchlist module is a stock watch list that allows you to quickly view real-
 #### 🎯 Key Features
 - **Quick Watch**: One-click addition to watchlist after stock search
 - **Real-time Refresh**: Automatically update watchlist real-time market data every 5 seconds ⭐ New
-- **Complete Data**: Display 9-column detailed market data for watchlist stocks
+- **Complete Data**: Display 10-column detailed market data for watchlist stocks (including turnover rate and volume)
 - **Flexible Management**: Support adding and deleting watchlist stocks
 - **Independent Storage**: Watchlist and portfolio are managed separately
 
@@ -177,6 +178,11 @@ Main Menu → Watchlist → Real-time view of all watchlist stocks (auto-refresh
 **4. Delete from Watchlist**
 ```
 Watchlist page → Press "D" key → Select stock to delete → Confirm deletion
+```
+
+**5. Quick Search New Stock** ⭐ v4.1 New
+```
+Watchlist page → Press "S" key → Direct jump to stock search page
 ```
 
 #### 🔄 New Search Result Actions
@@ -507,7 +513,52 @@ System adopts professional stock software color standards:
 
 ## 📈 Version History
 
-### 🎉 v4.0 - Chinese Stock Search Core Fix 🚀 **Major Update**
+### 🌟 v4.1 - Watchlist Enhancement and User Experience Optimization 🚀 **Feature Update**
+
+**📊 Watchlist Data Enhancement**:
+- ✅ **Removed Change Amount Display**: Simplified watchlist interface by removing redundant change amount column
+- ✅ **Added Turnover Rate Display**: New turnover rate column in watchlist showing stock liquidity indicators
+- ✅ **Added Volume Display**: New volume column in watchlist with intelligent formatting (billion, million, thousand units)
+- ✅ **Data Column Optimization**: Expanded watchlist from 8 to 10 columns for more comprehensive market data
+
+**⌨️ Shortcut Operation Enhancement**:
+- ✅ **S-Key Quick Search**: Watchlist interface now supports pressing S key to directly jump to stock search function
+- ✅ **Multi-language Shortcut Tips**: Chinese and English interfaces automatically display corresponding shortcut key instructions
+- ✅ **Seamless Operation Experience**: No need to return to main menu, directly search new stocks from watchlist
+
+**⚙️ Startup Module Configuration**:
+- ✅ **Configurable Startup Module**: New `startup_module` configuration option to choose which module to enter on startup
+- ✅ **Portfolio Mode**: Configure `startup_module: "portfolio"` to prioritize entering holdings monitoring page on startup
+- ✅ **Watchlist Mode**: Configure `startup_module: "watchlist"` to prioritize entering watchlist viewing page on startup
+- ✅ **Smart Startup Logic**: Automatically select the most suitable startup page based on configuration and data availability
+
+**🎯 User Experience Improvements**:
+- 🔧 **Configuration Template Update**: `config_demo.yaml` added startup module configuration instructions
+- 📱 **Interface Consistency**: Ensure consistent functionality and interaction experience between watchlist and holdings list
+- 🌐 **Complete Multi-language Support**: All new features support both Chinese and English interfaces
+
+**📋 Current Watchlist Display**:
+```
+Code | Name | Price | PrevClose | Open | High | Low | Today% | Turnover | Volume
+```
+
+**⚙️ Configuration Example**:
+```yaml
+system:
+    language: en
+    auto_start: true
+    startup_module: watchlist  # Start with watchlist module
+    debug_mode: false
+```
+
+---
+
+### 📅 Historical Versions
+
+<details>
+<summary>🔽 Click to view historical version details</summary>
+
+**🎉 v4.0 - Chinese Stock Search Core Fix 🚀**
 
 **🔧 Core Issues Fixed**:
 - ✅ **HTTP Headers Enhancement**: Added complete browser headers for Tencent search API and price API, resolving API access permission issues
@@ -533,16 +584,6 @@ System adopts professional stock software color standards:
 - ✅ 恒生科技 (Hang Seng Tech) → SH513180 ✅ Price retrieval successful  
 - ✅ 比亚迪 (BYD) → SZ002594 ✅ Price retrieval successful
 - ✅ 腾讯 (Tencent) → SH000847 ✅ Price retrieval successful
-
-**⚠️ Important Note**:
-This version fix is a critical improvement to the system's core functionality. All users are recommended to update immediately for the best Chinese stock search experience.
-
----
-
-### 📅 Historical Versions
-
-<details>
-<summary>🔽 Click to view historical version details</summary>
 
 **v3.1 - Watchlist Feature Major Update**
 
