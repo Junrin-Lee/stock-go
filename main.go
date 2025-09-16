@@ -72,9 +72,9 @@ type Config struct {
 }
 
 type SystemConfig struct {
-	Language    string `yaml:"language"`    // 默认语言 "zh" 或 "en"
-	AutoStart   bool   `yaml:"auto_start"`  // 有数据时自动进入监控模式
-	DebugMode   bool   `yaml:"debug_mode"`  // 调试模式开关
+	Language  string `yaml:"language"`   // 默认语言 "zh" 或 "en"
+	AutoStart bool   `yaml:"auto_start"` // 有数据时自动进入监控模式
+	DebugMode bool   `yaml:"debug_mode"` // 调试模式开关
 }
 
 type DisplayConfig struct {
@@ -124,162 +124,162 @@ type TextMap map[string]string
 // 语言文本映射
 var texts = map[Language]TextMap{
 	Chinese: {
-		"title":             "=== 股票监控系统 ===",
-		"stockList":         "持股列表",
-		"watchlist":         "自选股票",
-		"stockSearch":       "股票搜索",
-		"addStock":          "添加股票",
-		"editStock":         "修改股票",
-		"removeStock":       "删除股票",
-		"debugMode":         "调试模式",
-		"language":          "语言",
-		"exit":              "退出",
-		"on":                "开启",
-		"off":               "关闭",
-		"chinese":           "中文",
-		"english":           "English",
-		"keyHelp":           "使用方向键 ↑↓ 或 W/S 键选择，回车/空格确认，Q键退出",
-		"keyHelpWin":        "使用 W/S 键选择，回车确认，Q键退出",
-		"returnToMenu":      "ESC、Q键或M键返回主菜单",
-		"returnToMenuShort": "ESC或Q键返回主菜单",
-		"holdingsHelp":      "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票",
-		"monitoringTitle":   "=== 股票实时监控 ===",
-		"updateTime":        "更新时间(5s): %s",
-		"emptyPortfolio":    "投资组合为空",
-		"addStockFirst":     "请先添加股票到投资组合",
-		"total":             "总计",
-		"addingTitle":       "=== 添加股票 ===",
-		"enterCode":         "请输入股票代码: ",
-		"enterCost":         "请输入成本价: ",
-		"enterQuantity":     "请输入股票数量: ",
-		"codeFormat":        "支持格式: SH601138, 000001, AAPL 等",
-		"stockCode":         "股票代码: %s",
-		"stockName":         "股票名称: %s",
-		"currentPrice":      "当前价格: %.3f",
-		"costPrice":         "成本价: %s",
-		"codeRequired":      "股票代码不能为空",
-		"costRequired":      "成本价不能为空",
-		"quantityRequired":  "数量不能为空",
-		"invalidPrice":      "无效的价格格式",
-		"invalidQuantity":   "无效的数量格式",
-		"fetchingInfo":      "正在获取股票信息...",
-		"stockNotFound":     "无法获取股票 %s 的信息，请检查股票代码是否正确",
-		"addSuccess":        "成功添加股票: %s (%s)",
-		"removeTitle":       "=== 删除股票 ===",
-		"selectToRemove":    "选择要删除的股票:",
-		"navHelp":           "使用方向键选择，回车确认，ESC或Q键返回",
-		"removeSuccess":     "成功删除股票: %s (%s)",
-		"editTitle":         "=== 修改股票 ===",
-		"selectToEdit":      "选择要修改的股票:",
-		"currentCost":       "当前成本价: %.3f",
-		"enterNewCost":      "请输入新的成本价: ",
-		"newCost":           "新成本价: %.3f",
-		"currentQuantity":   "当前数量: %d",
-		"enterNewQuantity":  "请输入新的数量: ",
-		"editSuccess":       "成功修改股票 %s 的成本价和数量",
-		"searchTitle":       "=== 股票搜索 ===",
-		"enterSearch":       "请输入股票代码或名称: ",
-		"searchFormats":     "支持格式:\n• 中文名称: 贵州茅台, 苹果, 腾讯, 阿里巴巴 等\n• 中国股票: SH601138, 000001, SZ000002 等\n• 美股: AAPL, TSLA, MSFT 等\n• 港股: HK00700 等\n\n💡 提示: 中文检索成功率较低，建议优先使用股票代码检索",
-		"searchHelp":        "回车搜索，ESC或Q键返回主菜单",
-		"searching":         "正在搜索股票信息...",
-		"searchNotFound":    "无法找到股票 %s 的信息，请检查输入是否正确",
-		"detailTitle":       "=== 股票详情信息 ===",
-		"noInfo":            "未找到股票信息",
-		"detailHelp":        "ESC或Q键返回主菜单，R键重新搜索",
-		"emptyCannotEdit":   "投资组合为空，无法修改股票",
-		"languageTitle":     "=== 语言选择 ===",
-		"selectLanguage":    "请选择您的语言:",
-		"languageHelp":      "使用方向键选择，回车确认，ESC或Q键返回主菜单",
-		"watchlistTitle":    "=== 自选股票 ===",
-		"emptyWatchlist":    "自选列表为空",
-		"addToWatchFirst":   "请先添加股票到自选列表",
-		"removeFromWatch":   "从自选列表删除",
+		"title":               "=== 股票监控系统 ===",
+		"stockList":           "持股列表",
+		"watchlist":           "自选股票",
+		"stockSearch":         "股票搜索",
+		"addStock":            "添加股票",
+		"editStock":           "修改股票",
+		"removeStock":         "删除股票",
+		"debugMode":           "调试模式",
+		"language":            "语言",
+		"exit":                "退出",
+		"on":                  "开启",
+		"off":                 "关闭",
+		"chinese":             "中文",
+		"english":             "English",
+		"keyHelp":             "使用方向键 ↑↓ 或 W/S 键选择，回车/空格确认，Q键退出",
+		"keyHelpWin":          "使用 W/S 键选择，回车确认，Q键退出",
+		"returnToMenu":        "ESC、Q键或M键返回主菜单",
+		"returnToMenuShort":   "ESC或Q键返回主菜单",
+		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票",
+		"monitoringTitle":     "=== 股票实时监控 ===",
+		"updateTime":          "更新时间(5s): %s",
+		"emptyPortfolio":      "投资组合为空",
+		"addStockFirst":       "请先添加股票到投资组合",
+		"total":               "总计",
+		"addingTitle":         "=== 添加股票 ===",
+		"enterCode":           "请输入股票代码: ",
+		"enterCost":           "请输入成本价: ",
+		"enterQuantity":       "请输入股票数量: ",
+		"codeFormat":          "支持格式: SH601138, 000001, AAPL 等",
+		"stockCode":           "股票代码: %s",
+		"stockName":           "股票名称: %s",
+		"currentPrice":        "当前价格: %.3f",
+		"costPrice":           "成本价: %s",
+		"codeRequired":        "股票代码不能为空",
+		"costRequired":        "成本价不能为空",
+		"quantityRequired":    "数量不能为空",
+		"invalidPrice":        "无效的价格格式",
+		"invalidQuantity":     "无效的数量格式",
+		"fetchingInfo":        "正在获取股票信息...",
+		"stockNotFound":       "无法获取股票 %s 的信息，请检查股票代码是否正确",
+		"addSuccess":          "成功添加股票: %s (%s)",
+		"removeTitle":         "=== 删除股票 ===",
+		"selectToRemove":      "选择要删除的股票:",
+		"navHelp":             "使用方向键选择，回车确认，ESC或Q键返回",
+		"removeSuccess":       "成功删除股票: %s (%s)",
+		"editTitle":           "=== 修改股票 ===",
+		"selectToEdit":        "选择要修改的股票:",
+		"currentCost":         "当前成本价: %.3f",
+		"enterNewCost":        "请输入新的成本价: ",
+		"newCost":             "新成本价: %.3f",
+		"currentQuantity":     "当前数量: %d",
+		"enterNewQuantity":    "请输入新的数量: ",
+		"editSuccess":         "成功修改股票 %s 的成本价和数量",
+		"searchTitle":         "=== 股票搜索 ===",
+		"enterSearch":         "请输入股票代码或名称: ",
+		"searchFormats":       "支持格式:\n• 中文名称: 贵州茅台, 苹果, 腾讯, 阿里巴巴 等\n• 中国股票: SH601138, 000001, SZ000002 等\n• 美股: AAPL, TSLA, MSFT 等\n• 港股: HK00700 等\n\n💡 提示: 中文检索成功率较低，建议优先使用股票代码检索",
+		"searchHelp":          "回车搜索，ESC或Q键返回主菜单",
+		"searching":           "正在搜索股票信息...",
+		"searchNotFound":      "无法找到股票 %s 的信息，请检查输入是否正确",
+		"detailTitle":         "=== 股票详情信息 ===",
+		"noInfo":              "未找到股票信息",
+		"detailHelp":          "ESC或Q键返回主菜单，R键重新搜索",
+		"emptyCannotEdit":     "投资组合为空，无法修改股票",
+		"languageTitle":       "=== 语言选择 ===",
+		"selectLanguage":      "请选择您的语言:",
+		"languageHelp":        "使用方向键选择，回车确认，ESC或Q键返回主菜单",
+		"watchlistTitle":      "=== 自选股票 ===",
+		"emptyWatchlist":      "自选列表为空",
+		"addToWatchFirst":     "请先添加股票到自选列表",
+		"removeFromWatch":     "从自选列表删除",
 		"selectToRemoveWatch": "选择要从自选列表删除的股票:",
-		"removeWatchSuccess": "成功从自选列表删除股票: %s (%s)",
-		"addToWatchlist":    "添加到自选",
-		"addToPortfolio":    "添加到持股列表",
-		"addWatchSuccess":   "成功添加到自选列表: %s (%s)",
-		"alreadyInWatch":    "股票 %s 已在自选列表中",
-		"actionHelp":        "1-添加到自选, 2-添加到持股列表, ESC或Q键返回主菜单, R键重新搜索",
+		"removeWatchSuccess":  "成功从自选列表删除股票: %s (%s)",
+		"addToWatchlist":      "添加到自选",
+		"addToPortfolio":      "添加到持股列表",
+		"addWatchSuccess":     "成功添加到自选列表: %s (%s)",
+		"alreadyInWatch":      "股票 %s 已在自选列表中",
+		"actionHelp":          "1-添加到自选, 2-添加到持股列表, ESC或Q键返回主菜单, R键重新搜索",
 	},
 	English: {
-		"title":             "=== Stock Monitor System ===",
-		"stockList":         "Holdings",
-		"watchlist":         "Watchlist",
-		"stockSearch":       "Stock Search",
-		"addStock":          "Add Stock",
-		"editStock":         "Edit Stock",
-		"removeStock":       "Remove Stock",
-		"debugMode":         "Debug Mode",
-		"language":          "Language",
-		"exit":              "Exit",
-		"on":                "On",
-		"off":               "Off",
-		"chinese":           "中文",
-		"english":           "English",
-		"keyHelp":           "Use arrow keys ↑↓ or W/S to select, Enter/Space to confirm, Q to exit",
-		"keyHelpWin":        "Use W/S keys to select, Enter to confirm, Q to exit",
-		"returnToMenu":      "ESC, Q or M to return to main menu",
-		"returnToMenuShort": "ESC or Q to return to main menu",
-		"holdingsHelp":      "ESC, Q or M to return to main menu, E to edit stock, D to delete stock",
-		"monitoringTitle":   "=== Real-time Stock Monitor ===",
-		"updateTime":        "Update Time(5s): %s",
-		"emptyPortfolio":    "Portfolio is empty",
-		"addStockFirst":     "Please add stocks to your portfolio first",
-		"total":             "Total",
-		"addingTitle":       "=== Add Stock ===",
-		"enterCode":         "Enter stock code: ",
-		"enterCost":         "Enter cost price: ",
-		"enterQuantity":     "Enter quantity: ",
-		"codeFormat":        "Supported formats: SH601138, 000001, AAPL, etc.",
-		"stockCode":         "Stock Code: %s",
-		"stockName":         "Stock Name: %s",
-		"currentPrice":      "Current Price: %.3f",
-		"costPrice":         "Cost Price: %s",
-		"codeRequired":      "Stock code cannot be empty",
-		"costRequired":      "Cost price cannot be empty",
-		"quantityRequired":  "Quantity cannot be empty",
-		"invalidPrice":      "Invalid price format",
-		"invalidQuantity":   "Invalid quantity format",
-		"fetchingInfo":      "Fetching stock information...",
-		"stockNotFound":     "Unable to get information for stock %s, please check the code is correct",
-		"addSuccess":        "Successfully added stock: %s (%s)",
-		"removeTitle":       "=== Remove Stock ===",
-		"selectToRemove":    "Select stock to remove:",
-		"navHelp":           "Use arrow keys to select, Enter to confirm, ESC or Q to return",
-		"removeSuccess":     "Successfully removed stock: %s (%s)",
-		"editTitle":         "=== Edit Stock ===",
-		"selectToEdit":      "Select stock to edit:",
-		"currentCost":       "Current cost price: %.3f",
-		"enterNewCost":      "Enter new cost price: ",
-		"newCost":           "New cost price: %.3f",
-		"currentQuantity":   "Current quantity: %d",
-		"enterNewQuantity":  "Enter new quantity: ",
-		"editSuccess":       "Successfully edited stock %s cost price and quantity",
-		"searchTitle":       "=== Stock Search ===",
-		"enterSearch":       "Enter stock code or name: ",
-		"searchFormats":     "Supported formats:\n• Chinese names: 贵州茅台, Apple, Tencent, Alibaba, etc.\n• Chinese stocks: SH601138, 000001, SZ000002, etc.\n• US stocks: AAPL, TSLA, MSFT, etc.\n• Hong Kong stocks: HK00700, etc.\n\n💡 Tip: Chinese name searches have lower success rates, recommend using stock codes",
-		"searchHelp":        "Press Enter to search, ESC or Q to return to main menu",
-		"searching":         "Searching stock information...",
-		"searchNotFound":    "Unable to find information for stock %s, please check your input is correct",
-		"detailTitle":       "=== Stock Detail Information ===",
-		"noInfo":            "No stock information found",
-		"detailHelp":        "ESC or Q to return to main menu, R to search again",
-		"emptyCannotEdit":   "Portfolio is empty, cannot edit stocks",
-		"languageTitle":     "=== Language Selection ===",
-		"selectLanguage":    "Please select your language:",
-		"languageHelp":      "Use arrow keys to select, Enter to confirm, ESC or Q to return to main menu",
-		"watchlistTitle":    "=== Watchlist ===",
-		"emptyWatchlist":    "Watchlist is empty",
-		"addToWatchFirst":   "Please add stocks to your watchlist first",
-		"removeFromWatch":   "Remove from Watchlist",
+		"title":               "=== Stock Monitor System ===",
+		"stockList":           "Holdings",
+		"watchlist":           "Watchlist",
+		"stockSearch":         "Stock Search",
+		"addStock":            "Add Stock",
+		"editStock":           "Edit Stock",
+		"removeStock":         "Remove Stock",
+		"debugMode":           "Debug Mode",
+		"language":            "Language",
+		"exit":                "Exit",
+		"on":                  "On",
+		"off":                 "Off",
+		"chinese":             "中文",
+		"english":             "English",
+		"keyHelp":             "Use arrow keys ↑↓ or W/S to select, Enter/Space to confirm, Q to exit",
+		"keyHelpWin":          "Use W/S keys to select, Enter to confirm, Q to exit",
+		"returnToMenu":        "ESC, Q or M to return to main menu",
+		"returnToMenuShort":   "ESC or Q to return to main menu",
+		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock",
+		"monitoringTitle":     "=== Real-time Stock Monitor ===",
+		"updateTime":          "Update Time(5s): %s",
+		"emptyPortfolio":      "Portfolio is empty",
+		"addStockFirst":       "Please add stocks to your portfolio first",
+		"total":               "Total",
+		"addingTitle":         "=== Add Stock ===",
+		"enterCode":           "Enter stock code: ",
+		"enterCost":           "Enter cost price: ",
+		"enterQuantity":       "Enter quantity: ",
+		"codeFormat":          "Supported formats: SH601138, 000001, AAPL, etc.",
+		"stockCode":           "Stock Code: %s",
+		"stockName":           "Stock Name: %s",
+		"currentPrice":        "Current Price: %.3f",
+		"costPrice":           "Cost Price: %s",
+		"codeRequired":        "Stock code cannot be empty",
+		"costRequired":        "Cost price cannot be empty",
+		"quantityRequired":    "Quantity cannot be empty",
+		"invalidPrice":        "Invalid price format",
+		"invalidQuantity":     "Invalid quantity format",
+		"fetchingInfo":        "Fetching stock information...",
+		"stockNotFound":       "Unable to get information for stock %s, please check the code is correct",
+		"addSuccess":          "Successfully added stock: %s (%s)",
+		"removeTitle":         "=== Remove Stock ===",
+		"selectToRemove":      "Select stock to remove:",
+		"navHelp":             "Use arrow keys to select, Enter to confirm, ESC or Q to return",
+		"removeSuccess":       "Successfully removed stock: %s (%s)",
+		"editTitle":           "=== Edit Stock ===",
+		"selectToEdit":        "Select stock to edit:",
+		"currentCost":         "Current cost price: %.3f",
+		"enterNewCost":        "Enter new cost price: ",
+		"newCost":             "New cost price: %.3f",
+		"currentQuantity":     "Current quantity: %d",
+		"enterNewQuantity":    "Enter new quantity: ",
+		"editSuccess":         "Successfully edited stock %s cost price and quantity",
+		"searchTitle":         "=== Stock Search ===",
+		"enterSearch":         "Enter stock code or name: ",
+		"searchFormats":       "Supported formats:\n• Chinese names: 贵州茅台, Apple, Tencent, Alibaba, etc.\n• Chinese stocks: SH601138, 000001, SZ000002, etc.\n• US stocks: AAPL, TSLA, MSFT, etc.\n• Hong Kong stocks: HK00700, etc.\n\n💡 Tip: Chinese name searches have lower success rates, recommend using stock codes",
+		"searchHelp":          "Press Enter to search, ESC or Q to return to main menu",
+		"searching":           "Searching stock information...",
+		"searchNotFound":      "Unable to find information for stock %s, please check your input is correct",
+		"detailTitle":         "=== Stock Detail Information ===",
+		"noInfo":              "No stock information found",
+		"detailHelp":          "ESC or Q to return to main menu, R to search again",
+		"emptyCannotEdit":     "Portfolio is empty, cannot edit stocks",
+		"languageTitle":       "=== Language Selection ===",
+		"selectLanguage":      "Please select your language:",
+		"languageHelp":        "Use arrow keys to select, Enter to confirm, ESC or Q to return to main menu",
+		"watchlistTitle":      "=== Watchlist ===",
+		"emptyWatchlist":      "Watchlist is empty",
+		"addToWatchFirst":     "Please add stocks to your watchlist first",
+		"removeFromWatch":     "Remove from Watchlist",
 		"selectToRemoveWatch": "Select stock to remove from watchlist:",
-		"removeWatchSuccess": "Successfully removed stock from watchlist: %s (%s)",
-		"addToWatchlist":    "Add to Watchlist",
-		"addToPortfolio":    "Add to Holdings",
-		"addWatchSuccess":   "Successfully added to watchlist: %s (%s)",
-		"alreadyInWatch":    "Stock %s is already in watchlist",
-		"actionHelp":        "1-Add to Watchlist, 2-Add to Holdings, ESC or Q to return to main menu, R to search again",
+		"removeWatchSuccess":  "Successfully removed stock from watchlist: %s (%s)",
+		"addToWatchlist":      "Add to Watchlist",
+		"addToPortfolio":      "Add to Holdings",
+		"addWatchSuccess":     "Successfully added to watchlist: %s (%s)",
+		"alreadyInWatch":      "Stock %s is already in watchlist",
+		"actionHelp":          "1-Add to Watchlist, 2-Add to Holdings, ESC or Q to return to main menu, R to search again",
 	},
 }
 
@@ -291,20 +291,20 @@ type Model struct {
 	input           string
 	message         string
 	portfolio       Portfolio
-	watchlist       Watchlist  // 自选股票列表
-	config          Config     // 系统配置
+	watchlist       Watchlist // 自选股票列表
+	config          Config    // 系统配置
 	debugMode       bool
 	language        Language
 	debugLogs       []string // 调试日志存储
 	debugScrollPos  int      // debug日志滚动位置
 
 	// For stock addition
-	addingStep   int
-	tempCode     string
-	tempCost     string
-	tempQuantity string
-	stockInfo    *StockData
-	fromSearch   bool     // 标记是否从搜索结果添加
+	addingStep    int
+	tempCode      string
+	tempCost      string
+	tempQuantity  string
+	stockInfo     *StockData
+	fromSearch    bool     // 标记是否从搜索结果添加
 	previousState AppState // 记录进入编辑/删除前的状态
 
 	// For stock editing
@@ -383,7 +383,7 @@ func main() {
 
 	// 根据语言设置菜单项
 	m.menuItems = m.getMenuItems()
-	
+
 	// 设置全局模型引用用于调试日志
 	globalModel = &m
 
@@ -404,13 +404,13 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var newModel tea.Model
 	var cmd tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// debug滚动快捷键，在任何状态下都可用
 		if m.debugMode {
 			keyStr := msg.String()
-			
+
 			switch keyStr {
 			case "pgup":
 				m.scrollDebugUp()
@@ -426,7 +426,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		
+
 		// 处理各状态的正常按键
 		switch m.state {
 		case MainMenu:
@@ -464,14 +464,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		newModel, cmd = m, nil
 	}
-	
+
 	// 更新全局模型引用以保持调试日志同步
 	if newModel != nil {
 		if modelPtr, ok := newModel.(*Model); ok {
 			globalModel = modelPtr
 		}
 	}
-	
+
 	return newModel, cmd
 }
 
@@ -503,7 +503,7 @@ func (m *Model) View() string {
 	default:
 		mainContent = ""
 	}
-	
+
 	// 添加调试面板
 	return mainContent + m.renderDebugPanel()
 }
@@ -1016,17 +1016,17 @@ func (m *Model) savePortfolio() {
 func getDefaultConfig() Config {
 	return Config{
 		System: SystemConfig{
-			Language:  "en",    // 默认英文
-			AutoStart: true,    // 有数据时自动进入监控模式
-			DebugMode: false,   // 调试模式关闭
+			Language:  "en",  // 默认英文
+			AutoStart: true,  // 有数据时自动进入监控模式
+			DebugMode: false, // 调试模式关闭
 		},
 		Display: DisplayConfig{
 			ColorScheme:   "professional", // 专业配色方案
-			DecimalPlaces: 3,             // 3位小数
-			TableStyle:    "light",       // 轻量表格样式
+			DecimalPlaces: 3,              // 3位小数
+			TableStyle:    "light",        // 轻量表格样式
 		},
 		Update: UpdateConfig{
-			RefreshInterval: 5,   // 5秒刷新间隔
+			RefreshInterval: 5,    // 5秒刷新间隔
 			AutoUpdate:      true, // 自动更新开启
 		},
 	}
@@ -1262,12 +1262,10 @@ func searchChineseStock(chineseName string) *StockData {
 	return nil
 }
 
-
-
 // 使用腾讯搜索API查找股票
 func searchStockByTencentAPI(keyword string) *StockData {
 	debugPrint("[调试] 使用腾讯搜索API查找: %s\n", keyword)
-	
+
 	// 腾讯股票搜索API URL - 使用更完整的搜索接口
 	url := fmt.Sprintf("https://smartbox.gtimg.cn/s3/?q=%s&t=gp", keyword)
 	debugPrint("[调试] 腾讯搜索请求URL: %s\n", url)
@@ -1278,13 +1276,13 @@ func searchStockByTencentAPI(keyword string) *StockData {
 		debugPrint("[错误] 腾讯搜索API创建请求失败: %v\n", err)
 		return nil
 	}
-	
+
 	// 添加必要的请求头，提高成功率
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", "https://stockapp.finance.qq.com/")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		debugPrint("[错误] 腾讯搜索API HTTP请求失败: %v\n", err)
@@ -1317,19 +1315,19 @@ func searchStockByTencentAPI(keyword string) *StockData {
 // 解析腾讯搜索结果
 func parseSearchResults(content, keyword string) *StockData {
 	debugPrint("[调试] 开始解析搜索结果\n")
-	
+
 	// 尝试解析新的腾讯格式 (v_hint=)
 	result := parseTencentHintFormat(content, keyword)
 	if result != nil {
 		return result
 	}
-	
+
 	// 尝试解析JSON格式的响应
 	result = parseJSONSearchResults(content, keyword)
 	if result != nil {
 		return result
 	}
-	
+
 	// 如果JSON解析失败，尝试解析旧格式
 	return parseLegacySearchResults(content, keyword)
 }
@@ -1338,34 +1336,34 @@ func parseSearchResults(content, keyword string) *StockData {
 func parseTencentHintFormat(content, keyword string) *StockData {
 	// 格式: v_hint="sz~000880~潍柴重机~wczj~GP-A"
 	debugPrint("[调试] 尝试解析腾讯Hint格式\n")
-	
+
 	// 查找v_hint=
 	if !strings.Contains(content, "v_hint=") {
 		return nil
 	}
-	
+
 	// 提取引号内的内容
 	startPos := strings.Index(content, "v_hint=\"")
 	if startPos == -1 {
 		return nil
 	}
 	startPos += len("v_hint=\"")
-	
+
 	endPos := strings.Index(content[startPos:], "\"")
 	if endPos == -1 {
 		return nil
 	}
-	
+
 	data := content[startPos : startPos+endPos]
 	debugPrint("[调试] 提取的数据: %s\n", data)
-	
+
 	// 按^分割多个结果，取第一个
 	results := strings.Split(data, "^")
 	if len(results) == 0 {
 		debugPrint("[调试] 未找到搜索结果\n")
 		return nil
 	}
-	
+
 	// 处理第一个结果
 	firstResult := results[0]
 	fields := strings.Split(firstResult, "~")
@@ -1373,25 +1371,25 @@ func parseTencentHintFormat(content, keyword string) *StockData {
 		debugPrint("[调试] 字段数量不足: %d\n", len(fields))
 		return nil
 	}
-	
-	market := fields[0]  // sz, sh, hk
-	code := fields[1]    // 000880
-	name := fields[2]    // 潍柴重机（可能是Unicode编码）
-	
+
+	market := fields[0] // sz, sh, hk
+	code := fields[1]   // 000880
+	name := fields[2]   // 潍柴重机（可能是Unicode编码）
+
 	// 尝试解码Unicode字符串
 	decodedName, err := strconv.Unquote(`"` + name + `"`)
 	if err == nil {
 		name = decodedName
 	}
-	
+
 	debugPrint("[调试] 解析结果 - 市场: %s, 代码: %s, 名称: %s\n", market, code, name)
-	
+
 	// 对于搜索结果，直接返回第一个匹配项（因为用户输入的关键词已经被API处理过了）
 	if true {
 		// 转换为标准格式
 		standardCode := strings.ToUpper(market) + code
 		debugPrint("[调试] 腾讯Hint格式找到匹配股票: %s (%s)\n", name, standardCode)
-		
+
 		// 获取详细信息
 		stockData := getStockPrice(standardCode)
 		if stockData != nil && stockData.Price > 0 {
@@ -1400,7 +1398,7 @@ func parseTencentHintFormat(content, keyword string) *StockData {
 			return stockData
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1412,41 +1410,41 @@ func parseJSONSearchResults(content, keyword string) *StockData {
 		debugPrint("[调试] JSON解析失败: %v\n", err)
 		return nil
 	}
-	
+
 	// 查找数据字段
 	data, ok := searchResult["data"]
 	if !ok {
 		debugPrint("[调试] 找不到data字段\n")
 		return nil
 	}
-	
+
 	dataArray, ok := data.([]interface{})
 	if !ok {
 		debugPrint("[调试] data不是数组格式\n")
 		return nil
 	}
-	
+
 	for _, item := range dataArray {
 		itemMap, ok := item.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		// 提取股票信息
 		code, _ := itemMap["code"].(string)
 		name, _ := itemMap["name"].(string)
-		
+
 		if code == "" || name == "" {
 			continue
 		}
-		
+
 		// 检查名称是否匹配关键词
 		if strings.Contains(name, keyword) {
 			debugPrint("[调试] JSON格式找到匹配股票: %s (%s)\n", name, code)
-			
+
 			// 转换为标准格式
 			standardCode := convertJSONCodeToStandard(code)
-			
+
 			// 获取详细信息
 			stockData := getStockPrice(standardCode)
 			if stockData != nil && stockData.Price > 0 {
@@ -1456,7 +1454,7 @@ func parseJSONSearchResults(content, keyword string) *StockData {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1466,39 +1464,39 @@ func parseLegacySearchResults(content, keyword string) *StockData {
 	// 腾讯搜索结果格式分析
 	// 格式类似: v_s_关键词="sz002415~海康威视~002415~7.450~-0.160~-2.105~15270~7705~7565~7.610"
 	lines := strings.Split(content, "\n")
-	
+
 	for _, line := range lines {
 		if !strings.Contains(line, "~") {
 			continue
 		}
-		
+
 		// 找到符号="的位置
 		startPos := strings.Index(line, "\"")
 		endPos := strings.LastIndex(line, "\"")
 		if startPos == -1 || endPos == -1 || startPos >= endPos {
 			continue
 		}
-		
+
 		// 提取数据部分
 		data := line[startPos+1 : endPos]
 		fields := strings.Split(data, "~")
-		
+
 		if len(fields) < 4 {
 			continue
 		}
-		
+
 		// 解析字段
 		code := fields[0]
 		name := fields[1]
 		shortCode := fields[2]
-		
+
 		// 检查名称是否匹配关键词
 		if strings.Contains(name, keyword) {
 			debugPrint("[调试] 旧格式找到匹配股票: %s (%s)\n", name, code)
-			
+
 			// 转换为标准格式
 			standardCode := convertToStandardCode(code, shortCode)
-			
+
 			// 获取详细信息
 			stockData := getStockPrice(standardCode)
 			if stockData != nil && stockData.Price > 0 {
@@ -1508,19 +1506,19 @@ func parseLegacySearchResults(content, keyword string) *StockData {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
 // 转换JSON格式的股票代码为标准格式
 func convertJSONCodeToStandard(code string) string {
 	code = strings.TrimSpace(code)
-	
+
 	// 如果已经是标准格式，直接返回
 	if strings.HasPrefix(code, "SH") || strings.HasPrefix(code, "SZ") || strings.HasPrefix(code, "HK") {
 		return code
 	}
-	
+
 	// 根据数字开头判断市场
 	if len(code) == 6 {
 		if strings.HasPrefix(code, "6") {
@@ -1529,14 +1527,14 @@ func convertJSONCodeToStandard(code string) string {
 			return "SZ" + code
 		}
 	}
-	
+
 	return code
 }
 
 // 将腾讯的股票代码转换为标准格式
 func convertToStandardCode(code, shortCode string) string {
 	code = strings.ToLower(strings.TrimSpace(code))
-	
+
 	if strings.HasPrefix(code, "sh") {
 		return "SH" + shortCode
 	} else if strings.HasPrefix(code, "sz") {
@@ -1544,7 +1542,7 @@ func convertToStandardCode(code, shortCode string) string {
 	} else if strings.HasPrefix(code, "hk") {
 		return "HK" + shortCode
 	}
-	
+
 	// 如果无法识别，返回原始代码
 	return code
 }
@@ -1552,7 +1550,7 @@ func convertToStandardCode(code, shortCode string) string {
 // 使用新浪财经搜索API查找股票
 func searchStockBySinaAPI(keyword string) *StockData {
 	debugPrint("[调试] 使用新浪财经搜索API查找: %s\n", keyword)
-	
+
 	// 新浪财经搜索API URL
 	url := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,13,14,15&key=%s", keyword)
 	debugPrint("[调试] 新浪财经请求URL: %s\n", url)
@@ -1582,36 +1580,36 @@ func searchStockBySinaAPI(keyword string) *StockData {
 func parseSinaSearchResults(content, keyword string) *StockData {
 	// 新浪返回格式类似: var suggestvalue="sz000858,五粮液;sh600519,贵州茅台;";
 	lines := strings.Split(content, ";")
-	
+
 	for _, line := range lines {
 		if !strings.Contains(line, ",") {
 			continue
 		}
-		
+
 		// 提取股票信息
 		parts := strings.Split(line, ",")
 		if len(parts) < 2 {
 			continue
 		}
-		
+
 		code := strings.TrimSpace(parts[0])
 		name := strings.TrimSpace(parts[1])
-		
+
 		// 清理代码和名称中的特殊字符
 		code = strings.Trim(code, "\"'")
 		name = strings.Trim(name, "\"'")
-		
+
 		if code == "" || name == "" {
 			continue
 		}
-		
+
 		// 检查名称是否匹配关键词
 		if strings.Contains(name, keyword) {
 			debugPrint("[调试] 新浪搜索找到匹配股票: %s (%s)\n", name, code)
-			
+
 			// 转换为标准格式
 			standardCode := convertSinaCodeToStandard(code)
-			
+
 			// 获取详细信息
 			stockData := getStockPrice(standardCode)
 			if stockData != nil && stockData.Price > 0 {
@@ -1621,19 +1619,19 @@ func parseSinaSearchResults(content, keyword string) *StockData {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
 // 转换新浪的股票代码为标准格式
 func convertSinaCodeToStandard(code string) string {
 	code = strings.ToLower(strings.TrimSpace(code))
-	
+
 	// 如果已经是标准格式，直接返回
 	if strings.HasPrefix(strings.ToUpper(code), "SH") || strings.HasPrefix(strings.ToUpper(code), "SZ") {
 		return strings.ToUpper(code)
 	}
-	
+
 	if strings.HasPrefix(code, "sh") {
 		return "SH" + strings.TrimPrefix(code, "sh")
 	} else if strings.HasPrefix(code, "sz") {
@@ -1641,7 +1639,7 @@ func convertSinaCodeToStandard(code string) string {
 	} else if strings.HasPrefix(code, "hk") {
 		return "HK" + strings.TrimPrefix(code, "hk")
 	}
-	
+
 	// 如果是6位数字，根据开头判断市场
 	if len(code) == 6 {
 		if strings.HasPrefix(code, "6") {
@@ -1650,7 +1648,7 @@ func convertSinaCodeToStandard(code string) string {
 			return "SZ" + code
 		}
 	}
-	
+
 	return strings.ToUpper(code)
 }
 
@@ -1658,29 +1656,29 @@ func convertSinaCodeToStandard(code string) string {
 func tryAdvancedSearch(chineseName string) *StockData {
 	// 生成搜索关键词变形
 	keywords := generateSearchKeywords(chineseName)
-	
+
 	for _, keyword := range keywords {
 		if keyword == chineseName {
 			continue // 跳过原始关键词，避免重复搜索
 		}
-		
+
 		debugPrint("[调试] 尝试搜索关键词变形: %s\n", keyword)
 		result := searchStockByTencentAPI(keyword)
 		if result != nil && result.Price > 0 {
 			return result
 		}
 	}
-	
+
 	return nil
 }
 
 // 生成搜索关键词变形
 func generateSearchKeywords(name string) []string {
 	var keywords []string
-	
+
 	// 原始关键词
 	keywords = append(keywords, name)
-	
+
 	// 如果名称包含“股份”、“集团”等后缀，尝试去掉
 	suffixes := []string{"股份", "集团", "公司", "有限公司", "科技", "实业"}
 	for _, suffix := range suffixes {
@@ -1691,7 +1689,7 @@ func generateSearchKeywords(name string) []string {
 			}
 		}
 	}
-	
+
 	// 如果名称包含“中国”、“上海”等前缀，尝试去掉
 	prefixes := []string{"中国", "上海", "北京", "广东", "深圳", "天津"}
 	for _, prefix := range prefixes {
@@ -1702,7 +1700,7 @@ func generateSearchKeywords(name string) []string {
 			}
 		}
 	}
-	
+
 	// 如果名称较长，尝试取前几个字符作为关键词
 	if len([]rune(name)) > 4 {
 		runes := []rune(name)
@@ -1715,10 +1713,9 @@ func generateSearchKeywords(name string) []string {
 			keywords = append(keywords, string(runes[:4]))
 		}
 	}
-	
+
 	return keywords
 }
-
 
 func getStockPrice(symbol string) *StockData {
 	if isChinaStock(symbol) {
@@ -1757,13 +1754,13 @@ func tryTencentAPI(symbol string) *StockData {
 		debugPrint("[错误] 腾讯价格API创建请求失败: %v\n", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
-	
+
 	// 添加必要的请求头，与搜索API保持一致
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", "https://stockapp.finance.qq.com/")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		debugPrint("[错误] 腾讯API HTTP请求失败: %v\n", err)
@@ -1971,7 +1968,6 @@ func getFinnhubStockName(symbol string) string {
 	return symbol
 }
 
-
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -2001,7 +1997,7 @@ func (m *Model) debugPrint(format string, args ...any) {
 func (m *Model) addDebugLog(msg string) {
 	// 无限制存储所有调试日志
 	m.debugLogs = append(m.debugLogs, msg)
-	
+
 	// 关键修复：当新日志添加时，如果用户不在底部查看，需要调整滚动位置
 	// 以保持用户当前查看的内容不发生错位
 	if m.debugScrollPos > 0 {
@@ -2047,28 +2043,28 @@ func (m *Model) renderDebugPanel() string {
 	if !m.debugMode {
 		return ""
 	}
-	
+
 	// 显示最多8条完整日志，支持滚动查看
 	maxDebugLines := 8
-	
+
 	// 只有在有日志时才显示debug面板
 	if len(m.debugLogs) == 0 {
 		return "\n🔧 Debug Mode: ON (暂无日志)"
 	}
-	
+
 	s := "\n" + strings.Repeat("=", 80) + "\n"
-	
+
 	// 显示滚动信息和快捷键提示
 	totalLogs := len(m.debugLogs)
 	currentPos := totalLogs - m.debugScrollPos
-	
+
 	if m.language == Chinese {
 		s += fmt.Sprintf("🔧 调试日志 (%d/%d) [PageUp/PageDown:翻页 Home/End:首尾]\n", currentPos, totalLogs)
 	} else {
 		s += fmt.Sprintf("🔧 Debug Logs (%d/%d) [PageUp/PageDown:scroll Home/End:top/bottom]\n", currentPos, totalLogs)
 	}
 	s += strings.Repeat("-", 80) + "\n"
-	
+
 	// 根据滚动位置计算要显示的日志范围
 	logs := m.debugLogs
 	endIndex := len(logs) - m.debugScrollPos
@@ -2079,7 +2075,7 @@ func (m *Model) renderDebugPanel() string {
 	if endIndex > len(logs) {
 		endIndex = len(logs)
 	}
-	
+
 	// 显示当前窗口内的日志
 	for i := startIndex; i < endIndex; i++ {
 		// 显示完整的日志内容，不截断
@@ -2089,7 +2085,7 @@ func (m *Model) renderDebugPanel() string {
 		}
 		s += prefix + logs[i] + "\n"
 	}
-	
+
 	// 如果可以滚动，显示滚动指示
 	if totalLogs > maxDebugLines {
 		s += strings.Repeat("-", 80) + "\n"
@@ -2108,9 +2104,9 @@ func (m *Model) renderDebugPanel() string {
 			}
 		}
 	}
-	
+
 	s += strings.Repeat("=", 80)
-	
+
 	return s
 }
 
@@ -2587,7 +2583,7 @@ func (m *Model) addToWatchlist(code, name string) bool {
 	if m.isStockInWatchlist(code) {
 		return false // 已在列表中
 	}
-	
+
 	watchStock := WatchlistStock{
 		Code: code,
 		Name: name,
@@ -2758,7 +2754,7 @@ func (m *Model) viewSearchResultWithActions() string {
 	t.AppendRow(table.Row(values))
 
 	s += t.Render() + "\n\n"
-	
+
 	// 操作按钮提示
 	s += m.getText("actionHelp") + "\n"
 
@@ -2805,9 +2801,9 @@ func (m *Model) viewWatchlistViewing() string {
 
 	// 获取本地化的表头
 	if m.language == Chinese {
-		t.AppendHeader(table.Row{"代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "涨跌额"})
+		t.AppendHeader(table.Row{"代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"})
 	} else {
-		t.AppendHeader(table.Row{"Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Change"})
+		t.AppendHeader(table.Row{"Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"})
 	}
 
 	for i, watchStock := range m.watchlist.Stocks {
@@ -2823,8 +2819,16 @@ func (m *Model) viewWatchlistViewing() string {
 				todayChangeStr = "-"
 			}
 
-			// 涨跌额显示
-			changeStr := m.formatProfitWithColorZeroLang(stockData.Change)
+			// 换手率显示
+			var turnoverStr string
+			if stockData.TurnoverRate > 0 {
+				turnoverStr = fmt.Sprintf("%.2f%%", stockData.TurnoverRate)
+			} else {
+				turnoverStr = "-"
+			}
+
+			// 成交量显示
+			volumeStr := formatVolume(stockData.Volume)
 
 			t.AppendRow(table.Row{
 				watchStock.Code,
@@ -2835,13 +2839,15 @@ func (m *Model) viewWatchlistViewing() string {
 				m.formatPriceWithColorLang(stockData.MaxPrice, stockData.PrevClose),
 				m.formatPriceWithColorLang(stockData.MinPrice, stockData.PrevClose),
 				todayChangeStr,
-				changeStr,
+				turnoverStr,
+				volumeStr,
 			})
 		} else {
 			// 如果无法获取数据，显示基本信息
 			t.AppendRow(table.Row{
 				watchStock.Code,
 				watchStock.Name,
+				"-",
 				"-",
 				"-",
 				"-",
