@@ -143,6 +143,7 @@ var texts = map[Language]TextMap{
 		"returnToMenu":        "ESC、Q键或M键返回主菜单",
 		"returnToMenuShort":   "ESC或Q键返回主菜单",
 		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票",
+		"watchlistHelp":       "ESC、Q键或M键返回主菜单，D键删除股票，S键搜索股票",
 		"monitoringTitle":     "=== 股票实时监控 ===",
 		"updateTime":          "更新时间(5s): %s",
 		"emptyPortfolio":      "投资组合为空",
@@ -222,6 +223,7 @@ var texts = map[Language]TextMap{
 		"returnToMenu":        "ESC, Q or M to return to main menu",
 		"returnToMenuShort":   "ESC or Q to return to main menu",
 		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock",
+		"watchlistHelp":       "ESC, Q or M to return to main menu, D to delete stock, S to search stock",
 		"monitoringTitle":     "=== Real-time Stock Monitor ===",
 		"updateTime":          "Update Time(5s): %s",
 		"emptyPortfolio":      "Portfolio is empty",
@@ -2780,6 +2782,14 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cursor = 0
 		}
 		return m, nil
+	case "s":
+		// 跳转到股票搜索页面
+		m.logUserAction("从自选列表跳转到股票搜索页面")
+		m.state = SearchingStock
+		m.searchInput = ""
+		m.searchResult = nil
+		m.message = ""
+		return m, nil
 	}
 	return m, nil
 }
@@ -2791,7 +2801,7 @@ func (m *Model) viewWatchlistViewing() string {
 	if len(m.watchlist.Stocks) == 0 {
 		s += m.getText("emptyWatchlist") + "\n\n"
 		s += m.getText("addToWatchFirst") + "\n\n"
-		s += m.getText("holdingsHelp") + "\n"
+		s += m.getText("watchlistHelp") + "\n"
 		return s
 	}
 
@@ -2865,7 +2875,7 @@ func (m *Model) viewWatchlistViewing() string {
 	}
 
 	s += t.Render() + "\n\n"
-	s += m.getText("returnToMenu") + ", D键删除股票\n"
+	s += m.getText("watchlistHelp") + "\n"
 
 	if m.message != "" {
 		s += "\n" + m.message + "\n"
