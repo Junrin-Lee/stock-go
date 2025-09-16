@@ -90,9 +90,9 @@ type UpdateConfig struct {
 }
 
 const (
-	dataFile        = "portfolio.json"
-	watchlistFile   = "watchlist.json"
-	configFile      = "config.yaml"
+	dataFile        = "data/portfolio.json"
+	watchlistFile   = "data/watchlist.json"
+	configFile      = "cmd/conf/config.yml"
 	refreshInterval = 5 * time.Second
 )
 
@@ -354,6 +354,10 @@ func (m *Model) getMenuItems() []string {
 }
 
 func main() {
+	// 确保目录存在
+	os.MkdirAll("data", 0755)
+	os.MkdirAll("cmd/conf", 0755)
+
 	// 加载配置文件
 	config := loadConfig()
 	portfolio := loadPortfolio()
