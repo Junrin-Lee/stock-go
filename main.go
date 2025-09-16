@@ -72,9 +72,10 @@ type Config struct {
 }
 
 type SystemConfig struct {
-	Language  string `yaml:"language"`   // 默认语言 "zh" 或 "en"
-	AutoStart bool   `yaml:"auto_start"` // 有数据时自动进入监控模式
-	DebugMode bool   `yaml:"debug_mode"` // 调试模式开关
+	Language      string `yaml:"language"`       // 默认语言 "zh" 或 "en"
+	AutoStart     bool   `yaml:"auto_start"`     // 有数据时自动进入监控模式
+	StartupModule string `yaml:"startup_module"` // 启动模块 "portfolio"(持股) 或 "watchlist"(自选)
+	DebugMode     bool   `yaml:"debug_mode"`     // 调试模式开关
 }
 
 type DisplayConfig struct {
@@ -359,9 +360,28 @@ func main() {
 	// 根据配置和是否有股票数据决定初始状态
 	initialState := MainMenu
 	var lastUpdate time.Time
-	if config.System.AutoStart && len(portfolio.Stocks) > 0 {
-		initialState = Monitoring
-		lastUpdate = time.Now()
+	if config.System.AutoStart {
+		// 根据startup_module配置决定启动哪个模块
+		switch config.System.StartupModule {
+		case "portfolio":
+			// 启动持股模块，需要有持股数据
+			if len(portfolio.Stocks) > 0 {
+				initialState = Monitoring
+				lastUpdate = time.Now()
+			}
+		case "watchlist":
+			// 启动自选模块，需要有自选数据
+			if len(watchlist.Stocks) > 0 {
+				initialState = WatchlistViewing
+				lastUpdate = time.Now()
+			}
+		default:
+			// 默认行为：如果有持股数据则进入持股模块
+			if len(portfolio.Stocks) > 0 {
+				initialState = Monitoring
+				lastUpdate = time.Now()
+			}
+		}
 	}
 
 	// 根据配置文件设置语言
@@ -397,7 +417,7 @@ func main() {
 }
 
 func (m *Model) Init() tea.Cmd {
-	if m.state == Monitoring {
+	if m.state == Monitoring || m.state == WatchlistViewing {
 		return m.tickCmd()
 	}
 	return nil
@@ -1018,9 +1038,10 @@ func (m *Model) savePortfolio() {
 func getDefaultConfig() Config {
 	return Config{
 		System: SystemConfig{
-			Language:  "en",  // 默认英文
-			AutoStart: true,  // 有数据时自动进入监控模式
-			DebugMode: false, // 调试模式关闭
+			Language:      "en",        // 默认英文
+			AutoStart:     true,        // 有数据时自动进入监控模式
+			StartupModule: "portfolio", // 默认启动持股模块
+			DebugMode:     false,       // 调试模式关闭
 		},
 		Display: DisplayConfig{
 			ColorScheme:   "professional", // 专业配色方案

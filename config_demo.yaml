@@ -5,6 +5,8 @@ system:
     language: en
     ## whether to auto start fetching stock data on launch
     auto_start: false
+    ## which module to start: "portfolio" (holdings) or "watchlist" (favorites)
+    startup_module: portfolio
     ## whether to enable debug mode for logging user actions
     debug_mode: false
 display:
