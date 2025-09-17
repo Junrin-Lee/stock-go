@@ -82,6 +82,7 @@ type DisplayConfig struct {
 	ColorScheme   string `yaml:"color_scheme"`   // 颜色方案 "professional", "simple"
 	DecimalPlaces int    `yaml:"decimal_places"` // 价格显示小数位数
 	TableStyle    string `yaml:"table_style"`    // 表格样式 "light", "bold", "simple"
+	MaxLines      int    `yaml:"max_lines"`      // 列表每页最大显示行数
 }
 
 type UpdateConfig struct {
@@ -609,11 +610,11 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 	case 0: // 股票列表
 		m.logUserAction("进入持股监控页面")
 		m.state = Monitoring
-		// 设置滚动位置和光标到显示前10条股票
+		// 设置滚动位置和光标到显示前N条股票
 		if len(m.portfolio.Stocks) > 0 {
-			const maxPortfolioLines = 10
+			maxPortfolioLines := m.config.Display.MaxLines
 			if len(m.portfolio.Stocks) > maxPortfolioLines {
-				// 显示前10条：滚动位置设置为显示从索引0开始的10条
+				// 显示前N条：滚动位置设置为显示从索引0开始的N条
 				m.portfolioScrollPos = len(m.portfolio.Stocks) - maxPortfolioLines
 				m.portfolioCursor = 0 // 光标指向第一个股票（索引0）
 			} else {
@@ -627,11 +628,11 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 	case 1: // 自选股票
 		m.logUserAction("进入自选股票页面")
 		m.state = WatchlistViewing
-		// 设置滚动位置和光标到显示前10条股票
+		// 设置滚动位置和光标到显示前N条股票
 		if len(m.watchlist.Stocks) > 0 {
-			const maxWatchlistLines = 10
+			maxWatchlistLines := m.config.Display.MaxLines
 			if len(m.watchlist.Stocks) > maxWatchlistLines {
-				// 显示前10条：滚动位置设置为显示从索引0开始的10条
+				// 显示前N条：滚动位置设置为显示从索引0开始的N条
 				m.watchlistScrollPos = len(m.watchlist.Stocks) - maxWatchlistLines
 				m.watchlistCursor = 0 // 光标指向第一个股票（索引0）
 			} else {
@@ -1028,7 +1029,7 @@ func (m *Model) viewMonitoring() string {
 
 	// 显示滚动信息
 	totalStocks := len(m.portfolio.Stocks)
-	const maxPortfolioLines = 10
+	maxPortfolioLines := m.config.Display.MaxLines
 	if totalStocks > 0 {
 		currentPos := m.portfolioCursor + 1 // 显示从1开始的位置
 		if m.language == Chinese {
@@ -1239,6 +1240,7 @@ func getDefaultConfig() Config {
 			ColorScheme:   "professional", // 专业配色方案
 			DecimalPlaces: 3,              // 3位小数
 			TableStyle:    "light",        // 轻量表格样式
+			MaxLines:      10,             // 默认每页显示10行
 		},
 		Update: UpdateConfig{
 			RefreshInterval: 5,    // 5秒刷新间隔
@@ -1263,6 +1265,12 @@ func loadConfig() Config {
 		// 如果配置文件格式错误，使用默认配置
 		return getDefaultConfig()
 	}
+	
+	// 验证配置的合理性
+	if config.Display.MaxLines <= 0 || config.Display.MaxLines > 50 {
+		config.Display.MaxLines = 10 // 默认值
+	}
+	
 	return config
 }
 
@@ -2254,7 +2262,7 @@ func (m *Model) scrollPortfolioUp() {
 		m.portfolioCursor--
 	}
 	// 确保光标在可见范围内，如果需要则调整滚动位置
-	const maxPortfolioLines = 10
+	maxPortfolioLines := m.config.Display.MaxLines
 	endIndex := len(m.portfolio.Stocks) - m.portfolioScrollPos
 	startIndex := endIndex - maxPortfolioLines
 	if startIndex < 0 {
@@ -2276,7 +2284,7 @@ func (m *Model) scrollPortfolioDown() {
 		m.portfolioCursor++
 	}
 	// 确保光标在可见范围内，如果需要则调整滚动位置
-	const maxPortfolioLines = 10
+	maxPortfolioLines := m.config.Display.MaxLines
 	endIndex := len(m.portfolio.Stocks) - m.portfolioScrollPos
 	startIndex := endIndex - maxPortfolioLines
 	if startIndex < 0 {
@@ -2314,7 +2322,7 @@ func (m *Model) scrollWatchlistUp() {
 		m.watchlistCursor--
 	}
 	// 确保光标在可见范围内，如果需要则调整滚动位置
-	const maxWatchlistLines = 10
+	maxWatchlistLines := m.config.Display.MaxLines
 	endIndex := len(m.watchlist.Stocks) - m.watchlistScrollPos
 	startIndex := endIndex - maxWatchlistLines
 	if startIndex < 0 {
@@ -2336,7 +2344,7 @@ func (m *Model) scrollWatchlistDown() {
 		m.watchlistCursor++
 	}
 	// 确保光标在可见范围内，如果需要则调整滚动位置
-	const maxWatchlistLines = 10
+	maxWatchlistLines := m.config.Display.MaxLines
 	endIndex := len(m.watchlist.Stocks) - m.watchlistScrollPos
 	startIndex := endIndex - maxWatchlistLines
 	if startIndex < 0 {
@@ -2971,11 +2979,11 @@ func (m *Model) handleSearchResultWithActions(msg tea.KeyMsg) (tea.Model, tea.Cm
 			}
 			// 跳转到自选列表页面
 			m.state = WatchlistViewing
-			// 设置滚动位置和光标到显示前10条股票
+			// 设置滚动位置和光标到显示前N条股票
 			if len(m.watchlist.Stocks) > 0 {
-				const maxWatchlistLines = 10
+				maxWatchlistLines := m.config.Display.MaxLines
 				if len(m.watchlist.Stocks) > maxWatchlistLines {
-					// 显示前10条：滚动位置设置为显示从索引0开始的10条
+					// 显示前N条：滚动位置设置为显示从索引0开始的N条
 					m.watchlistScrollPos = len(m.watchlist.Stocks) - maxWatchlistLines
 					m.watchlistCursor = 0 // 光标指向第一个股票（索引0）
 				} else {
@@ -3177,7 +3185,7 @@ func (m *Model) viewWatchlistViewing() string {
 
 	// 显示滚动信息
 	totalWatchStocks := len(m.watchlist.Stocks)
-	const maxWatchlistLines = 10
+	maxWatchlistLines := m.config.Display.MaxLines
 	if totalWatchStocks > 0 {
 		currentPos := m.watchlistCursor + 1 // 显示从1开始的位置
 		if m.language == Chinese {

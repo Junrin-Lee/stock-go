@@ -1,21 +1,61 @@
-## this file is a template of configuration, 
-## please drop the suffix(_demo) of the file name to config.yaml before use
+# 股票监控系统配置文件示例
+# Stock Monitoring System Configuration Example
+# 使用说明：将文件名修改为 config.yaml 后即可使用
+# Usage: Rename this file to config.yaml to use
+
+# 系统配置 System Configuration
 system:
-    ## "zh" for Chinese, "en" for English
+    # 语言设置 Language Setting
+    # 支持: zh (中文), en (English)
     language: en
-    ## whether to auto start fetching stock data on launch
+    
+    # 自动启动 Auto Start
+    # true: 启动时自动开始监控 | false: 手动启动
+    # true: auto start monitoring on launch | false: manual start
     auto_start: false
-    ## which module to start: "portfolio" (holdings) or "watchlist" (favorites)
+    
+    # 启动模块 Startup Module
+    # 可选值: portfolio (持股列表), watchlist (自选列表)
+    # options: portfolio (holdings), watchlist (favorites)
     startup_module: portfolio
-    ## whether to enable debug mode for logging user actions
+    
+    # 调试模式 Debug Mode
+    # true: 开启调试日志 | false: 关闭调试日志
+    # true: enable debug logging | false: disable debug logging
     debug_mode: false
+
+# 显示配置 Display Configuration
 display:
+    # 颜色方案 Color Scheme
+    # 可选值: professional (专业版), classic (经典版), dark (暗色版)
+    # options: professional, classic, dark
     color_scheme: professional
-    ## number of decimal places to show for stock prices
+    
+    # 小数位数 Decimal Places
+    # 价格显示的小数位数 (1-4)
+    # number of decimal places to show for prices (1-4)
     decimal_places: 3
+    
+    # 表格样式 Table Style
+    # 可选值: light (轻量), bold (加粗), double (双线), rounded (圆角)
+    # options: light, bold, double, rounded
     table_style: light
+    
+    # 最大显示行数 Maximum Display Lines
+    # 每页显示的股票数量，适用于持股列表和自选列表
+    # number of stocks displayed per page for portfolio and watchlist
+    # 建议根据屏幕分辨率调整: 1080p推荐10行, 1440p推荐15行, 4K推荐20行
+    # recommended by screen resolution: 1080p=10 lines, 1440p=15 lines, 4K=20 lines
+    max_lines: 10
+
+# 更新配置 Update Configuration
 update:
-    ## data refresh interval in seconds
+    # 刷新间隔 Refresh Interval (秒)
+    # 股票数据自动刷新间隔时间 (1-60秒)
+    # auto refresh interval for stock data in seconds (1-60)
     refresh_interval: 5
-    ## whether to enable auto update of the application
+    
+    # 自动更新 Auto Update
+    # true: 自动刷新股票数据 | false: 手动刷新
+    # true: enable auto refresh of stock data | false: manual refresh
     auto_update: true
