@@ -117,6 +117,7 @@ const (
 	WatchlistViewing
 	WatchlistRemoving
 	SearchResultWithActions
+	WatchlistSearchConfirm
 )
 
 // 文本映射结构
@@ -145,7 +146,7 @@ var texts = map[Language]TextMap{
 		"returnToMenuShort":   "ESC或Q键返回主菜单",
 		"returnEscOnly":       "ESC键返回",
 		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票，A键添加股票",
-		"watchlistHelp":       "ESC、Q键或M键返回主菜单，D键删除股票，S键搜索股票",
+		"watchlistHelp":       "ESC、Q键或M键返回主菜单，D键删除股票，A键添加股票",
 		"monitoringTitle":     "=== 股票实时监控 ===",
 		"updateTime":          "更新时间(5s): %s",
 		"emptyPortfolio":      "投资组合为空",
@@ -159,6 +160,11 @@ var texts = map[Language]TextMap{
 		"stockCode":           "股票代码: %s",
 		"stockName":           "股票名称: %s",
 		"currentPrice":        "当前价格: %.3f",
+		"openPrice":           "开盘价",
+		"highPrice":           "最高价",
+		"lowPrice":            "最低价",
+		"prevClose":           "昨收价",
+		"change":              "涨跌",
 		"costPrice":           "成本价: %s",
 		"codeRequired":        "股票代码不能为空",
 		"costRequired":        "成本价不能为空",
@@ -226,7 +232,7 @@ var texts = map[Language]TextMap{
 		"returnToMenuShort":   "ESC or Q to return to main menu",
 		"returnEscOnly":       "ESC to return",
 		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock, A to add stock",
-		"watchlistHelp":       "ESC, Q or M to return to main menu, D to delete stock, S to search stock",
+		"watchlistHelp":       "ESC, Q or M to return to main menu, D to delete stock, A to add stock",
 		"monitoringTitle":     "=== Real-time Stock Monitor ===",
 		"updateTime":          "Update Time(5s): %s",
 		"emptyPortfolio":      "Portfolio is empty",
@@ -240,6 +246,11 @@ var texts = map[Language]TextMap{
 		"stockCode":           "Stock Code: %s",
 		"stockName":           "Stock Name: %s",
 		"currentPrice":        "Current Price: %.3f",
+		"openPrice":           "Open Price",
+		"highPrice":           "High Price",
+		"lowPrice":            "Low Price",
+		"prevClose":           "Prev Close",
+		"change":              "Change",
 		"costPrice":           "Cost Price: %s",
 		"codeRequired":        "Stock code cannot be empty",
 		"costRequired":        "Cost price cannot be empty",
@@ -317,8 +328,9 @@ type Model struct {
 	selectedStockIndex int
 
 	// For stock searching
-	searchInput  string
-	searchResult *StockData
+	searchInput     string
+	searchResult    *StockData
+	searchFromWatchlist bool // 标记是否从自选列表进入搜索
 
 	// For language selection
 	languageCursor int
@@ -473,6 +485,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel, cmd = m.handleSearchResult(msg)
 		case SearchResultWithActions:
 			newModel, cmd = m.handleSearchResultWithActions(msg)
+		case WatchlistSearchConfirm:
+			newModel, cmd = m.handleWatchlistSearchConfirm(msg)
 		case LanguageSelection:
 			newModel, cmd = m.handleLanguageSelection(msg)
 		case WatchlistViewing:
@@ -522,6 +536,8 @@ func (m *Model) View() string {
 		mainContent = m.viewSearchResult()
 	case SearchResultWithActions:
 		mainContent = m.viewSearchResultWithActions()
+	case WatchlistSearchConfirm:
+		mainContent = m.viewWatchlistSearchConfirm()
 	case LanguageSelection:
 		mainContent = m.viewLanguageSelection()
 	case WatchlistViewing:
@@ -576,6 +592,7 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		m.state = SearchingStock
 		m.searchInput = ""
 		m.searchResult = nil
+		m.searchFromWatchlist = false
 		m.message = ""
 		return m, nil
 	case 3: // 调试模式
@@ -2324,7 +2341,12 @@ func (m *Model) viewEditingStock() string {
 func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.state = MainMenu
+		if m.searchFromWatchlist {
+			m.state = WatchlistViewing
+			m.searchFromWatchlist = false
+		} else {
+			m.state = MainMenu
+		}
 		m.message = ""
 		return m, nil
 	case "enter":
@@ -2341,7 +2363,13 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.logUserAction(fmt.Sprintf("搜索成功: %s (%s)", m.searchResult.Name, m.searchResult.Symbol))
-		m.state = SearchResultWithActions
+		
+		// 如果是从自选列表进入的搜索，跳转到确认页面
+		if m.searchFromWatchlist {
+			m.state = WatchlistSearchConfirm
+		} else {
+			m.state = SearchResultWithActions
+		}
 		m.message = ""
 		return m, nil
 	case "backspace":
@@ -2370,6 +2398,7 @@ func (m *Model) handleSearchResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "r":
 		m.state = SearchingStock
+		m.searchFromWatchlist = false
 		m.message = ""
 		return m, nil
 	}
@@ -2673,6 +2702,7 @@ func (m *Model) handleSearchResultWithActions(msg tea.KeyMsg) (tea.Model, tea.Cm
 		return m, nil
 	case "r":
 		m.state = SearchingStock
+		m.searchFromWatchlist = false
 		m.message = ""
 		return m, nil
 	case "1":
@@ -2842,12 +2872,13 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cursor = 0
 		}
 		return m, nil
-	case "s":
+	case "a":
 		// 跳转到股票搜索页面
 		m.logUserAction("从自选列表跳转到股票搜索页面")
 		m.state = SearchingStock
 		m.searchInput = ""
 		m.searchResult = nil
+		m.searchFromWatchlist = true
 		m.message = ""
 		return m, nil
 	}
@@ -3002,4 +3033,134 @@ func gbkToUtf8(data []byte) (string, error) {
 		return "", err
 	}
 	return string(utf8Data), nil
+}
+
+// ========== 自选股票搜索确认处理 ==========
+
+func (m *Model) handleWatchlistSearchConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.state = WatchlistViewing
+		m.searchFromWatchlist = false
+		m.message = ""
+		return m, nil
+	case "enter":
+		// 确认添加到自选列表
+		if m.searchResult != nil {
+			if m.addToWatchlist(m.searchResult.Symbol, m.searchResult.Name) {
+				m.message = fmt.Sprintf(m.getText("addWatchSuccess"), m.searchResult.Name, m.searchResult.Symbol)
+				m.logUserAction(fmt.Sprintf("添加到自选列表: %s (%s)", m.searchResult.Name, m.searchResult.Symbol))
+			} else {
+				m.message = fmt.Sprintf(m.getText("alreadyInWatch"), m.searchResult.Symbol)
+			}
+			m.state = WatchlistViewing
+			m.searchFromWatchlist = false
+			return m, m.tickCmd()
+		}
+		return m, nil
+	case "r":
+		// 重新搜索
+		m.state = SearchingStock
+		m.searchInput = ""
+		m.searchResult = nil
+		m.message = ""
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m *Model) viewWatchlistSearchConfirm() string {
+	if m.searchResult == nil {
+		return m.getText("searchNotFound")
+	}
+
+	s := m.getText("searchTitle") + "\n\n"
+	
+	// 创建表格显示股票信息
+	t := table.NewWriter()
+	t.SetStyle(table.StyleLight)
+	
+	// 设置表头
+	if m.language == Chinese {
+		t.AppendHeader(table.Row{"名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"})
+	} else {
+		t.AppendHeader(table.Row{"Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"})
+	}
+	
+	// 构建数据行
+	var values []interface{}
+	
+	// 名称
+	values = append(values, m.searchResult.Name)
+	
+	// 现价 (带颜色)
+	priceStr := m.formatPriceWithColorLang(m.searchResult.Price, m.searchResult.PrevClose)
+	values = append(values, priceStr)
+	
+	// 昨收价
+	values = append(values, fmt.Sprintf("%.3f", m.searchResult.PrevClose))
+	
+	// 开盘价
+	if m.searchResult.StartPrice > 0 {
+		openStr := m.formatPriceWithColorLang(m.searchResult.StartPrice, m.searchResult.PrevClose)
+		values = append(values, openStr)
+	} else {
+		values = append(values, "-")
+	}
+	
+	// 最高价
+	if m.searchResult.MaxPrice > 0 {
+		highStr := m.formatPriceWithColorLang(m.searchResult.MaxPrice, m.searchResult.PrevClose)
+		values = append(values, highStr)
+	} else {
+		values = append(values, "-")
+	}
+	
+	// 最低价
+	if m.searchResult.MinPrice > 0 {
+		lowStr := m.formatPriceWithColorLang(m.searchResult.MinPrice, m.searchResult.PrevClose)
+		values = append(values, lowStr)
+	} else {
+		values = append(values, "-")
+	}
+	
+	// 今日涨幅
+	if m.searchResult.ChangePercent != 0 {
+		changePercentStr := m.formatProfitRateWithColorZeroLang(m.searchResult.ChangePercent)
+		values = append(values, changePercentStr)
+	} else {
+		values = append(values, "-")
+	}
+	
+	// 换手率
+	if m.searchResult.TurnoverRate > 0 {
+		values = append(values, fmt.Sprintf("%.2f%%", m.searchResult.TurnoverRate))
+	} else {
+		values = append(values, "-")
+	}
+	
+	// 成交量
+	if m.searchResult.Volume > 0 {
+		if m.searchResult.Volume >= 100000000 { // 大于等于1亿
+			values = append(values, fmt.Sprintf("%.2f亿", float64(m.searchResult.Volume)/100000000))
+		} else if m.searchResult.Volume >= 10000 { // 大于等于1万
+			values = append(values, fmt.Sprintf("%.2f万", float64(m.searchResult.Volume)/10000))
+		} else {
+			values = append(values, fmt.Sprintf("%d", m.searchResult.Volume))
+		}
+	} else {
+		values = append(values, "-")
+	}
+	
+	t.AppendRow(values)
+	
+	s += t.Render() + "\n\n"
+	
+	if m.language == Chinese {
+		s += "按回车键添加到自选列表，ESC键返回，R键重新搜索\n"
+	} else {
+		s += "Press Enter to add to watchlist, ESC to return, R to search again\n"
+	}
+	
+	return s
 }
