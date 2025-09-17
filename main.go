@@ -145,8 +145,8 @@ var texts = map[Language]TextMap{
 		"returnToMenu":        "ESC、Q键或M键返回主菜单",
 		"returnToMenuShort":   "ESC或Q键返回主菜单",
 		"returnEscOnly":       "ESC键返回",
-		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票，A键添加股票",
-		"watchlistHelp":       "ESC、Q键或M键返回主菜单，D键删除股票，A键添加股票",
+		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票，A键添加股票 | ↑/↓:翻页",
+		"watchlistHelp":       "ESC、Q键或M键返回主菜单，D键删除股票，A键添加股票 | ↑/↓:翻页",
 		"monitoringTitle":     "=== 股票实时监控 ===",
 		"updateTime":          "更新时间(5s): %s",
 		"emptyPortfolio":      "投资组合为空",
@@ -199,7 +199,7 @@ var texts = map[Language]TextMap{
 		"languageTitle":       "=== 语言选择 ===",
 		"selectLanguage":      "请选择您的语言:",
 		"languageHelp":        "使用方向键选择，回车确认，ESC或Q键返回主菜单",
-		"watchlistTitle":      "=== 自选股票 ===",
+		"watchlistTitle":      "=== 自选实时监控 ===",
 		"emptyWatchlist":      "自选列表为空",
 		"addToWatchFirst":     "请先添加股票到自选列表",
 		"removeFromWatch":     "从自选列表删除",
@@ -231,8 +231,8 @@ var texts = map[Language]TextMap{
 		"returnToMenu":        "ESC, Q or M to return to main menu",
 		"returnToMenuShort":   "ESC or Q to return to main menu",
 		"returnEscOnly":       "ESC to return",
-		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock, A to add stock",
-		"watchlistHelp":       "ESC, Q or M to return to main menu, D to delete stock, A to add stock",
+		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock, A to add stock | ↑/↓:scroll",
+		"watchlistHelp":       "ESC, Q or M to return to main menu, D to delete stock, A to add stock | ↑/↓:scroll",
 		"monitoringTitle":     "=== Real-time Stock Monitor ===",
 		"updateTime":          "Update Time(5s): %s",
 		"emptyPortfolio":      "Portfolio is empty",
@@ -285,7 +285,7 @@ var texts = map[Language]TextMap{
 		"languageTitle":       "=== Language Selection ===",
 		"selectLanguage":      "Please select your language:",
 		"languageHelp":        "Use arrow keys to select, Enter to confirm, ESC or Q to return to main menu",
-		"watchlistTitle":      "=== Watchlist ===",
+		"watchlistTitle":      "=== Real-time Stock Monitor ===",
 		"emptyWatchlist":      "Watchlist is empty",
 		"addToWatchFirst":     "Please add stocks to your watchlist first",
 		"removeFromWatch":     "Remove from Watchlist",
@@ -328,8 +328,8 @@ type Model struct {
 	selectedStockIndex int
 
 	// For stock searching
-	searchInput     string
-	searchResult    *StockData
+	searchInput         string
+	searchResult        *StockData
 	searchFromWatchlist bool // 标记是否从自选列表进入搜索
 
 	// For language selection
@@ -337,6 +337,12 @@ type Model struct {
 
 	// For monitoring
 	lastUpdate time.Time
+
+	// For scrolling
+	portfolioScrollPos int // 持股列表滚动位置
+	watchlistScrollPos int // 自选列表滚动位置
+	portfolioCursor    int // 持股列表当前选中行
+	watchlistCursor    int // 自选列表当前选中行
 }
 
 type tickMsg struct{}
@@ -409,16 +415,20 @@ func main() {
 	}
 
 	m := Model{
-		state:           initialState,
-		currentMenuItem: 0,
-		portfolio:       portfolio,
-		watchlist:       watchlist,
-		config:          config,
-		debugMode:       config.System.DebugMode,
-		language:        language,
-		lastUpdate:      lastUpdate,
-		debugLogs:       make([]string, 0),
-		debugScrollPos:  0, // 初始滚动位置
+		state:              initialState,
+		currentMenuItem:    0,
+		portfolio:          portfolio,
+		watchlist:          watchlist,
+		config:             config,
+		debugMode:          config.System.DebugMode,
+		language:           language,
+		lastUpdate:         lastUpdate,
+		debugLogs:          make([]string, 0),
+		debugScrollPos:     0, // 初始滚动位置
+		portfolioScrollPos: 0, // 持股列表滚动位置
+		watchlistScrollPos: 0, // 自选列表滚动位置
+		portfolioCursor:    0, // 持股列表游标
+		watchlistCursor:    0, // 自选列表游标
 	}
 
 	// 根据语言设置菜单项
@@ -463,6 +473,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "end":
 				m.scrollDebugToBottom()
+				return m, nil
+			}
+		}
+
+		// 持股列表和自选列表滚动快捷键
+		if m.state == Monitoring || m.state == WatchlistViewing {
+			keyStr := msg.String()
+			switch keyStr {
+			case "up":
+				if m.state == Monitoring {
+					m.scrollPortfolioUp()
+				} else {
+					m.scrollWatchlistUp()
+				}
+				return m, nil
+			case "down":
+				if m.state == Monitoring {
+					m.scrollPortfolioDown()
+				} else {
+					m.scrollWatchlistDown()
+				}
 				return m, nil
 			}
 		}
@@ -578,11 +609,37 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 	case 0: // 股票列表
 		m.logUserAction("进入持股监控页面")
 		m.state = Monitoring
+		// 设置滚动位置和光标到显示前10条股票
+		if len(m.portfolio.Stocks) > 0 {
+			const maxPortfolioLines = 10
+			if len(m.portfolio.Stocks) > maxPortfolioLines {
+				// 显示前10条：滚动位置设置为显示从索引0开始的10条
+				m.portfolioScrollPos = len(m.portfolio.Stocks) - maxPortfolioLines
+				m.portfolioCursor = 0 // 光标指向第一个股票（索引0）
+			} else {
+				// 股票数量不超过显示行数，显示全部
+				m.portfolioScrollPos = 0
+				m.portfolioCursor = 0
+			}
+		}
 		m.lastUpdate = time.Now()
 		return m, m.tickCmd()
 	case 1: // 自选股票
 		m.logUserAction("进入自选股票页面")
 		m.state = WatchlistViewing
+		// 设置滚动位置和光标到显示前10条股票
+		if len(m.watchlist.Stocks) > 0 {
+			const maxWatchlistLines = 10
+			if len(m.watchlist.Stocks) > maxWatchlistLines {
+				// 显示前10条：滚动位置设置为显示从索引0开始的10条
+				m.watchlistScrollPos = len(m.watchlist.Stocks) - maxWatchlistLines
+				m.watchlistCursor = 0 // 光标指向第一个股票（索引0）
+			} else {
+				// 股票数量不超过显示行数，显示全部
+				m.watchlistScrollPos = 0
+				m.watchlistCursor = 0
+			}
+		}
 		m.cursor = 0
 		m.message = ""
 		m.lastUpdate = time.Now()
@@ -929,6 +986,16 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = ""
 		m.fromSearch = true // 设置标志，表示从持股列表进入，完成后应该回到监控页面
 		return m, nil
+	case "up", "k", "w":
+		if m.portfolioCursor > 0 {
+			m.portfolioCursor--
+		}
+		return m, nil
+	case "down", "j", "s":
+		if m.portfolioCursor < len(m.portfolio.Stocks)-1 {
+			m.portfolioCursor++
+		}
+		return m, nil
 	}
 	return m, nil
 }
@@ -950,18 +1017,42 @@ func (m *Model) viewMonitoring() string {
 
 	// 获取本地化的表头
 	if m.language == Chinese {
-		t.AppendHeader(table.Row{"代码", "名称", "昨收价", "现价", "成本价", "开盘", "最高", "最低", "持股数", "今日涨幅", "今日盈亏", "持仓盈亏", "盈亏率", "市值"})
+		t.AppendHeader(table.Row{"", "代码", "名称", "昨收价", "现价", "成本价", "开盘", "最高", "最低", "持股数", "今日涨幅", "今日盈亏", "持仓盈亏", "盈亏率", "市值"})
 	} else {
-		t.AppendHeader(table.Row{"Code", "Name", "PrevClose", "Price", "Cost", "Open", "High", "Low", "Quantity", "Today%", "TodayP&L", "PositionP&L", "P&LRate", "Value"})
+		t.AppendHeader(table.Row{"", "Code", "Name", "PrevClose", "Price", "Cost", "Open", "High", "Low", "Quantity", "Today%", "TodayP&L", "PositionP&L", "P&LRate", "Value"})
 	}
 
 	var totalMarketValue float64
 	var totalCost float64
 	var totalTodayProfit float64
 
+	// 显示滚动信息
+	totalStocks := len(m.portfolio.Stocks)
+	const maxPortfolioLines = 10
+	if totalStocks > 0 {
+		currentPos := m.portfolioCursor + 1 // 显示从1开始的位置
+		if m.language == Chinese {
+			s += fmt.Sprintf("📊 持股列表 (%d/%d) [↑/↓:翻页]\n", currentPos, totalStocks)
+		} else {
+			s += fmt.Sprintf("📊 Portfolio (%d/%d) [↑/↓:scroll]\n", currentPos, totalStocks)
+		}
+		s += "\n"
+	}
+
+	// 计算要显示的股票范围
+	stocks := m.portfolio.Stocks
+	endIndex := len(stocks) - m.portfolioScrollPos
+	startIndex := endIndex - maxPortfolioLines
+	if startIndex < 0 {
+		startIndex = 0
+	}
+	if endIndex > len(stocks) {
+		endIndex = len(stocks)
+	}
+
+	// 首先计算所有股票的总计（用于汇总行）
 	for i := range m.portfolio.Stocks {
 		stock := &m.portfolio.Stocks[i]
-
 		stockData := getStockPrice(stock.Code)
 		if stockData != nil {
 			stock.Price = stockData.Price
@@ -974,13 +1065,27 @@ func (m *Model) viewMonitoring() string {
 		}
 
 		if stock.Price > 0 {
+			marketValue := stock.Price * float64(stock.Quantity)
+			cost := stock.CostPrice * float64(stock.Quantity)
+			todayProfit := stock.Change * float64(stock.Quantity)
+
+			totalMarketValue += marketValue
+			totalCost += cost
+			totalTodayProfit += todayProfit
+		}
+	}
+
+	// 然后显示当前范围内的股票
+	for i := startIndex; i < endIndex; i++ {
+		stock := &m.portfolio.Stocks[i]
+
+		if stock.Price > 0 {
 			// 今日盈亏：今日价格变化带来的盈亏 = (现价 - 昨收价) × 持股数
 			todayProfit := stock.Change * float64(stock.Quantity)
 			// 持仓盈亏：基于成本价的实时盈亏状态
 			positionProfit := (stock.Price - stock.CostPrice) * float64(stock.Quantity)
 			profitRate := ((stock.Price - stock.CostPrice) / stock.CostPrice) * 100
 			marketValue := stock.Price * float64(stock.Quantity)
-			cost := stock.CostPrice * float64(stock.Quantity)
 
 			// 计算今日涨幅：应该基于昨收价，而不是开盘价
 			var todayChangeStr string
@@ -991,16 +1096,19 @@ func (m *Model) viewMonitoring() string {
 				todayChangeStr = "-"
 			}
 
-			totalMarketValue += marketValue
-			totalCost += cost
-			totalTodayProfit += todayProfit
-
 			// 使用多语言颜色显示函数
 			todayProfitStr := m.formatProfitWithColorZeroLang(todayProfit)
 			positionProfitStr := m.formatProfitWithColorZeroLang(positionProfit)
 			profitRateStr := m.formatProfitRateWithColorZeroLang(profitRate)
 
+			// 光标列 - 检查光标是否在当前可见范围内且指向此行
+			cursorCol := ""
+			if m.portfolioCursor >= startIndex && m.portfolioCursor < endIndex && i == m.portfolioCursor {
+				cursorCol = "►"
+			}
+
 			t.AppendRow(table.Row{
+				cursorCol,
 				stock.Code,
 				stock.Name,
 				fmt.Sprintf("%.3f", stock.PrevClose), // 昨收价（无颜色）
@@ -1017,13 +1125,20 @@ func (m *Model) viewMonitoring() string {
 				fmt.Sprintf("%.2f", marketValue),
 			})
 
-			// 在每个股票后添加分隔线（除了最后一个）
-			if i < len(m.portfolio.Stocks)-1 {
+			// 在每个股票后添加分隔线（除了显示范围内的最后一个）
+			if i < endIndex-1 {
 				t.AppendSeparator()
 			}
 		} else {
 			// 如果无法获取数据，显示基本信息但标记数据不可用
+			// 光标列 - 检查光标是否在当前可见范围内且指向此行
+			cursorCol := ""
+			if m.portfolioCursor >= startIndex && m.portfolioCursor < endIndex && i == m.portfolioCursor {
+				cursorCol = "►"
+			}
+
 			t.AppendRow(table.Row{
+				cursorCol,
 				stock.Code,
 				stock.Name,
 				"-",
@@ -1039,8 +1154,8 @@ func (m *Model) viewMonitoring() string {
 				"-",
 				"-",
 			})
-			// 在每个股票后添加分隔线（除了最后一个）
-			if i < len(m.portfolio.Stocks)-1 {
+			// 在每个股票后添加分隔线（除了显示范围内的最后一个）
+			if i < endIndex-1 {
 				t.AppendSeparator()
 			}
 		}
@@ -1054,6 +1169,7 @@ func (m *Model) viewMonitoring() string {
 
 	t.AppendSeparator()
 	t.AppendRow(table.Row{
+		"",                 // 光标列
 		"",                 // 代码
 		m.getText("total"), // 名称 -> 总计
 		"",                 // 昨收价
@@ -1071,6 +1187,26 @@ func (m *Model) viewMonitoring() string {
 	})
 
 	s += t.Render() + "\n"
+
+	// 如果可以滚动，显示滚动指示
+	if totalStocks > maxPortfolioLines {
+		s += strings.Repeat("-", 80) + "\n"
+		if m.portfolioScrollPos > 0 {
+			if m.language == Chinese {
+				s += "↑ 有更新的股票 (按↓查看)\n"
+			} else {
+				s += "↑ Newer stocks available (press ↓)\n"
+			}
+		}
+		if m.portfolioScrollPos < totalStocks-1 {
+			if m.language == Chinese {
+				s += "↓ 有更多历史股票 (按↑查看)\n"
+			} else {
+				s += "↓ More stocks available (press ↑)\n"
+			}
+		}
+	}
+
 	s += "\n" + m.getText("holdingsHelp") + "\n"
 
 	return s
@@ -2110,6 +2246,126 @@ func (m *Model) scrollDebugToBottom() {
 	m.debugScrollPos = 0
 }
 
+// ========== 持股列表滚动控制方法 ==========
+
+func (m *Model) scrollPortfolioUp() {
+	// 向上翻页：显示更早的股票，光标也向上移动
+	if m.portfolioCursor > 0 {
+		m.portfolioCursor--
+	}
+	// 确保光标在可见范围内，如果需要则调整滚动位置
+	const maxPortfolioLines = 10
+	endIndex := len(m.portfolio.Stocks) - m.portfolioScrollPos
+	startIndex := endIndex - maxPortfolioLines
+	if startIndex < 0 {
+		startIndex = 0
+	}
+	
+	// 如果光标超出可见范围的上边界，调整滚动位置
+	if m.portfolioCursor < startIndex {
+		m.portfolioScrollPos = len(m.portfolio.Stocks) - m.portfolioCursor - maxPortfolioLines
+		if m.portfolioScrollPos < 0 {
+			m.portfolioScrollPos = 0
+		}
+	}
+}
+
+func (m *Model) scrollPortfolioDown() {
+	// 向下翻页：显示更新的股票，光标也向下移动
+	if m.portfolioCursor < len(m.portfolio.Stocks)-1 {
+		m.portfolioCursor++
+	}
+	// 确保光标在可见范围内，如果需要则调整滚动位置
+	const maxPortfolioLines = 10
+	endIndex := len(m.portfolio.Stocks) - m.portfolioScrollPos
+	startIndex := endIndex - maxPortfolioLines
+	if startIndex < 0 {
+		startIndex = 0
+	}
+	
+	// 如果光标超出可见范围的下边界，调整滚动位置
+	if m.portfolioCursor >= endIndex {
+		m.portfolioScrollPos = len(m.portfolio.Stocks) - m.portfolioCursor - 1
+		if m.portfolioScrollPos < 0 {
+			m.portfolioScrollPos = 0
+		}
+	}
+}
+
+func (m *Model) scrollPortfolioToTop() {
+	if len(m.portfolio.Stocks) > 0 {
+		m.portfolioScrollPos = len(m.portfolio.Stocks) - 1
+		m.portfolioCursor = 0 // 指向最早的股票
+	}
+}
+
+func (m *Model) scrollPortfolioToBottom() {
+	m.portfolioScrollPos = 0
+	if len(m.portfolio.Stocks) > 0 {
+		m.portfolioCursor = len(m.portfolio.Stocks) - 1 // 指向最新的股票
+	}
+}
+
+// ========== 自选列表滚动控制方法 ==========
+
+func (m *Model) scrollWatchlistUp() {
+	// 向上翻页：显示更早的股票，光标也向上移动
+	if m.watchlistCursor > 0 {
+		m.watchlistCursor--
+	}
+	// 确保光标在可见范围内，如果需要则调整滚动位置
+	const maxWatchlistLines = 10
+	endIndex := len(m.watchlist.Stocks) - m.watchlistScrollPos
+	startIndex := endIndex - maxWatchlistLines
+	if startIndex < 0 {
+		startIndex = 0
+	}
+	
+	// 如果光标超出可见范围的上边界，调整滚动位置
+	if m.watchlistCursor < startIndex {
+		m.watchlistScrollPos = len(m.watchlist.Stocks) - m.watchlistCursor - maxWatchlistLines
+		if m.watchlistScrollPos < 0 {
+			m.watchlistScrollPos = 0
+		}
+	}
+}
+
+func (m *Model) scrollWatchlistDown() {
+	// 向下翻页：显示更新的股票，光标也向下移动
+	if m.watchlistCursor < len(m.watchlist.Stocks)-1 {
+		m.watchlistCursor++
+	}
+	// 确保光标在可见范围内，如果需要则调整滚动位置
+	const maxWatchlistLines = 10
+	endIndex := len(m.watchlist.Stocks) - m.watchlistScrollPos
+	startIndex := endIndex - maxWatchlistLines
+	if startIndex < 0 {
+		startIndex = 0
+	}
+	
+	// 如果光标超出可见范围的下边界，调整滚动位置
+	if m.watchlistCursor >= endIndex {
+		m.watchlistScrollPos = len(m.watchlist.Stocks) - m.watchlistCursor - 1
+		if m.watchlistScrollPos < 0 {
+			m.watchlistScrollPos = 0
+		}
+	}
+}
+
+func (m *Model) scrollWatchlistToTop() {
+	if len(m.watchlist.Stocks) > 0 {
+		m.watchlistScrollPos = len(m.watchlist.Stocks) - 1
+		m.watchlistCursor = 0 // 指向最早的股票
+	}
+}
+
+func (m *Model) scrollWatchlistToBottom() {
+	m.watchlistScrollPos = 0
+	if len(m.watchlist.Stocks) > 0 {
+		m.watchlistCursor = len(m.watchlist.Stocks) - 1 // 指向最新的股票
+	}
+}
+
 func (m *Model) logUserAction(action string) {
 	if m.debugMode {
 		timestamp := time.Now().Format("15:04:05")
@@ -2363,7 +2619,7 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.logUserAction(fmt.Sprintf("搜索成功: %s (%s)", m.searchResult.Name, m.searchResult.Symbol))
-		
+
 		// 如果是从自选列表进入的搜索，跳转到确认页面
 		if m.searchFromWatchlist {
 			m.state = WatchlistSearchConfirm
@@ -2715,6 +2971,19 @@ func (m *Model) handleSearchResultWithActions(msg tea.KeyMsg) (tea.Model, tea.Cm
 			}
 			// 跳转到自选列表页面
 			m.state = WatchlistViewing
+			// 设置滚动位置和光标到显示前10条股票
+			if len(m.watchlist.Stocks) > 0 {
+				const maxWatchlistLines = 10
+				if len(m.watchlist.Stocks) > maxWatchlistLines {
+					// 显示前10条：滚动位置设置为显示从索引0开始的10条
+					m.watchlistScrollPos = len(m.watchlist.Stocks) - maxWatchlistLines
+					m.watchlistCursor = 0 // 光标指向第一个股票（索引0）
+				} else {
+					// 股票数量不超过显示行数，显示全部
+					m.watchlistScrollPos = 0
+					m.watchlistCursor = 0
+				}
+			}
 			m.cursor = 0
 			m.lastUpdate = time.Now()
 		}
@@ -2881,6 +3150,16 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searchFromWatchlist = true
 		m.message = ""
 		return m, nil
+	case "up", "k", "w":
+		if m.watchlistCursor > 0 {
+			m.watchlistCursor--
+		}
+		return m, nil
+	case "down", "j", "s":
+		if m.watchlistCursor < len(m.watchlist.Stocks)-1 {
+			m.watchlistCursor++
+		}
+		return m, nil
 	}
 	return m, nil
 }
@@ -2896,18 +3175,43 @@ func (m *Model) viewWatchlistViewing() string {
 		return s
 	}
 
+	// 显示滚动信息
+	totalWatchStocks := len(m.watchlist.Stocks)
+	const maxWatchlistLines = 10
+	if totalWatchStocks > 0 {
+		currentPos := m.watchlistCursor + 1 // 显示从1开始的位置
+		if m.language == Chinese {
+			s += fmt.Sprintf("⭐ 自选列表 (%d/%d) [↑/↓:翻页]\n", currentPos, totalWatchStocks)
+		} else {
+			s += fmt.Sprintf("⭐ Watchlist (%d/%d) [↑/↓:scroll]\n", currentPos, totalWatchStocks)
+		}
+		s += "\n"
+	}
+
 	// 创建表格显示自选股票列表
 	t := table.NewWriter()
 	t.SetStyle(table.StyleLight)
 
 	// 获取本地化的表头
 	if m.language == Chinese {
-		t.AppendHeader(table.Row{"代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"})
+		t.AppendHeader(table.Row{"", "代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"})
 	} else {
-		t.AppendHeader(table.Row{"Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"})
+		t.AppendHeader(table.Row{"", "Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"})
 	}
 
-	for i, watchStock := range m.watchlist.Stocks {
+	// 计算要显示的自选股票范围
+	watchStocks := m.watchlist.Stocks
+	endIndex := len(watchStocks) - m.watchlistScrollPos
+	startIndex := endIndex - maxWatchlistLines
+	if startIndex < 0 {
+		startIndex = 0
+	}
+	if endIndex > len(watchStocks) {
+		endIndex = len(watchStocks)
+	}
+
+	for i := startIndex; i < endIndex; i++ {
+		watchStock := watchStocks[i]
 		// 获取实时股价数据
 		stockData := getStockPrice(watchStock.Code)
 		if stockData != nil {
@@ -2931,7 +3235,14 @@ func (m *Model) viewWatchlistViewing() string {
 			// 成交量显示
 			volumeStr := formatVolume(stockData.Volume)
 
+			// 光标列 - 检查光标是否在当前可见范围内且指向此行
+			cursorCol := ""
+			if m.watchlistCursor >= startIndex && m.watchlistCursor < endIndex && i == m.watchlistCursor {
+				cursorCol = "►"
+			}
+
 			t.AppendRow(table.Row{
+				cursorCol,
 				watchStock.Code,
 				watchStock.Name,
 				m.formatPriceWithColorLang(stockData.Price, stockData.PrevClose),
@@ -2945,7 +3256,14 @@ func (m *Model) viewWatchlistViewing() string {
 			})
 		} else {
 			// 如果无法获取数据，显示基本信息
+			// 光标列 - 检查光标是否在当前可见范围内且指向此行
+			cursorCol := ""
+			if m.watchlistCursor >= startIndex && m.watchlistCursor < endIndex && i == m.watchlistCursor {
+				cursorCol = "►"
+			}
+
 			t.AppendRow(table.Row{
+				cursorCol,
 				watchStock.Code,
 				watchStock.Name,
 				"-",
@@ -2959,14 +3277,34 @@ func (m *Model) viewWatchlistViewing() string {
 			})
 		}
 
-		// 在每个股票后添加分隔线（除了最后一个）
-		if i < len(m.watchlist.Stocks)-1 {
+		// 在每个股票后添加分隔线（除了显示范围内的最后一个）
+		if i < endIndex-1 {
 			t.AppendSeparator()
 		}
 	}
 
-	s += t.Render() + "\n\n"
-	s += m.getText("watchlistHelp") + "\n"
+	s += t.Render() + "\n"
+
+	// 如果可以滚动，显示滚动指示
+	if totalWatchStocks > maxWatchlistLines {
+		s += "\n" + strings.Repeat("-", 80) + "\n"
+		if m.watchlistScrollPos > 0 {
+			if m.language == Chinese {
+				s += "↑ 有更新的自选股票 (按↓查看)\n"
+			} else {
+				s += "↑ Newer watchlist stocks available (press ↓)\n"
+			}
+		}
+		if m.watchlistScrollPos < totalWatchStocks-1 {
+			if m.language == Chinese {
+				s += "↓ 有更多历史自选股票 (按↑查看)\n"
+			} else {
+				s += "↓ More watchlist stocks available (press ↑)\n"
+			}
+		}
+	}
+
+	s += "\n" + m.getText("watchlistHelp") + "\n"
 
 	if m.message != "" {
 		s += "\n" + m.message + "\n"
@@ -3075,31 +3413,31 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 	}
 
 	s := m.getText("searchTitle") + "\n\n"
-	
+
 	// 创建表格显示股票信息
 	t := table.NewWriter()
 	t.SetStyle(table.StyleLight)
-	
+
 	// 设置表头
 	if m.language == Chinese {
 		t.AppendHeader(table.Row{"名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"})
 	} else {
 		t.AppendHeader(table.Row{"Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"})
 	}
-	
+
 	// 构建数据行
 	var values []interface{}
-	
+
 	// 名称
 	values = append(values, m.searchResult.Name)
-	
+
 	// 现价 (带颜色)
 	priceStr := m.formatPriceWithColorLang(m.searchResult.Price, m.searchResult.PrevClose)
 	values = append(values, priceStr)
-	
+
 	// 昨收价
 	values = append(values, fmt.Sprintf("%.3f", m.searchResult.PrevClose))
-	
+
 	// 开盘价
 	if m.searchResult.StartPrice > 0 {
 		openStr := m.formatPriceWithColorLang(m.searchResult.StartPrice, m.searchResult.PrevClose)
@@ -3107,7 +3445,7 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 	} else {
 		values = append(values, "-")
 	}
-	
+
 	// 最高价
 	if m.searchResult.MaxPrice > 0 {
 		highStr := m.formatPriceWithColorLang(m.searchResult.MaxPrice, m.searchResult.PrevClose)
@@ -3115,7 +3453,7 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 	} else {
 		values = append(values, "-")
 	}
-	
+
 	// 最低价
 	if m.searchResult.MinPrice > 0 {
 		lowStr := m.formatPriceWithColorLang(m.searchResult.MinPrice, m.searchResult.PrevClose)
@@ -3123,7 +3461,7 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 	} else {
 		values = append(values, "-")
 	}
-	
+
 	// 今日涨幅
 	if m.searchResult.ChangePercent != 0 {
 		changePercentStr := m.formatProfitRateWithColorZeroLang(m.searchResult.ChangePercent)
@@ -3131,14 +3469,14 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 	} else {
 		values = append(values, "-")
 	}
-	
+
 	// 换手率
 	if m.searchResult.TurnoverRate > 0 {
 		values = append(values, fmt.Sprintf("%.2f%%", m.searchResult.TurnoverRate))
 	} else {
 		values = append(values, "-")
 	}
-	
+
 	// 成交量
 	if m.searchResult.Volume > 0 {
 		if m.searchResult.Volume >= 100000000 { // 大于等于1亿
@@ -3151,16 +3489,16 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 	} else {
 		values = append(values, "-")
 	}
-	
+
 	t.AppendRow(values)
-	
+
 	s += t.Render() + "\n\n"
-	
+
 	if m.language == Chinese {
 		s += "按回车键添加到自选列表，ESC键返回，R键重新搜索\n"
 	} else {
 		s += "Press Enter to add to watchlist, ESC to return, R to search again\n"
 	}
-	
+
 	return s
 }
