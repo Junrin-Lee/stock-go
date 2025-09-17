@@ -606,6 +606,7 @@ func (m *Model) handleMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
+	m.message = "" // 清除之前的消息
 	switch m.currentMenuItem {
 	case 0: // 股票列表
 		m.logUserAction("进入持股监控页面")
@@ -893,6 +894,7 @@ func (m *Model) handleRemovingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.tickCmd()
 		} else {
 			m.state = MainMenu
+			m.message = "" // 清除消息
 			return m, nil
 		}
 	case "up", "k", "w":
@@ -948,6 +950,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q", "m":
 		m.state = MainMenu
+		m.message = "" // 清除消息
 		return m, nil
 	case "e":
 		// 修改股票功能
@@ -2843,6 +2846,7 @@ func (m *Model) handleLanguageSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
 		m.state = MainMenu
+		m.message = "" // 清除消息
 		return m, nil
 	case "up", "k", "w":
 		if m.languageCursor > 0 {
