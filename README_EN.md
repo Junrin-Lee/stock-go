@@ -551,6 +551,39 @@ Code | Name | PrevClose | Price | Cost | Open | High | Low | Quantity | Today% |
 <details>
 <summary>🔽 Click to view historical version details</summary>
 
+### 🌟 v4.2 - Portfolio Data Optimization and P&L Analysis Enhancement 🚀 **Data Optimization Update**
+
+**📊 P&L Calculation Logic Optimization**:
+- ✅ **Position P&L Correction**: Fixed position P&L calculation logic to ensure correct display based on cost price
+- ✅ **Today's P&L Addition**: Added "Today's P&L" column showing P&L amount from daily price changes
+- ✅ **Enhanced P&L Analysis**: Provides three-dimensional analysis: Today's Change% (percentage), Today's P&L (amount), Position P&L (total P&L)
+
+**📋 Table Layout Optimization**:
+- ✅ **Header Order Adjustment**: Optimized to logical sequence `PrevClose | Price | Cost` for better price comparison
+- ✅ **Cost Price Display Optimization**: Removed color display from cost price column as neutral reference price
+- ✅ **Data Column Expansion**: Portfolio expanded from 13 to 14 columns providing more detailed P&L analysis
+
+**🧮 Calculation Formula Enhancement**:
+- ✅ **Today's P&L**: `(Current Price - Previous Close) × Quantity` - reflects P&L from daily price changes
+- ✅ **Position P&L**: `(Current Price - Cost Price) × Quantity` - reflects overall investment P&L status
+- ✅ **P&L Rate**: `(Current Price - Cost Price) / Cost Price × 100%` - investment return rate
+
+**🎯 User Experience Enhancement**:
+- 🔧 **Data Alignment Correction**: Fixed total row data misalignment issues, ensuring correct column data correspondence
+- 📱 **Display Logic Optimization**: Simplified redundant data columns, highlighted core P&L indicators
+- 🌈 **Rational Color Display**: Cost price no longer displays color, highlighting price change importance
+
+**📋 Current Portfolio Display**:
+```
+Code | Name | PrevClose | Price | Cost | Open | High | Low | Quantity | Today% | TodayP&L | PositionP&L | P&LRate | Value
+```
+
+**💡 Example Illustration** (ZhaoWei Motor):
+- Current Price: 142.47, Cost Price: 145.962, Previous Close: 137.19
+- Today's Change: +3.85% (price change relative to yesterday)
+- Today's P&L: +528 yuan (profit from today's price change)
+- Position P&L: -349.2 yuan (still in loss relative to cost price)
+
 **🌟 v4.1 - Watchlist Enhancement and User Experience Optimization 🚀**
 
 **📊 Watchlist Data Enhancement**:

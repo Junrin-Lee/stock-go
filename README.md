@@ -86,6 +86,13 @@ go build -o cmd/stock-monitor main.go
 - **持股列表专用**:
   - `E` 键: 修改选中的股票
   - `D` 键: 删除选中的股票
+  - `↑↓` 方向键: 分页浏览股票列表 ⭐ v4.3新增
+- **自选列表专用**:
+  - `A` 键: 添加股票到自选列表 ⭐ v4.3更新（原S键）
+  - `D` 键: 删除自选股票
+  - `↑↓` 方向键: 分页浏览自选列表 ⭐ v4.3新增
+- **调试模式专用**:
+  - `PageUp/PageDown`: 浏览调试日志 ⭐ v4.3调整
 
 #### 🏠 主菜单导航
 ```
@@ -120,6 +127,7 @@ go build -o cmd/stock-monitor main.go
 | `display.color_scheme` | `"professional"` | 颜色方案 | `"professional"`, `"simple"` |
 | `display.decimal_places` | `3` | 价格显示小数位数 | `1-4` |
 | `display.table_style` | `"light"` | 表格样式 | `"light"`, `"bold"`, `"simple"` |
+| `display.max_lines` | `10` | 每页显示行数 ⭐ v4.3新增 | 任意正整数 (推荐10-20) |
 | `update.refresh_interval` | `5` | 数据刷新间隔（秒） | 任意正整数 |
 | `update.auto_update` | `true` | 是否自动更新 | `true`, `false` |
 
@@ -178,9 +186,15 @@ vim config.yaml
 自选股票页面 → 按"D"键 → 选择要删除的股票 → 确认删除
 ```
 
-**5. 快捷搜索新股票** ⭐ v4.1新增
+**5. 快捷搜索新股票** ⭐ v4.3更新
 ```
-自选股票页面 → 按"S"键 → 直接跳转到股票搜索页面
+自选股票页面 → 按"A"键 → 直接跳转到股票搜索页面
+```
+
+**6. 分页浏览功能** ⭐ v4.3新增
+```
+持股/自选列表 → 使用↑↓方向键 → 按页浏览股票（每页可配置行数）
+当前显示：第X行/共Y行 → 光标箭头(►)指示当前选中股票
 ```
 
 #### 🔄 搜索结果新增操作
@@ -376,9 +390,13 @@ stock-go/
 ├── go.mod               # 📦 Go 模块依赖配置  
 ├── go.sum               # 🔒 依赖版本锁定文件
 │
-├── config.yaml          # ⚙️ 系统配置文件（用户可编辑）
-├── portfolio.json       # 📊 投资组合数据（自动生成）
-├── watchlist.json       # ⭐ 自选股票数据（自动生成）
+├── cmd/
+│   └── conf/
+│       ├── config.yml          # ⚙️ 系统配置文件（用户可编辑）
+│       └── config_demo.yaml    # 📋 参考配置文件（含双语注释）⭐ v4.3新增
+├── data/
+│   ├── portfolio.json       # 📊 投资组合数据（自动生成）
+│   └── watchlist.json       # ⭐ 自选股票数据（自动生成）
 ├── stock-monitor        # ⚙️ 编译后的可执行文件
 │
 ├── README.md            # 📝 中文文档
@@ -387,25 +405,27 @@ stock-go/
 
 ### 💾 数据存储
 
-**config.yaml** 配置文件示例：
+**config.yml** 配置文件示例：
 ```yaml
 # 股票监控系统配置文件
 system:
     language: zh          # 默认语言: "zh" (中文) or "en" (English)
     auto_start: true      # 有数据时自动进入监控模式
+    startup_module: portfolio  # 启动模块: "portfolio", "watchlist"
     debug_mode: false     # 调试模式开关
 
 display:
     color_scheme: professional   # 颜色方案: "professional", "simple"
     decimal_places: 3            # 价格显示小数位数 (1-4)
     table_style: light           # 表格样式: "light", "bold", "simple"
+    max_lines: 10               # 每页显示行数 ⭐ v4.3新增
 
 update:
     refresh_interval: 5   # 刷新间隔(秒)
     auto_update: true     # 是否自动更新
 ```
 
-**portfolio.json** 示例：
+**data/portfolio.json** 示例：
 ```json
 {
   "stocks": [
@@ -416,27 +436,31 @@ update:
       "quantity": 400,
       "price": 61.9,
       "change": 2.86,
-      "change_percent": 4.84
+      "change_percent": 4.84,
+      "start_price": 58.9,
+      "max_price": 63.0,
+      "min_price": 57.71,
+      "prev_close": 59.73
     }
   ]
 }
 ```
 
-**watchlist.json** 示例：
+**data/watchlist.json** 示例：
 ```json
 {
   "stocks": [
     {
-      "code": "AAPL",
-      "name": "苹果公司"
+      "code": "SH600410",
+      "name": "华胜天成"
     },
     {
       "code": "SH600519",
       "name": "贵州茅台"
     },
     {
-      "code": "00700.HK",
-      "name": "腾讯控股"
+      "code": "SZ001309",
+      "name": "德明利"
     }
   ]
 }
@@ -544,6 +568,45 @@ go get golang.org/x/text@v0.28.0
 
 ## 📈 版本更新
 
+### 🌟 v4.3 - 用户界面交互增强与分页显示优化 🚀 **界面体验更新**
+
+**⌨️ 交互操作优化**：
+- ✅ **快捷键调整**: 自选股票添加快捷键从'S'改为'A'，操作更加直观
+- ✅ **搜索结果表格化**: 搜索结果以专业表格格式展示，包含名称│现价│昨收价│开盘│最高│最低│今日涨幅│换手率│成交量
+- ✅ **键盘冲突解决**: debug模式使用PageUp/PageDown，股票列表使用上下方向键，避免操作冲突
+
+**📊 分页显示系统**：
+- ✅ **智能分页**: 持股列表和自选列表支持分页浏览，默认每页10行数据
+- ✅ **可配置行数**: 新增`max_lines`配置项，用户可根据屏幕分辨率自定义每页显示行数
+- ✅ **光标导航**: 添加独立光标列显示当前选中行的指针箭头（►）
+- ✅ **位置显示**: 实时显示当前股票位置和总数（如：第3行/共15行）
+
+**🎯 显示逻辑优化**：
+- ✅ **首行光标**: 修复进入列表时光标默认显示在第一行而非最后一行
+- ✅ **数据顺序**: 修复自选列表首次显示前N行而非最后N行的问题
+- ✅ **光标可见性**: 解决首次进入自选列表光标不可见的问题
+- ✅ **独立光标列**: 光标（►）显示在单独列中，不影响股票名称显示
+
+**⚙️ 配置文件增强**：
+- ✅ **显示行数配置**: `display.max_lines`可配置每页显示的股票数量（建议：1080p=10行，1440p=15行，4K=20行）
+- ✅ **配置文件优化**: 移除`config.yml.example`，统一使用`config_demo.yaml`作为参考配置
+- ✅ **双语配置注释**: 配置文件包含完整的中英文双语注释说明
+
+**💡 用户体验提升**：
+- 🎮 **流畅翻页**: 支持上下方向键进行10行分页浏览，大数据量下操作更便捷
+- 📍 **精确定位**: 实时显示当前浏览位置，方便用户了解数据范围
+- 🔍 **清晰标识**: 光标箭头直观显示当前选中的股票行
+- ⚙️ **个性化定制**: 根据不同屏幕尺寸灵活调整显示密度
+
+---
+
+---
+
+### 📅 历史版本
+
+<details>
+<summary>🔽 点击查看历史版本详情</summary>
+
 ### 🌟 v4.2 - 持股列表数据优化与盈亏分析增强 🚀 **数据优化更新**
 
 **📊 盈亏计算逻辑优化**：
@@ -576,13 +639,6 @@ go get golang.org/x/text@v0.28.0
 - 今日涨幅: +3.85%（价格相对昨日的变化）
 - 今日盈亏: +528元（今日价格变化带来的收益）
 - 持仓盈亏: -349.2元（相对成本价仍为亏损状态）
-
----
-
-### 📅 历史版本
-
-<details>
-<summary>🔽 点击查看历史版本详情</summary>
 
 **🌟 v4.1 - 自选列表增强与用户体验优化 🚀**
 
