@@ -55,6 +55,7 @@ type Portfolio struct {
 type WatchlistStock struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
+	Tag  string `json:"tag"`  // 标签字段，默认为"-"
 }
 
 type Watchlist struct {
@@ -117,6 +118,8 @@ const (
 	WatchlistViewing
 	SearchResultWithActions
 	WatchlistSearchConfirm
+	WatchlistTagging      // 自选股票打标签状态
+	WatchlistGroupSelect  // 自选股票分组选择状态
 )
 
 // 文本映射结构
@@ -342,6 +345,11 @@ type Model struct {
 	watchlistScrollPos int // 自选列表滚动位置
 	portfolioCursor    int // 持股列表当前选中行
 	watchlistCursor    int // 自选列表当前选中行
+	
+	// For watchlist tagging and grouping
+	selectedTag        string   // 当前选择的标签过滤
+	availableTags      []string // 所有可用的标签列表
+	tagInput           string   // 标签输入框内容
 }
 
 type tickMsg struct{}
@@ -519,6 +527,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel, cmd = m.handleLanguageSelection(msg)
 		case WatchlistViewing:
 			newModel, cmd = m.handleWatchlistViewing(msg)
+		case WatchlistTagging:
+			newModel, cmd = m.handleWatchlistTagging(msg)
+		case WatchlistGroupSelect:
+			newModel, cmd = m.handleWatchlistGroupSelect(msg)
 		default:
 			newModel, cmd = m, nil
 		}
@@ -566,6 +578,10 @@ func (m *Model) View() string {
 		mainContent = m.viewLanguageSelection()
 	case WatchlistViewing:
 		mainContent = m.viewWatchlistViewing()
+	case WatchlistTagging:
+		mainContent = m.viewWatchlistTagging()
+	case WatchlistGroupSelect:
+		mainContent = m.viewWatchlistGroupSelect()
 	default:
 		mainContent = ""
 	}
@@ -601,37 +617,13 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 	case 0: // 股票列表
 		m.logUserAction("进入持股监控页面")
 		m.state = Monitoring
-		// 设置滚动位置和光标到显示前N条股票
-		if len(m.portfolio.Stocks) > 0 {
-			maxPortfolioLines := m.config.Display.MaxLines
-			if len(m.portfolio.Stocks) > maxPortfolioLines {
-				// 显示前N条：滚动位置设置为显示从索引0开始的N条
-				m.portfolioScrollPos = len(m.portfolio.Stocks) - maxPortfolioLines
-				m.portfolioCursor = 0 // 光标指向第一个股票（索引0）
-			} else {
-				// 股票数量不超过显示行数，显示全部
-				m.portfolioScrollPos = 0
-				m.portfolioCursor = 0
-			}
-		}
+		m.resetPortfolioCursor() // 重置游标到第一只股票
 		m.lastUpdate = time.Now()
 		return m, m.tickCmd()
 	case 1: // 自选股票
 		m.logUserAction("进入自选股票页面")
 		m.state = WatchlistViewing
-		// 设置滚动位置和光标到显示前N条股票
-		if len(m.watchlist.Stocks) > 0 {
-			maxWatchlistLines := m.config.Display.MaxLines
-			if len(m.watchlist.Stocks) > maxWatchlistLines {
-				// 显示前N条：滚动位置设置为显示从索引0开始的N条
-				m.watchlistScrollPos = len(m.watchlist.Stocks) - maxWatchlistLines
-				m.watchlistCursor = 0 // 光标指向第一个股票（索引0）
-			} else {
-				// 股票数量不超过显示行数，显示全部
-				m.watchlistScrollPos = 0
-				m.watchlistCursor = 0
-			}
-		}
+		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.cursor = 0
 		m.message = ""
 		m.lastUpdate = time.Now()
@@ -723,6 +715,7 @@ func (m *Model) handleAddingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// 从持股列表或搜索结果进入，返回相应页面
 			if m.previousState == Monitoring {
 				m.state = Monitoring
+				m.resetPortfolioCursor() // 重置游标到第一只股票
 				m.lastUpdate = time.Now()
 			} else {
 				m.state = SearchResultWithActions
@@ -826,6 +819,7 @@ func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 		if m.fromSearch {
 			// 从搜索结果添加，跳转到持股列表（监控）页面
 			m.state = Monitoring
+			m.resetPortfolioCursor() // 重置游标到第一只股票
 			m.lastUpdate = time.Now()
 			m.fromSearch = false // 重置标志
 			m.message = fmt.Sprintf(m.getText("addSuccess"), m.stockInfo.Name, m.tempCode)
@@ -2257,56 +2251,34 @@ func (m *Model) scrollWatchlistUp() {
 	if m.watchlistCursor > 0 {
 		m.watchlistCursor--
 	}
-	// 确保光标在可见范围内，如果需要则调整滚动位置
-	maxWatchlistLines := m.config.Display.MaxLines
-	endIndex := len(m.watchlist.Stocks) - m.watchlistScrollPos
-	startIndex := endIndex - maxWatchlistLines
-	if startIndex < 0 {
-		startIndex = 0
-	}
-
-	// 如果光标超出可见范围的上边界，调整滚动位置
-	if m.watchlistCursor < startIndex {
-		m.watchlistScrollPos = len(m.watchlist.Stocks) - m.watchlistCursor - maxWatchlistLines
-		if m.watchlistScrollPos < 0 {
-			m.watchlistScrollPos = 0
-		}
-	}
+	// 基于过滤后的列表调整滚动
+	filteredStocks := m.getFilteredWatchlist()
+	m.adjustWatchlistScroll(filteredStocks)
 }
 
 func (m *Model) scrollWatchlistDown() {
 	// 向下翻页：显示更新的股票，光标也向下移动
-	if m.watchlistCursor < len(m.watchlist.Stocks)-1 {
+	filteredStocks := m.getFilteredWatchlist()
+	if m.watchlistCursor < len(filteredStocks)-1 {
 		m.watchlistCursor++
 	}
-	// 确保光标在可见范围内，如果需要则调整滚动位置
-	maxWatchlistLines := m.config.Display.MaxLines
-	endIndex := len(m.watchlist.Stocks) - m.watchlistScrollPos
-	startIndex := endIndex - maxWatchlistLines
-	if startIndex < 0 {
-		startIndex = 0
-	}
-
-	// 如果光标超出可见范围的下边界，调整滚动位置
-	if m.watchlistCursor >= endIndex {
-		m.watchlistScrollPos = len(m.watchlist.Stocks) - m.watchlistCursor - 1
-		if m.watchlistScrollPos < 0 {
-			m.watchlistScrollPos = 0
-		}
-	}
+	// 基于过滤后的列表调整滚动
+	m.adjustWatchlistScroll(filteredStocks)
 }
 
 func (m *Model) scrollWatchlistToTop() {
-	if len(m.watchlist.Stocks) > 0 {
-		m.watchlistScrollPos = len(m.watchlist.Stocks) - 1
-		m.watchlistCursor = 0 // 指向最早的股票
+	filteredStocks := m.getFilteredWatchlist()
+	if len(filteredStocks) > 0 {
+		m.watchlistCursor = 0 // 指向第一个股票
+		m.adjustWatchlistScroll(filteredStocks)
 	}
 }
 
 func (m *Model) scrollWatchlistToBottom() {
-	m.watchlistScrollPos = 0
-	if len(m.watchlist.Stocks) > 0 {
-		m.watchlistCursor = len(m.watchlist.Stocks) - 1 // 指向最新的股票
+	filteredStocks := m.getFilteredWatchlist()
+	if len(filteredStocks) > 0 {
+		m.watchlistCursor = len(filteredStocks) - 1 // 指向最后一个股票
+		m.adjustWatchlistScroll(filteredStocks)
 	}
 }
 
@@ -2395,6 +2367,7 @@ func (m *Model) handleEditingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// 根据之前的状态决定返回到哪里
 		if m.previousState == Monitoring {
 			m.state = Monitoring
+			m.resetPortfolioCursor() // 重置游标到第一只股票
 			m.lastUpdate = time.Now()
 			m.message = ""
 			return m, m.tickCmd()
@@ -2457,6 +2430,7 @@ func (m *Model) processEditingStep() (tea.Model, tea.Cmd) {
 			// 根据之前的状态决定返回到哪里
 			if m.previousState == Monitoring {
 				m.state = Monitoring
+				m.resetPortfolioCursor() // 重置游标到第一只股票
 				m.lastUpdate = time.Now()
 				m.message = fmt.Sprintf(m.getText("editSuccess"), stockName)
 				m.editingStep = 0
@@ -2512,6 +2486,7 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		if m.searchFromWatchlist {
 			m.state = WatchlistViewing
+			m.resetWatchlistCursor() // 重置游标到第一只股票
 			m.searchFromWatchlist = false
 		} else {
 			m.state = MainMenu
@@ -2724,7 +2699,7 @@ func isControlKey(str string) bool {
 		"up", "down", "left", "right",
 		"home", "end", "pgup", "pgdown",
 		"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
-		"insert", "delete", "tab",
+		"insert", "delete", "tab", "enter", "backspace", "esc",
 	}
 
 	for _, key := range controlKeys {
@@ -2817,6 +2792,14 @@ func loadWatchlist() Watchlist {
 	if err != nil {
 		return Watchlist{Stocks: []WatchlistStock{}}
 	}
+
+	// 为旧数据添加默认标签
+	for i := range watchlist.Stocks {
+		if watchlist.Stocks[i].Tag == "" {
+			watchlist.Stocks[i].Tag = "-"
+		}
+	}
+
 	return watchlist
 }
 
@@ -2827,6 +2810,275 @@ func (m *Model) saveWatchlist() {
 		return
 	}
 	os.WriteFile(watchlistFile, data, 0644)
+}
+
+// 获取所有可用的标签
+func (m *Model) getAvailableTags() []string {
+	tagMap := make(map[string]bool)
+	
+	for _, stock := range m.watchlist.Stocks {
+		if stock.Tag != "" {
+			tagMap[stock.Tag] = true
+		}
+	}
+	
+	tags := make([]string, 0, len(tagMap))
+	for tag := range tagMap {
+		tags = append(tags, tag)
+	}
+	
+	return tags
+}
+
+// 根据标签过滤自选股票
+func (m *Model) getFilteredWatchlist() []WatchlistStock {
+	if m.selectedTag == "" {
+		return m.watchlist.Stocks
+	}
+	
+	var filtered []WatchlistStock
+	for _, stock := range m.watchlist.Stocks {
+		if stock.Tag == m.selectedTag {
+			filtered = append(filtered, stock)
+		}
+	}
+	
+	return filtered
+}
+
+// 重置持股列表游标到第一只股票
+func (m *Model) resetPortfolioCursor() {
+	if len(m.portfolio.Stocks) > 0 {
+		m.portfolioCursor = 0
+		maxPortfolioLines := m.config.Display.MaxLines
+		if len(m.portfolio.Stocks) > maxPortfolioLines {
+			// 显示前N条：滚动位置设置为显示从索引0开始的N条
+			m.portfolioScrollPos = len(m.portfolio.Stocks) - maxPortfolioLines
+		} else {
+			// 股票数量不超过显示行数，显示全部
+			m.portfolioScrollPos = 0
+		}
+	}
+}
+
+// 重置自选列表游标到第一只股票（基于过滤后的列表）
+func (m *Model) resetWatchlistCursor() {
+	filteredStocks := m.getFilteredWatchlist()
+	if len(filteredStocks) > 0 {
+		m.watchlistCursor = 0
+		maxWatchlistLines := m.config.Display.MaxLines
+		if len(filteredStocks) > maxWatchlistLines {
+			// 显示前N条：滚动位置设置为显示从索引0开始的N条
+			m.watchlistScrollPos = len(filteredStocks) - maxWatchlistLines
+		} else {
+			// 股票数量不超过显示行数，显示全部
+			m.watchlistScrollPos = 0
+		}
+	} else {
+		// 没有股票时重置
+		m.watchlistCursor = 0
+		m.watchlistScrollPos = 0
+	}
+}
+
+// 调整自选列表滚动位置（基于过滤后的列表）
+func (m *Model) adjustWatchlistScroll(filteredStocks []WatchlistStock) {
+	maxWatchlistLines := m.config.Display.MaxLines
+	totalStocks := len(filteredStocks)
+	
+	if totalStocks <= maxWatchlistLines {
+		m.watchlistScrollPos = 0
+		return
+	}
+	
+	// 确保光标在可见范围内
+	endIndex := totalStocks - m.watchlistScrollPos
+	startIndex := endIndex - maxWatchlistLines
+	if startIndex < 0 {
+		startIndex = 0
+	}
+	
+	// 如果光标超出可见范围的上边界，调整滚动位置
+	if m.watchlistCursor < startIndex {
+		m.watchlistScrollPos = totalStocks - m.watchlistCursor - maxWatchlistLines
+		if m.watchlistScrollPos < 0 {
+			m.watchlistScrollPos = 0
+		}
+	}
+	
+	// 如果光标超出可见范围的下边界，调整滚动位置
+	if m.watchlistCursor >= endIndex {
+		m.watchlistScrollPos = totalStocks - m.watchlistCursor - 1
+		if m.watchlistScrollPos < 0 {
+			m.watchlistScrollPos = 0
+		}
+	}
+}
+
+// 处理自选股票打标签
+func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		if m.tagInput == "" {
+			m.tagInput = "-"  // 默认标签
+		}
+		
+		// 更新当前选中股票的标签（基于过滤后的列表）
+		filteredStocks := m.getFilteredWatchlist()
+		if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+			stockToTag := filteredStocks[m.watchlistCursor]
+			
+			// 在原始列表中找到该股票并更新标签
+			for i, stock := range m.watchlist.Stocks {
+				if stock.Code == stockToTag.Code {
+					m.watchlist.Stocks[i].Tag = m.tagInput
+					break
+				}
+			}
+			
+			m.saveWatchlist()
+			
+			if m.language == Chinese {
+				m.message = fmt.Sprintf("已将 %s 的标签设置为: %s", 
+					stockToTag.Name, m.tagInput)
+			} else {
+				m.message = fmt.Sprintf("Tag for %s set to: %s", 
+					stockToTag.Name, m.tagInput)
+			}
+		}
+		
+		m.state = WatchlistViewing
+		m.tagInput = ""
+		m.resetWatchlistCursor() // 重置游标到第一只股票
+		return m, nil
+	case "esc", "q":
+		m.state = WatchlistViewing
+		m.tagInput = ""
+		m.message = ""
+		m.resetWatchlistCursor() // 重置游标到第一只股票
+		return m, nil
+	case "backspace":
+		if len(m.tagInput) > 0 {
+			// 正确处理UTF-8字符（包括中文）的删除
+			runes := []rune(m.tagInput)
+			if len(runes) > 0 {
+				m.tagInput = string(runes[:len(runes)-1])
+			}
+		}
+		return m, nil
+	default:
+		// 使用与项目其他输入处理相同的逻辑，支持中文字符
+		str := msg.String()
+		if len(str) > 0 && str != "\n" && str != "\r" && !isControlKey(str) {
+			m.tagInput += str
+		}
+		return m, nil
+	}
+}
+
+// 处理自选股票分组选择
+func (m *Model) handleWatchlistGroupSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		if m.cursor >= 0 && m.cursor < len(m.availableTags) {
+			m.selectedTag = m.availableTags[m.cursor]
+		}
+		m.state = WatchlistViewing
+		m.message = ""
+		m.resetWatchlistCursor() // 重置游标到第一只股票（考虑过滤）
+		return m, nil
+	case "esc", "q":
+		m.selectedTag = ""  // 清除过滤
+		m.state = WatchlistViewing
+		m.resetWatchlistCursor() // 重置游标到第一只股票
+		m.message = ""
+		return m, nil
+	case "c":
+		// 清除过滤，显示所有股票
+		m.selectedTag = ""
+		m.state = WatchlistViewing
+		m.resetWatchlistCursor() // 重置游标到第一只股票
+		m.message = ""
+		return m, nil
+	case "up", "k", "w":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+		return m, nil
+	case "down", "j", "s":
+		if m.cursor < len(m.availableTags)-1 {
+			m.cursor++
+		}
+		return m, nil
+	}
+	return m, nil
+}
+
+// 打标签视图
+func (m *Model) viewWatchlistTagging() string {
+	var s string
+	
+	if m.language == Chinese {
+		s += "=== 设置标签 ===\n\n"
+	} else {
+		s += "=== Set Tag ===\n\n"
+	}
+	
+	filteredStocks := m.getFilteredWatchlist()
+	if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+		stock := filteredStocks[m.watchlistCursor]
+		if m.language == Chinese {
+			s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
+			s += fmt.Sprintf("当前标签: %s\n\n", stock.Tag)
+			s += "请输入新标签: " + m.tagInput + "_\n\n"
+			s += "按Enter确认，ESC或Q键取消"
+		} else {
+			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
+			s += fmt.Sprintf("Current tag: %s\n\n", stock.Tag)
+			s += "Enter new tag: " + m.tagInput + "_\n\n"
+			s += "Press Enter to confirm, ESC or Q to cancel"
+		}
+	}
+	
+	return s
+}
+
+// 分组选择视图
+func (m *Model) viewWatchlistGroupSelect() string {
+	var s string
+	
+	if m.language == Chinese {
+		s += "=== 选择标签分组 ===\n\n"
+	} else {
+		s += "=== Select Tag Group ===\n\n"
+	}
+	
+	// 显示当前过滤状态
+	if m.selectedTag != "" {
+		if m.language == Chinese {
+			s += fmt.Sprintf("当前过滤: %s\n\n", m.selectedTag)
+		} else {
+			s += fmt.Sprintf("Current filter: %s\n\n", m.selectedTag)
+		}
+	}
+	
+	// 显示标签选项
+	for i, tag := range m.availableTags {
+		cursor := " "
+		if i == m.cursor {
+			cursor = "►"
+		}
+		s += fmt.Sprintf("%s %s\n", cursor, tag)
+	}
+	
+	s += "\n"
+	if m.language == Chinese {
+		s += "按Enter选择标签，C键清除过滤，ESC或Q键返回"
+	} else {
+		s += "Press Enter to select tag, C to clear filter, ESC or Q to return"
+	}
+	
+	return s
 }
 
 // 检查股票是否已在自选列表中
@@ -2848,6 +3100,7 @@ func (m *Model) addToWatchlist(code, name string) bool {
 	watchStock := WatchlistStock{
 		Code: code,
 		Name: name,
+		Tag:  "-", // 默认标签
 	}
 	m.watchlist.Stocks = append(m.watchlist.Stocks, watchStock)
 	m.saveWatchlist()
@@ -2885,19 +3138,7 @@ func (m *Model) handleSearchResultWithActions(msg tea.KeyMsg) (tea.Model, tea.Cm
 			}
 			// 跳转到自选列表页面
 			m.state = WatchlistViewing
-			// 设置滚动位置和光标到显示前N条股票
-			if len(m.watchlist.Stocks) > 0 {
-				maxWatchlistLines := m.config.Display.MaxLines
-				if len(m.watchlist.Stocks) > maxWatchlistLines {
-					// 显示前N条：滚动位置设置为显示从索引0开始的N条
-					m.watchlistScrollPos = len(m.watchlist.Stocks) - maxWatchlistLines
-					m.watchlistCursor = 0 // 光标指向第一个股票（索引0）
-				} else {
-					// 股票数量不超过显示行数，显示全部
-					m.watchlistScrollPos = 0
-					m.watchlistCursor = 0
-				}
-			}
+			m.resetWatchlistCursor() // 重置游标到第一只股票
 			m.cursor = 0
 			m.lastUpdate = time.Now()
 		}
@@ -3050,18 +3291,32 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "d":
 		// 直接删除光标指向的自选股票
-		if len(m.watchlist.Stocks) == 0 {
+		filteredStocks := m.getFilteredWatchlist()
+		if len(filteredStocks) == 0 {
 			m.message = m.getText("emptyWatchlist")
 			return m, nil
 		}
-		// 删除当前光标指向的自选股票
-		removedStock := m.watchlist.Stocks[m.watchlistCursor]
-		m.removeFromWatchlist(m.watchlistCursor)
-		// 调整光标位置
-		if m.watchlistCursor >= len(m.watchlist.Stocks) && len(m.watchlist.Stocks) > 0 {
-			m.watchlistCursor = len(m.watchlist.Stocks) - 1
+		
+		// 获取要删除的股票（从过滤列表中）
+		if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+			stockToRemove := filteredStocks[m.watchlistCursor]
+			
+			// 在原始列表中找到该股票并删除
+			for i, stock := range m.watchlist.Stocks {
+				if stock.Code == stockToRemove.Code {
+					m.removeFromWatchlist(i)
+					break
+				}
+			}
+			
+			// 调整光标位置（基于过滤后的列表）
+			newFilteredStocks := m.getFilteredWatchlist()
+			if m.watchlistCursor >= len(newFilteredStocks) && len(newFilteredStocks) > 0 {
+				m.watchlistCursor = len(newFilteredStocks) - 1
+			}
+			
+			m.message = fmt.Sprintf(m.getText("removeWatchSuccess"), stockToRemove.Name, stockToRemove.Code)
 		}
-		m.message = fmt.Sprintf(m.getText("removeWatchSuccess"), removedStock.Name, removedStock.Code)
 		return m, nil
 	case "a":
 		// 跳转到股票搜索页面
@@ -3072,15 +3327,59 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searchFromWatchlist = true
 		m.message = ""
 		return m, nil
+	case "t":
+		// 给当前选中的股票打标签
+		filteredStocks := m.getFilteredWatchlist()
+		if len(filteredStocks) == 0 {
+			m.message = m.getText("emptyWatchlist")
+			return m, nil
+		}
+		m.state = WatchlistTagging
+		m.tagInput = ""
+		m.message = ""
+		return m, nil
+	case "g":
+		// 分组查看
+		m.availableTags = m.getAvailableTags()
+		if len(m.availableTags) == 0 {
+			if m.language == Chinese {
+				m.message = "没有可用的标签"
+			} else {
+				m.message = "No available tags"
+			}
+			return m, nil
+		}
+		m.state = WatchlistGroupSelect
+		m.cursor = 0
+		m.message = ""
+		return m, nil
+	case "c":
+		// 清除标签过滤
+		if m.selectedTag != "" {
+			m.selectedTag = ""
+			m.resetWatchlistCursor() // 重置游标到第一只股票
+			if m.language == Chinese {
+				m.message = "已清除标签过滤"
+			} else {
+				m.message = "Tag filter cleared"
+			}
+		}
+		return m, nil
 	case "up", "k", "w":
+		filteredStocks := m.getFilteredWatchlist()
 		if m.watchlistCursor > 0 {
 			m.watchlistCursor--
 		}
+		// 基于过滤后的列表调整滚动
+		m.adjustWatchlistScroll(filteredStocks)
 		return m, nil
 	case "down", "j", "s":
-		if m.watchlistCursor < len(m.watchlist.Stocks)-1 {
+		filteredStocks := m.getFilteredWatchlist()
+		if m.watchlistCursor < len(filteredStocks)-1 {
 			m.watchlistCursor++
 		}
+		// 基于过滤后的列表调整滚动
+		m.adjustWatchlistScroll(filteredStocks)
 		return m, nil
 	}
 	return m, nil
@@ -3088,17 +3387,40 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) viewWatchlistViewing() string {
 	s := m.getText("watchlistTitle") + "\n"
-	s += fmt.Sprintf(m.getText("updateTime"), m.lastUpdate.Format("2006-01-02 15:04:05")) + "\n\n"
+	s += fmt.Sprintf(m.getText("updateTime"), m.lastUpdate.Format("2006-01-02 15:04:05")) + "\n"
+	
+	// 显示当前过滤状态
+	if m.selectedTag != "" {
+		if m.language == Chinese {
+			s += fmt.Sprintf("当前过滤: %s\n", m.selectedTag)
+		} else {
+			s += fmt.Sprintf("Current filter: %s\n", m.selectedTag)
+		}
+	}
+	s += "\n"
 
-	if len(m.watchlist.Stocks) == 0 {
-		s += m.getText("emptyWatchlist") + "\n\n"
-		s += m.getText("addToWatchFirst") + "\n\n"
+	// 获取过滤后的股票列表
+	filteredStocks := m.getFilteredWatchlist()
+	
+	if len(filteredStocks) == 0 {
+		if m.selectedTag != "" {
+			if m.language == Chinese {
+				s += fmt.Sprintf("标签 '%s' 下没有股票\n\n", m.selectedTag)
+				s += "按G键选择其他标签，或按C键清除过滤\n"
+			} else {
+				s += fmt.Sprintf("No stocks under tag '%s'\n\n", m.selectedTag)
+				s += "Press G to select other tags, or C to clear filter\n"
+			}
+		} else {
+			s += m.getText("emptyWatchlist") + "\n\n"
+			s += m.getText("addToWatchFirst") + "\n\n"
+		}
 		s += m.getText("watchlistHelp") + "\n"
 		return s
 	}
 
 	// 显示滚动信息
-	totalWatchStocks := len(m.watchlist.Stocks)
+	totalWatchStocks := len(filteredStocks)
 	maxWatchlistLines := m.config.Display.MaxLines
 	if totalWatchStocks > 0 {
 		currentPos := m.watchlistCursor + 1 // 显示从1开始的位置
@@ -3114,26 +3436,25 @@ func (m *Model) viewWatchlistViewing() string {
 	t := table.NewWriter()
 	t.SetStyle(table.StyleLight)
 
-	// 获取本地化的表头
+	// 获取本地化的表头 - 添加标签列
 	if m.language == Chinese {
-		t.AppendHeader(table.Row{"", "代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"})
+		t.AppendHeader(table.Row{"", "标签", "代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"})
 	} else {
-		t.AppendHeader(table.Row{"", "Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"})
+		t.AppendHeader(table.Row{"", "Tag", "Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"})
 	}
 
-	// 计算要显示的自选股票范围
-	watchStocks := m.watchlist.Stocks
-	endIndex := len(watchStocks) - m.watchlistScrollPos
+	// 计算要显示的股票范围
+	endIndex := len(filteredStocks) - m.watchlistScrollPos
 	startIndex := endIndex - maxWatchlistLines
 	if startIndex < 0 {
 		startIndex = 0
 	}
-	if endIndex > len(watchStocks) {
-		endIndex = len(watchStocks)
+	if endIndex > len(filteredStocks) {
+		endIndex = len(filteredStocks)
 	}
 
 	for i := startIndex; i < endIndex; i++ {
-		watchStock := watchStocks[i]
+		watchStock := filteredStocks[i]
 		// 获取实时股价数据
 		stockData := getStockPrice(watchStock.Code)
 		if stockData != nil {
@@ -3165,6 +3486,7 @@ func (m *Model) viewWatchlistViewing() string {
 
 			t.AppendRow(table.Row{
 				cursorCol,
+				watchStock.Tag, // 显示标签
 				watchStock.Code,
 				watchStock.Name,
 				m.formatPriceWithColorLang(stockData.Price, stockData.PrevClose),
@@ -3186,6 +3508,7 @@ func (m *Model) viewWatchlistViewing() string {
 
 			t.AppendRow(table.Row{
 				cursorCol,
+				watchStock.Tag, // 显示标签
 				watchStock.Code,
 				watchStock.Name,
 				"-",
@@ -3226,7 +3549,20 @@ func (m *Model) viewWatchlistViewing() string {
 		}
 	}
 
-	s += "\n" + m.getText("watchlistHelp") + "\n"
+	// 更新帮助信息，加入新快捷键
+	if m.language == Chinese {
+		s += "\nESC、Q键或M键返回主菜单，A键添加股票，D键删除股票\n"
+		s += "T键为当前股票打标签，G键按标签分组查看\n"
+		if m.selectedTag != "" {
+			s += "C键清除当前过滤\n"
+		}
+	} else {
+		s += "\nESC, Q or M to return to main menu, A to add stock, D to delete stock\n"
+		s += "T to tag current stock, G to group by tag\n"
+		if m.selectedTag != "" {
+			s += "C to clear current filter\n"
+		}
+	}
 
 	if m.message != "" {
 		s += "\n" + m.message + "\n"
@@ -3250,6 +3586,7 @@ func (m *Model) handleWatchlistSearchConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	switch msg.String() {
 	case "esc":
 		m.state = WatchlistViewing
+		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.searchFromWatchlist = false
 		m.message = ""
 		return m, nil
@@ -3263,6 +3600,7 @@ func (m *Model) handleWatchlistSearchConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd
 				m.message = fmt.Sprintf(m.getText("alreadyInWatch"), m.searchResult.Symbol)
 			}
 			m.state = WatchlistViewing
+			m.resetWatchlistCursor() // 重置游标到第一只股票
 			m.searchFromWatchlist = false
 			return m, m.tickCmd()
 		}
