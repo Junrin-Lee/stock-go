@@ -86,6 +86,12 @@ go build -o cmd/stock-monitor main.go
 - **Portfolio Specific**:
   - `E` key: Edit selected stock
   - `D` key: Delete selected stock
+- **Watchlist Specific**:
+  - `A` key: Add stock to watchlist
+  - `D` key: Delete selected stock
+  - `T` key: Add/modify tag for selected stock ⭐ v4.4 New
+  - `G` key: Enter group view mode by tags ⭐ v4.4 New
+  - `C` key: Clear tag filter, show all stocks ⭐ v4.4 New
 
 #### 🏠 Main Menu Navigation
 ```
@@ -152,8 +158,9 @@ The watchlist module is a stock watch list that allows you to quickly view real-
 #### 🎯 Key Features
 - **Quick Watch**: One-click addition to watchlist after stock search
 - **Real-time Refresh**: Automatically update watchlist real-time market data every 5 seconds ⭐ New
-- **Complete Data**: Display 10-column detailed market data for watchlist stocks (including turnover rate and volume)
-- **Flexible Management**: Support adding and deleting watchlist stocks
+- **Complete Data**: Display detailed market data for watchlist stocks (including tags, turnover rate and volume)
+- **Tag Grouping**: Support adding custom tags to stocks and view by tag groups ⭐ v4.4 New
+- **Flexible Management**: Support adding, deleting, tagging, and group filtering of watchlist stocks
 - **Independent Storage**: Watchlist and portfolio are managed separately
 
 #### 📱 Usage Workflow
@@ -180,7 +187,22 @@ Watchlist page → Press "D" key → Select stock to delete → Confirm deletion
 
 **5. Quick Search New Stock** ⭐ v4.1 New
 ```
-Watchlist page → Press "S" key → Direct jump to stock search page
+Watchlist page → Press "A" key → Direct jump to stock search page
+```
+
+**6. Stock Tag Management** ⭐ v4.4 New
+```
+Watchlist page → Press "T" key → Add tag to selected stock (supports Chinese) → Press Enter to confirm
+```
+
+**7. Group View Function** ⭐ v4.4 New
+```
+Watchlist page → Press "G" key → Select tag to view → Display only stocks under that tag
+```
+
+**8. Clear Tag Filter** ⭐ v4.4 New
+```
+In tag filter state → Press "C" key → Clear filter, display all stocks
 ```
 
 #### 🔄 New Search Result Actions
@@ -407,6 +429,29 @@ update:
 }
 ```
 
+**watchlist.json** example:
+```json
+{
+  "stocks": [
+    {
+      "code": "SH600410",
+      "name": "Huasheng Tiancheng",
+      "tag": "-"
+    },
+    {
+      "code": "SH600519",
+      "name": "Kweichow Moutai",
+      "tag": "-"
+    },
+    {
+      "code": "SZ001309",
+      "name": "Demingli",
+      "tag": "趋势"
+    }
+  ]
+}
+```
+
 ## 🏭 Technical Architecture
 
 ### 🔧 Core Technology Stack
@@ -511,38 +556,37 @@ System adopts professional stock software color standards:
 
 ## 📈 Version History
 
-### 🌟 v4.2 - Portfolio Data Optimization and P&L Analysis Enhancement 🚀 **Data Optimization Update**
+### 🌟 v4.4 - Watchlist Tag Grouping Feature 🚀 **Smart Grouping Update**
 
-**📊 P&L Calculation Logic Optimization**:
-- ✅ **Position P&L Correction**: Fixed position P&L calculation logic to ensure correct display based on cost price
-- ✅ **Today's P&L Addition**: Added "Today's P&L" column showing P&L amount from daily price changes
-- ✅ **Enhanced P&L Analysis**: Provides three-dimensional analysis: Today's Change% (percentage), Today's P&L (amount), Position P&L (total P&L)
+**🏷️ Tag Grouping System**:
+- ✅ **Stock Tag Management**: Watchlist supports adding custom tags to each stock for classification management
+- ✅ **Quick Tag Hotkey**: Press `T` key in watchlist to quickly add or modify tags for the selected stock
+- ✅ **Chinese Tag Support**: Perfect support for Chinese tag input, such as "趋势" (Trend), "价值" (Value), "成长" (Growth), etc.
+- ✅ **Group View Function**: Press `G` key to enter group selection page, select a tag to display only stocks under that tag
 
-**📋 Table Layout Optimization**:
-- ✅ **Header Order Adjustment**: Optimized to logical sequence `PrevClose | Price | Cost` for better price comparison
-- ✅ **Cost Price Display Optimization**: Removed color display from cost price column as neutral reference price
-- ✅ **Data Column Expansion**: Portfolio expanded from 13 to 14 columns providing more detailed P&L analysis
+**🎯 Tag Operation Experience**:
+- ✅ **Default Tags**: Legacy data and untagged stocks default to display `-` tag
+- ✅ **Tag Column Display**: Watchlist adds new `Tags` column, showing real-time tag information for each stock
+- ✅ **Filter Status Display**: When using group filtering, interface displays the current filtered tag name
+- ✅ **Quick Clear Filter**: Press `C` key to quickly clear tag filter and return to display all stocks state
 
-**🧮 Calculation Formula Enhancement**:
-- ✅ **Today's P&L**: `(Current Price - Previous Close) × Quantity` - reflects P&L from daily price changes
-- ✅ **Position P&L**: `(Current Price - Cost Price) × Quantity` - reflects overall investment P&L status
-- ✅ **P&L Rate**: `(Current Price - Cost Price) / Cost Price × 100%` - investment return rate
+**🔧 Cursor Control Optimization**:
+- ✅ **Cursor Position Fix**: Fixed cursor movement exceeding filtered data range when using group filtering
+- ✅ **Boundary Check Correction**: Cursor movement strictly based on filtered stock count for boundary checking
+- ✅ **Auto Reset**: After all tag-related operations complete, cursor automatically resets to first stock position
 
-**🎯 User Experience Enhancement**:
-- 🔧 **Data Alignment Correction**: Fixed total row data misalignment issues, ensuring correct column data correspondence
-- 📱 **Display Logic Optimization**: Simplified redundant data columns, highlighted core P&L indicators
-- 🌈 **Rational Color Display**: Cost price no longer displays color, highlighting price change importance
+**💡 Usage Scenario Examples**:
+- 🎯 **Investment Strategy Classification**: Group stocks by strategy tags like "Value Investing", "Growth Stocks", "Defensive"
+- 🏢 **Industry Classification Management**: Organize stocks by industry tags like "Technology", "Healthcare", "New Energy"
+- 📈 **Attention Level Classification**: Use attention level tags like "High Priority", "Long-term Hold", "Short-term Opportunity"
+- 🔄 **Stage Management**: Track investment process with status tags like "To Buy", "Holding", "Watching"
 
-**📋 Current Portfolio Display**:
+**⌨️ Tag Function Hotkeys**:
 ```
-Code | Name | PrevClose | Price | Cost | Open | High | Low | Quantity | Today% | TodayP&L | PositionP&L | P&LRate | Value
+T Key: Add/modify tag for selected stock (supports Chinese input)
+G Key: Enter group view mode, select tag group to view
+C Key: Clear current tag filter, display all stocks
 ```
-
-**💡 Example Illustration** (ZhaoWei Motor):
-- Current Price: 142.47, Cost Price: 145.962, Previous Close: 137.19
-- Today's Change: +3.85% (price change relative to yesterday)
-- Today's P&L: +528 yuan (profit from today's price change)
-- Position P&L: -349.2 yuan (still in loss relative to cost price)
 
 ---
 
@@ -550,6 +594,36 @@ Code | Name | PrevClose | Price | Cost | Open | High | Low | Quantity | Today% |
 
 <details>
 <summary>🔽 Click to view historical version details</summary>
+
+### 🌟 v4.3 - User Interface Interaction Enhancement and Pagination Display Optimization 🚀 **UI Experience Update**
+
+**⌨️ Interaction Operation Optimization**:
+- ✅ **Hotkey Adjustment**: Changed watchlist add hotkey from 'S' to 'A' for more intuitive operation
+- ✅ **Search Results Tabulation**: Search results displayed in professional table format including Name│Price│PrevClose│Open│High│Low│Today's Change│Turnover│Volume
+- ✅ **Keyboard Conflict Resolution**: Debug mode uses PageUp/PageDown, stock lists use up/down arrows to avoid operation conflicts
+
+**📊 Pagination Display System**:
+- ✅ **Smart Pagination**: Portfolio and watchlist support pagination browsing, default 10 rows per page
+- ✅ **Configurable Row Count**: New `max_lines` config option for users to customize display rows based on screen resolution
+- ✅ **Cursor Navigation**: Added independent cursor column showing current selected row pointer arrow (►)
+- ✅ **Position Display**: Real-time display of current stock position and total count (e.g., Row 3/Total 15)
+
+**🎯 Display Logic Optimization**:
+- ✅ **First Row Cursor**: Fixed cursor defaulting to first row instead of last row when entering lists
+- ✅ **Data Order**: Fixed watchlist initially showing first N rows instead of last N rows
+- ✅ **Cursor Visibility**: Resolved cursor invisibility issue when first entering watchlist
+- ✅ **Independent Cursor Column**: Cursor (►) displayed in separate column, not affecting stock name display
+
+**⚙️ Configuration File Enhancement**:
+- ✅ **Display Row Configuration**: `display.max_lines` configurable for stocks per page (recommended: 1080p=10 rows, 1440p=15 rows, 4K=20 rows)
+- ✅ **Config File Optimization**: Removed `config.yml.example`, unified use of `config_demo.yaml` as reference configuration
+- ✅ **Bilingual Config Comments**: Configuration file includes complete Chinese and English bilingual comment descriptions
+
+**💡 User Experience Enhancement**:
+- 🎮 **Smooth Page Turning**: Support up/down arrow keys for 10-row pagination browsing, more convenient for large datasets
+- 📍 **Precise Positioning**: Real-time display of current browsing position for user awareness of data range
+- 🔍 **Clear Identification**: Cursor arrow intuitively shows current selected stock row
+- ⚙️ **Personalized Customization**: Flexible display density adjustment based on different screen sizes
 
 ### 🌟 v4.2 - Portfolio Data Optimization and P&L Analysis Enhancement 🚀 **Data Optimization Update**
 
