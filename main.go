@@ -109,14 +109,12 @@ type AppState int
 const (
 	MainMenu AppState = iota
 	AddingStock
-	RemovingStock
 	Monitoring
 	EditingStock
 	SearchingStock
 	SearchResult
 	LanguageSelection
 	WatchlistViewing
-	WatchlistRemoving
 	SearchResultWithActions
 	WatchlistSearchConfirm
 )
@@ -505,8 +503,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel, cmd = m.handleMainMenu(msg)
 		case AddingStock:
 			newModel, cmd = m.handleAddingStock(msg)
-		case RemovingStock:
-			newModel, cmd = m.handleRemovingStock(msg)
 		case Monitoring:
 			newModel, cmd = m.handleMonitoring(msg)
 		case EditingStock:
@@ -523,8 +519,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel, cmd = m.handleLanguageSelection(msg)
 		case WatchlistViewing:
 			newModel, cmd = m.handleWatchlistViewing(msg)
-		case WatchlistRemoving:
-			newModel, cmd = m.handleWatchlistRemoving(msg)
 		default:
 			newModel, cmd = m, nil
 		}
@@ -556,8 +550,6 @@ func (m *Model) View() string {
 		mainContent = m.viewMainMenu()
 	case AddingStock:
 		mainContent = m.viewAddingStock()
-	case RemovingStock:
-		mainContent = m.viewRemovingStock()
 	case Monitoring:
 		mainContent = m.viewMonitoring()
 	case EditingStock:
@@ -574,8 +566,6 @@ func (m *Model) View() string {
 		mainContent = m.viewLanguageSelection()
 	case WatchlistViewing:
 		mainContent = m.viewWatchlistViewing()
-	case WatchlistRemoving:
-		mainContent = m.viewWatchlistRemoving()
 	default:
 		mainContent = ""
 	}
@@ -883,69 +873,6 @@ func (m *Model) viewAddingStock() string {
 	return s
 }
 
-func (m *Model) handleRemovingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "q":
-		// 根据之前的状态决定返回到哪里
-		if m.previousState == Monitoring {
-			m.state = Monitoring
-			m.lastUpdate = time.Now()
-			m.message = ""
-			return m, m.tickCmd()
-		} else {
-			m.state = MainMenu
-			m.message = "" // 清除消息
-			return m, nil
-		}
-	case "up", "k", "w":
-		if m.cursor > 0 {
-			m.cursor--
-		}
-	case "down", "j", "s":
-		if m.cursor < len(m.portfolio.Stocks)-1 {
-			m.cursor++
-		}
-	case "enter", " ":
-		if len(m.portfolio.Stocks) > 0 {
-			removedStock := m.portfolio.Stocks[m.cursor]
-			m.portfolio.Stocks = append(m.portfolio.Stocks[:m.cursor], m.portfolio.Stocks[m.cursor+1:]...)
-			m.savePortfolio()
-			// 根据之前的状态决定返回到哪里
-			if m.previousState == Monitoring {
-				m.state = Monitoring
-				m.lastUpdate = time.Now()
-				m.message = fmt.Sprintf(m.getText("removeSuccess"), removedStock.Name, removedStock.Code)
-				return m, m.tickCmd()
-			} else {
-				m.state = MainMenu
-				m.message = fmt.Sprintf(m.getText("removeSuccess"), removedStock.Name, removedStock.Code)
-			}
-		}
-	}
-	return m, nil
-}
-
-func (m *Model) viewRemovingStock() string {
-	s := m.getText("removeTitle") + "\n\n"
-
-	if len(m.portfolio.Stocks) == 0 {
-		s += m.getText("emptyPortfolio") + "\n\n" + m.getText("returnToMenuShort") + "\n"
-		return s
-	}
-
-	s += m.getText("selectToRemove") + "\n\n"
-	for i, stock := range m.portfolio.Stocks {
-		prefix := "  "
-		if i == m.cursor {
-			prefix = "► "
-		}
-		s += fmt.Sprintf("%s%d. %s (%s)\n", prefix, i+1, stock.Name, stock.Code)
-	}
-
-	s += "\n" + m.getText("navHelp") + "\n"
-	return s
-}
-
 func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q", "m":
@@ -953,28 +880,34 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = "" // 清除消息
 		return m, nil
 	case "e":
-		// 修改股票功能
+		// 直接修改光标指向的股票
 		if len(m.portfolio.Stocks) == 0 {
 			m.message = m.getText("emptyCannotEdit")
 			return m, nil
 		}
+		// 直接进入修改当前光标指向的股票
 		m.previousState = m.state // 记录当前状态
 		m.state = EditingStock
-		m.editingStep = 0
-		m.cursor = 0
-		m.input = ""
+		m.editingStep = 1                        // 直接跳到输入成本价步骤
+		m.selectedStockIndex = m.portfolioCursor // 使用当前光标位置
+		m.input = fmt.Sprintf("%.3f", m.portfolio.Stocks[m.portfolioCursor].CostPrice)
 		m.message = ""
 		return m, nil
 	case "d":
-		// 删除股票功能
+		// 直接删除光标指向的股票
 		if len(m.portfolio.Stocks) == 0 {
 			m.message = m.getText("emptyPortfolio")
 			return m, nil
 		}
-		m.previousState = m.state // 记录当前状态
-		m.state = RemovingStock
-		m.cursor = 0
-		m.message = ""
+		// 删除当前光标指向的股票
+		removedStock := m.portfolio.Stocks[m.portfolioCursor]
+		m.portfolio.Stocks = append(m.portfolio.Stocks[:m.portfolioCursor], m.portfolio.Stocks[m.portfolioCursor+1:]...)
+		m.savePortfolio()
+		// 调整光标位置
+		if m.portfolioCursor >= len(m.portfolio.Stocks) && len(m.portfolio.Stocks) > 0 {
+			m.portfolioCursor = len(m.portfolio.Stocks) - 1
+		}
+		m.message = fmt.Sprintf(m.getText("removeSuccess"), removedStock.Name, removedStock.Code)
 		return m, nil
 	case "a":
 		// 跳转到添加股票页面
@@ -1268,12 +1201,12 @@ func loadConfig() Config {
 		// 如果配置文件格式错误，使用默认配置
 		return getDefaultConfig()
 	}
-	
+
 	// 验证配置的合理性
 	if config.Display.MaxLines <= 0 || config.Display.MaxLines > 50 {
 		config.Display.MaxLines = 10 // 默认值
 	}
-	
+
 	return config
 }
 
@@ -2271,7 +2204,7 @@ func (m *Model) scrollPortfolioUp() {
 	if startIndex < 0 {
 		startIndex = 0
 	}
-	
+
 	// 如果光标超出可见范围的上边界，调整滚动位置
 	if m.portfolioCursor < startIndex {
 		m.portfolioScrollPos = len(m.portfolio.Stocks) - m.portfolioCursor - maxPortfolioLines
@@ -2293,7 +2226,7 @@ func (m *Model) scrollPortfolioDown() {
 	if startIndex < 0 {
 		startIndex = 0
 	}
-	
+
 	// 如果光标超出可见范围的下边界，调整滚动位置
 	if m.portfolioCursor >= endIndex {
 		m.portfolioScrollPos = len(m.portfolio.Stocks) - m.portfolioCursor - 1
@@ -2331,7 +2264,7 @@ func (m *Model) scrollWatchlistUp() {
 	if startIndex < 0 {
 		startIndex = 0
 	}
-	
+
 	// 如果光标超出可见范围的上边界，调整滚动位置
 	if m.watchlistCursor < startIndex {
 		m.watchlistScrollPos = len(m.watchlist.Stocks) - m.watchlistCursor - maxWatchlistLines
@@ -2353,7 +2286,7 @@ func (m *Model) scrollWatchlistDown() {
 	if startIndex < 0 {
 		startIndex = 0
 	}
-	
+
 	// 如果光标超出可见范围的下边界，调整滚动位置
 	if m.watchlistCursor >= endIndex {
 		m.watchlistScrollPos = len(m.watchlist.Stocks) - m.watchlistCursor - 1
@@ -2470,14 +2403,6 @@ func (m *Model) handleEditingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = ""
 			return m, nil
 		}
-	case "up", "k", "w":
-		if m.editingStep == 0 && m.cursor > 0 {
-			m.cursor--
-		}
-	case "down", "j", "s":
-		if m.editingStep == 0 && m.cursor < len(m.portfolio.Stocks)-1 {
-			m.cursor++
-		}
 	case "enter", " ":
 		return m.processEditingStep()
 	case "backspace":
@@ -2500,12 +2425,6 @@ func (m *Model) handleEditingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) processEditingStep() (tea.Model, tea.Cmd) {
 	switch m.editingStep {
-	case 0: // 选择股票
-		if len(m.portfolio.Stocks) > 0 {
-			m.selectedStockIndex = m.cursor
-			m.editingStep = 1
-			m.input = fmt.Sprintf("%.3f", m.portfolio.Stocks[m.selectedStockIndex].CostPrice)
-		}
 	case 1: // 修改成本价
 		if m.input == "" {
 			m.message = m.getText("costRequired")
@@ -2558,23 +2477,6 @@ func (m *Model) viewEditingStock() string {
 	s := m.getText("editTitle") + "\n\n"
 
 	switch m.editingStep {
-	case 0:
-		s += m.getText("selectToEdit") + "\n\n"
-		for i, stock := range m.portfolio.Stocks {
-			prefix := "  "
-			if i == m.cursor {
-				prefix = "► "
-			}
-			// 根据语言显示不同的格式
-			if m.language == Chinese {
-				s += fmt.Sprintf("%s%d. %s (%s) - 成本价: %.3f, 数量: %d\n",
-					prefix, i+1, stock.Name, stock.Code, stock.CostPrice, stock.Quantity)
-			} else {
-				s += fmt.Sprintf("%s%d. %s (%s) - Cost: %.3f, Quantity: %d\n",
-					prefix, i+1, stock.Name, stock.Code, stock.CostPrice, stock.Quantity)
-			}
-		}
-		s += "\n" + m.getText("navHelp") + "\n"
 	case 1:
 		stock := m.portfolio.Stocks[m.selectedStockIndex]
 		if m.language == Chinese {
@@ -3147,11 +3049,19 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = ""
 		return m, nil
 	case "d":
-		// 进入删除模式
-		if len(m.watchlist.Stocks) > 0 {
-			m.state = WatchlistRemoving
-			m.cursor = 0
+		// 直接删除光标指向的自选股票
+		if len(m.watchlist.Stocks) == 0 {
+			m.message = m.getText("emptyWatchlist")
+			return m, nil
 		}
+		// 删除当前光标指向的自选股票
+		removedStock := m.watchlist.Stocks[m.watchlistCursor]
+		m.removeFromWatchlist(m.watchlistCursor)
+		// 调整光标位置
+		if m.watchlistCursor >= len(m.watchlist.Stocks) && len(m.watchlist.Stocks) > 0 {
+			m.watchlistCursor = len(m.watchlist.Stocks) - 1
+		}
+		m.message = fmt.Sprintf(m.getText("removeWatchSuccess"), removedStock.Name, removedStock.Code)
 		return m, nil
 	case "a":
 		// 跳转到股票搜索页面
@@ -3322,57 +3232,6 @@ func (m *Model) viewWatchlistViewing() string {
 		s += "\n" + m.message + "\n"
 	}
 
-	return s
-}
-
-// ========== 自选股票删除处理 ==========
-
-func (m *Model) handleWatchlistRemoving(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "q":
-		m.state = WatchlistViewing
-		m.message = ""
-		m.lastUpdate = time.Now()
-		return m, m.tickCmd()
-	case "up", "k", "w":
-		if m.cursor > 0 {
-			m.cursor--
-		}
-	case "down", "j", "s":
-		if m.cursor < len(m.watchlist.Stocks)-1 {
-			m.cursor++
-		}
-	case "enter", " ":
-		if len(m.watchlist.Stocks) > 0 {
-			removedStock := m.watchlist.Stocks[m.cursor]
-			m.removeFromWatchlist(m.cursor)
-			m.state = WatchlistViewing
-			m.lastUpdate = time.Now()
-			m.message = fmt.Sprintf(m.getText("removeWatchSuccess"), removedStock.Name, removedStock.Code)
-		}
-		return m, m.tickCmd()
-	}
-	return m, nil
-}
-
-func (m *Model) viewWatchlistRemoving() string {
-	s := m.getText("removeFromWatch") + "\n\n"
-
-	if len(m.watchlist.Stocks) == 0 {
-		s += m.getText("emptyWatchlist") + "\n\n" + m.getText("returnToMenuShort") + "\n"
-		return s
-	}
-
-	s += m.getText("selectToRemoveWatch") + "\n\n"
-	for i, stock := range m.watchlist.Stocks {
-		prefix := "  "
-		if i == m.cursor {
-			prefix = "► "
-		}
-		s += fmt.Sprintf("%s%d. %s (%s)\n", prefix, i+1, stock.Name, stock.Code)
-	}
-
-	s += "\n" + m.getText("navHelp") + "\n"
 	return s
 }
 
