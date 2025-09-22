@@ -86,12 +86,19 @@ go build -o cmd/stock-monitor main.go
 - **Portfolio Specific**:
   - `E` key: Edit selected stock
   - `D` key: Delete selected stock
+  - `S` key: Enter sort settings menu ⭐ v4.5 New
 - **Watchlist Specific**:
   - `A` key: Add stock to watchlist
   - `D` key: Delete selected stock
+  - `S` key: Enter sort settings menu ⭐ v4.5 New
   - `T` key: Add/modify tag for selected stock ⭐ v4.4 New
   - `G` key: Enter group view mode by tags ⭐ v4.4 New
   - `C` key: Clear tag filter, show all stocks ⭐ v4.4 New
+- **Sort Menu Specific** ⭐ v4.5 New:
+  - `↑↓` keys: Select sort field
+  - `Enter` key: Apply sort or toggle ascending/descending
+  - `C` key: Clear current sort, restore original data order
+  - `ESC/Q` keys: Return to list page
 
 #### 🏠 Main Menu Navigation
 ```
@@ -556,6 +563,67 @@ System adopts professional stock software color standards:
 
 ## 📈 Version History
 
+### 🌟 v4.5 - Advanced Sorting System & Interaction Optimization 🚀 **Professional Sorting Update**
+
+**📊 Bubble Sort System**:
+- ✅ **Dual List Sorting**: Both portfolio and watchlist support ascending/descending sorting by table header fields
+- ✅ **Bubble Sort Algorithm**: Uses classic bubble sort algorithm to ensure sorting stability and reliability
+- ✅ **Multi-field Support**: Portfolio supports 11 field sorting, watchlist supports 7 field sorting
+- ✅ **Real-time Data Sorting**: Watchlist sorts based on real-time stock price data for accurate results
+
+**🎯 Smart User Experience**:
+- ✅ **Smart Cursor Positioning**: When re-entering sort menu, cursor automatically positions to current sort field
+- ✅ **Sort Direction Indicators**: Table headers display ↑(ascending) and ↓(descending) arrows for clarity
+- ✅ **Default Unsorted State**: Application starts with clean headers, indicators only appear after user sorts
+- ✅ **Independent Sort States**: Portfolio and watchlist sort states are completely independent
+
+**⚡ Sort Operation Optimization**:
+- ✅ **Hotkey Sorting**: Press `S` key in list pages to quickly enter sort settings
+- ✅ **One-key Toggle**: Enter key in sort menu quickly toggles ascending/descending
+- ✅ **Clear Sorting**: Press `C` key to clear current sort and restore original data order
+- ✅ **Smart Reset**: Auto-clear sort state after adding/deleting/modifying stocks to avoid data confusion
+
+**🔧 Technical Implementation Highlights**:
+- ✅ **Memory Sorting**: All sort states stored in memory, no impact on original data files
+- ✅ **State Isolation**: Two lists use completely independent sort state variable sets
+- ✅ **Data Recovery**: Clearing sort reloads original file data for complete restoration
+- ✅ **Boundary Safety**: Sort operations include complete boundary checking and error handling
+
+**📋 Supported Sort Fields**:
+
+**Portfolio** (11 fields):
+```
+Stock Code | Stock Name | Current Price | Cost Price | Today's Change% | Today's P&L | Position P&L | P&L Rate | Market Value | Quantity
+```
+
+**Watchlist** (7 fields):
+```
+Tag | Stock Code | Stock Name | Current Price | Today's Change% | Turnover Rate | Volume
+```
+
+**⌨️ Sort Function Hotkeys**:
+```
+S Key: Enter sort settings menu (smart positioning to current sort field)
+↑↓ Keys: Select sort field in sort menu
+Enter: Apply sort or toggle ascending/descending
+C Key: Clear current sort, restore original data order
+ESC/Q: Return to list page
+```
+
+**💡 Usage Scenario Examples**:
+- 📈 **P&L Analysis**: Sort by "P&L Rate" descending to view best performing stocks
+- 💰 **Value Sorting**: Sort by "Market Value" ascending/descending to manage portfolio allocation
+- 📊 **Change Monitoring**: Sort by "Today's Change%" descending to focus on daily hot stocks
+- 🔤 **Code Sorting**: Sort by "Stock Code" ascending for quick lookup of specific stocks
+- 🏷️ **Tag Grouping**: Sort watchlist by "Tag" for categorized viewing
+
+---
+
+### 📅 Historical Versions
+
+<details>
+<summary>🔽 Click to view historical version details</summary>
+
 ### 🌟 v4.4 - Watchlist Tag Grouping Feature 🚀 **Smart Grouping Update**
 
 **🏷️ Tag Grouping System**:
@@ -587,13 +655,6 @@ T Key: Add/modify tag for selected stock (supports Chinese input)
 G Key: Enter group view mode, select tag group to view
 C Key: Clear current tag filter, display all stocks
 ```
-
----
-
-### 📅 Historical Versions
-
-<details>
-<summary>🔽 Click to view historical version details</summary>
 
 ### 🌟 v4.3 - User Interface Interaction Enhancement and Pagination Display Optimization 🚀 **UI Experience Update**
 
