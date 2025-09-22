@@ -120,6 +120,36 @@ const (
 	WatchlistSearchConfirm
 	WatchlistTagging      // 自选股票打标签状态
 	WatchlistGroupSelect  // 自选股票分组选择状态
+	PortfolioSorting      // 持股列表排序状态
+	WatchlistSorting      // 自选列表排序状态
+)
+
+// 排序字段枚举
+type SortField int
+
+const (
+	SortByCode SortField = iota    // 股票代码
+	SortByName                     // 股票名称
+	SortByPrice                    // 现价
+	SortByCostPrice                // 成本价
+	SortByChange                   // 涨跌额
+	SortByChangePercent            // 涨跌幅
+	SortByQuantity                 // 持股数量
+	SortByTodayProfit              // 今日盈亏
+	SortByTotalProfit              // 持仓盈亏
+	SortByProfitRate               // 盈亏率
+	SortByMarketValue              // 市值
+	SortByTag                      // 标签 (仅自选列表)
+	SortByTurnoverRate             // 换手率 (仅自选列表)
+	SortByVolume                   // 成交量 (仅自选列表)
+)
+
+// 排序方向枚举
+type SortDirection int
+
+const (
+	SortAsc SortDirection = iota  // 升序
+	SortDesc                      // 降序
 )
 
 // 文本映射结构
@@ -147,8 +177,8 @@ var texts = map[Language]TextMap{
 		"returnToMenu":        "ESC、Q键或M键返回主菜单",
 		"returnToMenuShort":   "ESC或Q键返回主菜单",
 		"returnEscOnly":       "ESC键返回",
-		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票，A键添加股票 | ↑/↓:翻页",
-		"watchlistHelp":       "ESC、Q键或M键返回主菜单，D键删除股票，A键添加股票 | ↑/↓:翻页",
+		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票，A键添加股票，S键排序(升/降序) | ↑/↓:翻页",
+		"watchlistHelp":       "ESC、Q键或M键返回主菜单，A键添加股票，D键删除股票，S键排序(升/降序)，T键打标签，G键分组查看，C键清除过滤 | ↑/↓:翻页",
 		"monitoringTitle":     "=== 股票实时监控 ===",
 		"updateTime":          "更新时间(5s): %s",
 		"emptyPortfolio":      "投资组合为空",
@@ -212,6 +242,27 @@ var texts = map[Language]TextMap{
 		"addWatchSuccess":     "成功添加到自选列表: %s (%s)",
 		"alreadyInWatch":      "股票 %s 已在自选列表中",
 		"actionHelp":          "1-添加到自选, 2-添加到持股列表, ESC或Q键返回主菜单, R键重新搜索",
+		"sortTitle":           "=== 排序设置 ===",
+		"selectSortField":     "选择排序字段:",
+		"sortCode":            "股票代码",
+		"sortName":            "股票名称", 
+		"sortPrice":           "现价",
+		"sortCostPrice":       "成本价",
+		"sortChange":          "涨跌额",
+		"sortChangePercent":   "涨跌幅",
+		"sortQuantity":        "持股数量",
+		"sortTodayProfit":     "今日盈亏",
+		"sortTotalProfit":     "持仓盈亏",
+		"sortProfitRate":      "盈亏率",
+		"sortMarketValue":     "市值",
+		"sortTag":             "标签",
+		"sortTurnoverRate":    "换手率",
+		"sortVolume":          "成交量",
+		"sortAsc":             "升序",
+		"sortDesc":            "降序",
+		"sortHelp":            "使用方向键选择排序字段，回车切换升序/降序，C键清除排序，ESC返回列表",
+		"sortCleared":         "排序已清除",
+		"sortedBy":            "排序: %s(%s)",
 	},
 	English: {
 		"title":               "=== Stock Monitor System ===",
@@ -233,8 +284,8 @@ var texts = map[Language]TextMap{
 		"returnToMenu":        "ESC, Q or M to return to main menu",
 		"returnToMenuShort":   "ESC or Q to return to main menu",
 		"returnEscOnly":       "ESC to return",
-		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock, A to add stock | ↑/↓:scroll",
-		"watchlistHelp":       "ESC, Q or M to return to main menu, D to delete stock, A to add stock | ↑/↓:scroll",
+		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock, A to add stock, S to sort(Asc/Desc) | ↑/↓:scroll",
+		"watchlistHelp":       "ESC, Q or M to return to main menu, A to add stock, D to delete stock, S to sort(Asc/Desc), T to tag, G to group view, C to clear filter | ↑/↓:scroll",
 		"monitoringTitle":     "=== Real-time Stock Monitor ===",
 		"updateTime":          "Update Time(5s): %s",
 		"emptyPortfolio":      "Portfolio is empty",
@@ -298,6 +349,27 @@ var texts = map[Language]TextMap{
 		"addWatchSuccess":     "Successfully added to watchlist: %s (%s)",
 		"alreadyInWatch":      "Stock %s is already in watchlist",
 		"actionHelp":          "1-Add to Watchlist, 2-Add to Holdings, ESC or Q to return to main menu, R to search again",
+		"sortTitle":           "=== Sort Settings ===",
+		"selectSortField":     "Select sort field:",
+		"sortCode":            "Stock Code",
+		"sortName":            "Stock Name", 
+		"sortPrice":           "Current Price",
+		"sortCostPrice":       "Cost Price",
+		"sortChange":          "Change Amount",
+		"sortChangePercent":   "Change Percent",
+		"sortQuantity":        "Quantity",
+		"sortTodayProfit":     "Today's P&L",
+		"sortTotalProfit":     "Total P&L",
+		"sortProfitRate":      "P&L Rate",
+		"sortMarketValue":     "Market Value",
+		"sortTag":             "Tag",
+		"sortTurnoverRate":    "Turnover Rate",
+		"sortVolume":          "Volume",
+		"sortAsc":             "Ascending",
+		"sortDesc":            "Descending",
+		"sortHelp":            "Use arrow keys to select sort field, Enter to toggle Asc/Desc, C to clear sort, ESC to return to list",
+		"sortCleared":         "Sort cleared",
+		"sortedBy":            "Sorted by: %s(%s)",
 	},
 }
 
@@ -350,6 +422,18 @@ type Model struct {
 	selectedTag        string   // 当前选择的标签过滤
 	availableTags      []string // 所有可用的标签列表
 	tagInput           string   // 标签输入框内容
+	
+	// For sorting - 持股列表排序状态
+	portfolioSortField     SortField     // 持股列表当前排序字段
+	portfolioSortDirection SortDirection // 持股列表当前排序方向
+	portfolioSortCursor    int           // 持股列表排序菜单光标位置
+	portfolioIsSorted      bool          // 持股列表是否已经应用了排序
+	
+	// For sorting - 自选列表排序状态
+	watchlistSortField     SortField     // 自选列表当前排序字段
+	watchlistSortDirection SortDirection // 自选列表当前排序方向
+	watchlistSortCursor    int           // 自选列表排序菜单光标位置
+	watchlistIsSorted      bool          // 自选列表是否已经应用了排序
 }
 
 type tickMsg struct{}
@@ -436,6 +520,8 @@ func main() {
 		watchlistScrollPos: 0, // 自选列表滚动位置
 		portfolioCursor:    0, // 持股列表游标
 		watchlistCursor:    0, // 自选列表游标
+		portfolioIsSorted:  false, // 持股列表默认未排序状态
+		watchlistIsSorted:  false, // 自选列表默认未排序状态
 	}
 
 	// 根据语言设置菜单项
@@ -531,6 +617,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel, cmd = m.handleWatchlistTagging(msg)
 		case WatchlistGroupSelect:
 			newModel, cmd = m.handleWatchlistGroupSelect(msg)
+		case PortfolioSorting:
+			newModel, cmd = m.handlePortfolioSorting(msg)
+		case WatchlistSorting:
+			newModel, cmd = m.handleWatchlistSorting(msg)
 		default:
 			newModel, cmd = m, nil
 		}
@@ -582,6 +672,10 @@ func (m *Model) View() string {
 		mainContent = m.viewWatchlistTagging()
 	case WatchlistGroupSelect:
 		mainContent = m.viewWatchlistGroupSelect()
+	case PortfolioSorting:
+		mainContent = m.viewPortfolioSorting()
+	case WatchlistSorting:
+		mainContent = m.viewWatchlistSorting()
 	default:
 		mainContent = ""
 	}
@@ -814,6 +908,7 @@ func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 
 		m.portfolio.Stocks = append(m.portfolio.Stocks, stock)
 		m.savePortfolio()
+		m.portfolioIsSorted = false // 添加股票后重置持股列表排序状态
 
 		// 根据来源决定跳转目标
 		if m.fromSearch {
@@ -897,6 +992,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		removedStock := m.portfolio.Stocks[m.portfolioCursor]
 		m.portfolio.Stocks = append(m.portfolio.Stocks[:m.portfolioCursor], m.portfolio.Stocks[m.portfolioCursor+1:]...)
 		m.savePortfolio()
+		m.portfolioIsSorted = false // 删除股票后重置持股列表排序状态
 		// 调整光标位置
 		if m.portfolioCursor >= len(m.portfolio.Stocks) && len(m.portfolio.Stocks) > 0 {
 			m.portfolioCursor = len(m.portfolio.Stocks) - 1
@@ -917,12 +1013,20 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = ""
 		m.fromSearch = true // 设置标志，表示从持股列表进入，完成后应该回到监控页面
 		return m, nil
+	case "s":
+		// 进入排序菜单
+		m.logUserAction("从持股列表进入排序菜单")
+		m.state = PortfolioSorting
+		// 智能定位光标到当前排序字段
+		m.portfolioSortCursor = m.findSortFieldIndex(m.portfolioSortField, true)
+		m.message = ""
+		return m, nil
 	case "up", "k", "w":
 		if m.portfolioCursor > 0 {
 			m.portfolioCursor--
 		}
 		return m, nil
-	case "down", "j", "s":
+	case "down", "j":
 		if m.portfolioCursor < len(m.portfolio.Stocks)-1 {
 			m.portfolioCursor++
 		}
@@ -946,12 +1050,8 @@ func (m *Model) viewMonitoring() string {
 	t := table.NewWriter()
 	t.SetStyle(table.StyleLight)
 
-	// 获取本地化的表头
-	if m.language == Chinese {
-		t.AppendHeader(table.Row{"", "代码", "名称", "昨收价", "现价", "成本价", "开盘", "最高", "最低", "持股数", "今日涨幅", "今日盈亏", "持仓盈亏", "盈亏率", "市值"})
-	} else {
-		t.AppendHeader(table.Row{"", "Code", "Name", "PrevClose", "Price", "Cost", "Open", "High", "Low", "Quantity", "Today%", "TodayP&L", "PositionP&L", "P&LRate", "Value"})
-	}
+	// 获取带排序指示器的表头
+	t.AppendHeader(m.getPortfolioHeaderWithSortIndicator())
 
 	var totalMarketValue float64
 	var totalCost float64
@@ -2425,6 +2525,7 @@ func (m *Model) processEditingStep() (tea.Model, tea.Cmd) {
 		} else {
 			m.portfolio.Stocks[m.selectedStockIndex].Quantity = newQuantity
 			m.savePortfolio()
+			m.portfolioIsSorted = false // 修改股票后重置持股列表排序状态
 
 			stockName := m.portfolio.Stocks[m.selectedStockIndex].Name
 			// 根据之前的状态决定返回到哪里
@@ -3103,6 +3204,7 @@ func (m *Model) addToWatchlist(code, name string) bool {
 		Tag:  "-", // 默认标签
 	}
 	m.watchlist.Stocks = append(m.watchlist.Stocks, watchStock)
+	m.watchlistIsSorted = false // 添加自选股票后重置自选列表排序状态
 	m.saveWatchlist()
 	return true
 }
@@ -3112,6 +3214,7 @@ func (m *Model) removeFromWatchlist(index int) {
 	if index >= 0 && index < len(m.watchlist.Stocks) {
 		m.watchlist.Stocks = append(m.watchlist.Stocks[:index], m.watchlist.Stocks[index+1:]...)
 		m.saveWatchlist()
+		m.watchlistIsSorted = false // 删除自选股票后重置自选列表排序状态
 	}
 }
 
@@ -3327,6 +3430,14 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searchFromWatchlist = true
 		m.message = ""
 		return m, nil
+	case "s":
+		// 进入排序菜单
+		m.logUserAction("从自选列表进入排序菜单")
+		m.state = WatchlistSorting
+		// 智能定位光标到当前排序字段
+		m.watchlistSortCursor = m.findSortFieldIndex(m.watchlistSortField, false)
+		m.message = ""
+		return m, nil
 	case "t":
 		// 给当前选中的股票打标签
 		filteredStocks := m.getFilteredWatchlist()
@@ -3373,7 +3484,7 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// 基于过滤后的列表调整滚动
 		m.adjustWatchlistScroll(filteredStocks)
 		return m, nil
-	case "down", "j", "s":
+	case "down", "j":
 		filteredStocks := m.getFilteredWatchlist()
 		if m.watchlistCursor < len(filteredStocks)-1 {
 			m.watchlistCursor++
@@ -3436,12 +3547,8 @@ func (m *Model) viewWatchlistViewing() string {
 	t := table.NewWriter()
 	t.SetStyle(table.StyleLight)
 
-	// 获取本地化的表头 - 添加标签列
-	if m.language == Chinese {
-		t.AppendHeader(table.Row{"", "标签", "代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"})
-	} else {
-		t.AppendHeader(table.Row{"", "Tag", "Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"})
-	}
+	// 获取带排序指示器的表头
+	t.AppendHeader(m.getWatchlistHeaderWithSortIndicator())
 
 	// 计算要显示的股票范围
 	endIndex := len(filteredStocks) - m.watchlistScrollPos
@@ -3549,20 +3656,8 @@ func (m *Model) viewWatchlistViewing() string {
 		}
 	}
 
-	// 更新帮助信息，加入新快捷键
-	if m.language == Chinese {
-		s += "\nESC、Q键或M键返回主菜单，A键添加股票，D键删除股票\n"
-		s += "T键为当前股票打标签，G键按标签分组查看\n"
-		if m.selectedTag != "" {
-			s += "C键清除当前过滤\n"
-		}
-	} else {
-		s += "\nESC, Q or M to return to main menu, A to add stock, D to delete stock\n"
-		s += "T to tag current stock, G to group by tag\n"
-		if m.selectedTag != "" {
-			s += "C to clear current filter\n"
-		}
-	}
+	// 使用统一的帮助文本
+	s += "\n" + m.getText("watchlistHelp") + "\n"
 
 	if m.message != "" {
 		s += "\n" + m.message + "\n"
@@ -3711,3 +3806,604 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 
 	return s
 }
+
+// 冒泡排序算法 - 持股列表排序
+func (m *Model) bubbleSortPortfolio(field SortField, direction SortDirection) {
+	stocks := m.portfolio.Stocks
+	n := len(stocks)
+	
+	for i := 0; i < n-1; i++ {
+		for j := 0; j < n-i-1; j++ {
+			shouldSwap := false
+			
+			switch field {
+			case SortByCode:
+				if direction == SortAsc {
+					shouldSwap = stocks[j].Code > stocks[j+1].Code
+				} else {
+					shouldSwap = stocks[j].Code < stocks[j+1].Code
+				}
+			case SortByName:
+				if direction == SortAsc {
+					shouldSwap = stocks[j].Name > stocks[j+1].Name
+				} else {
+					shouldSwap = stocks[j].Name < stocks[j+1].Name
+				}
+			case SortByPrice:
+				if direction == SortAsc {
+					shouldSwap = stocks[j].Price > stocks[j+1].Price
+				} else {
+					shouldSwap = stocks[j].Price < stocks[j+1].Price
+				}
+			case SortByCostPrice:
+				if direction == SortAsc {
+					shouldSwap = stocks[j].CostPrice > stocks[j+1].CostPrice
+				} else {
+					shouldSwap = stocks[j].CostPrice < stocks[j+1].CostPrice
+				}
+			case SortByChange:
+				if direction == SortAsc {
+					shouldSwap = stocks[j].Change > stocks[j+1].Change
+				} else {
+					shouldSwap = stocks[j].Change < stocks[j+1].Change
+				}
+			case SortByChangePercent:
+				if direction == SortAsc {
+					shouldSwap = stocks[j].ChangePercent > stocks[j+1].ChangePercent
+				} else {
+					shouldSwap = stocks[j].ChangePercent < stocks[j+1].ChangePercent
+				}
+			case SortByQuantity:
+				if direction == SortAsc {
+					shouldSwap = stocks[j].Quantity > stocks[j+1].Quantity
+				} else {
+					shouldSwap = stocks[j].Quantity < stocks[j+1].Quantity
+				}
+			case SortByTodayProfit:
+				todayProfitJ := stocks[j].Change * float64(stocks[j].Quantity)
+				todayProfitJplus1 := stocks[j+1].Change * float64(stocks[j+1].Quantity)
+				if direction == SortAsc {
+					shouldSwap = todayProfitJ > todayProfitJplus1
+				} else {
+					shouldSwap = todayProfitJ < todayProfitJplus1
+				}
+			case SortByTotalProfit:
+				totalProfitJ := (stocks[j].Price - stocks[j].CostPrice) * float64(stocks[j].Quantity)
+				totalProfitJplus1 := (stocks[j+1].Price - stocks[j+1].CostPrice) * float64(stocks[j+1].Quantity)
+				if direction == SortAsc {
+					shouldSwap = totalProfitJ > totalProfitJplus1
+				} else {
+					shouldSwap = totalProfitJ < totalProfitJplus1
+				}
+			case SortByProfitRate:
+				profitRateJ := ((stocks[j].Price - stocks[j].CostPrice) / stocks[j].CostPrice) * 100
+				profitRateJplus1 := ((stocks[j+1].Price - stocks[j+1].CostPrice) / stocks[j+1].CostPrice) * 100
+				if direction == SortAsc {
+					shouldSwap = profitRateJ > profitRateJplus1
+				} else {
+					shouldSwap = profitRateJ < profitRateJplus1
+				}
+			case SortByMarketValue:
+				marketValueJ := stocks[j].Price * float64(stocks[j].Quantity)
+				marketValueJplus1 := stocks[j+1].Price * float64(stocks[j+1].Quantity)
+				if direction == SortAsc {
+					shouldSwap = marketValueJ > marketValueJplus1
+				} else {
+					shouldSwap = marketValueJ < marketValueJplus1
+				}
+			}
+			
+			if shouldSwap {
+				stocks[j], stocks[j+1] = stocks[j+1], stocks[j]
+			}
+		}
+	}
+}
+
+// 冒泡排序算法 - 自选列表排序（基于实时数据）
+func (m *Model) bubbleSortWatchlist(field SortField, direction SortDirection) {
+	// 获取过滤后的自选列表
+	filteredStocks := m.getFilteredWatchlist()
+	n := len(filteredStocks)
+	
+	// 创建带实时数据的结构用于排序
+	type WatchStockWithData struct {
+		Stock WatchlistStock
+		Data  *StockData
+	}
+	
+	// 获取所有股票的实时数据
+	stocksWithData := make([]WatchStockWithData, n)
+	for i, stock := range filteredStocks {
+		stockData := getStockPrice(stock.Code)
+		stocksWithData[i] = WatchStockWithData{Stock: stock, Data: stockData}
+	}
+	
+	// 冒泡排序
+	for i := 0; i < n-1; i++ {
+		for j := 0; j < n-i-1; j++ {
+			shouldSwap := false
+			
+			switch field {
+			case SortByCode:
+				if direction == SortAsc {
+					shouldSwap = stocksWithData[j].Stock.Code > stocksWithData[j+1].Stock.Code
+				} else {
+					shouldSwap = stocksWithData[j].Stock.Code < stocksWithData[j+1].Stock.Code
+				}
+			case SortByName:
+				if direction == SortAsc {
+					shouldSwap = stocksWithData[j].Stock.Name > stocksWithData[j+1].Stock.Name
+				} else {
+					shouldSwap = stocksWithData[j].Stock.Name < stocksWithData[j+1].Stock.Name
+				}
+			case SortByTag:
+				if direction == SortAsc {
+					shouldSwap = stocksWithData[j].Stock.Tag > stocksWithData[j+1].Stock.Tag
+				} else {
+					shouldSwap = stocksWithData[j].Stock.Tag < stocksWithData[j+1].Stock.Tag
+				}
+			case SortByPrice:
+				priceJ := float64(0)
+				priceJplus1 := float64(0)
+				if stocksWithData[j].Data != nil {
+					priceJ = stocksWithData[j].Data.Price
+				}
+				if stocksWithData[j+1].Data != nil {
+					priceJplus1 = stocksWithData[j+1].Data.Price
+				}
+				if direction == SortAsc {
+					shouldSwap = priceJ > priceJplus1
+				} else {
+					shouldSwap = priceJ < priceJplus1
+				}
+			case SortByChangePercent:
+				changeJ := float64(0)
+				changeJplus1 := float64(0)
+				if stocksWithData[j].Data != nil {
+					changeJ = stocksWithData[j].Data.ChangePercent
+				}
+				if stocksWithData[j+1].Data != nil {
+					changeJplus1 = stocksWithData[j+1].Data.ChangePercent
+				}
+				if direction == SortAsc {
+					shouldSwap = changeJ > changeJplus1
+				} else {
+					shouldSwap = changeJ < changeJplus1
+				}
+			case SortByTurnoverRate:
+				turnoverJ := float64(0)
+				turnoverJplus1 := float64(0)
+				if stocksWithData[j].Data != nil {
+					turnoverJ = stocksWithData[j].Data.TurnoverRate
+				}
+				if stocksWithData[j+1].Data != nil {
+					turnoverJplus1 = stocksWithData[j+1].Data.TurnoverRate
+				}
+				if direction == SortAsc {
+					shouldSwap = turnoverJ > turnoverJplus1
+				} else {
+					shouldSwap = turnoverJ < turnoverJplus1
+				}
+			case SortByVolume:
+				volumeJ := int64(0)
+				volumeJplus1 := int64(0)
+				if stocksWithData[j].Data != nil {
+					volumeJ = stocksWithData[j].Data.Volume
+				}
+				if stocksWithData[j+1].Data != nil {
+					volumeJplus1 = stocksWithData[j+1].Data.Volume
+				}
+				if direction == SortAsc {
+					shouldSwap = volumeJ > volumeJplus1
+				} else {
+					shouldSwap = volumeJ < volumeJplus1
+				}
+			}
+			
+			if shouldSwap {
+				stocksWithData[j], stocksWithData[j+1] = stocksWithData[j+1], stocksWithData[j]
+			}
+		}
+	}
+	
+	// 将排序后的结果转换回原格式
+	sortedStocks := make([]WatchlistStock, n)
+	for i, stockWithData := range stocksWithData {
+		sortedStocks[i] = stockWithData.Stock
+	}
+	
+	// 更新自选列表的顺序
+	// 由于我们只对过滤后的列表排序，需要重新构建整个watchlist
+	newWatchlist := make([]WatchlistStock, 0, len(m.watchlist.Stocks))
+	
+	// 先添加排序后的过滤结果
+	for _, stock := range sortedStocks {
+		newWatchlist = append(newWatchlist, stock)
+	}
+	
+	// 再添加不在过滤条件内的股票
+	if m.selectedTag != "" {
+		for _, stock := range m.watchlist.Stocks {
+			if stock.Tag != m.selectedTag {
+				newWatchlist = append(newWatchlist, stock)
+			}
+		}
+	}
+	
+	m.watchlist.Stocks = newWatchlist
+}
+
+// 获取排序字段的显示名称
+func (m *Model) getSortFieldName(field SortField) string {
+	switch field {
+	case SortByCode:
+		return m.getText("sortCode")
+	case SortByName:
+		return m.getText("sortName")
+	case SortByPrice:
+		return m.getText("sortPrice")
+	case SortByCostPrice:
+		return m.getText("sortCostPrice")
+	case SortByChange:
+		return m.getText("sortChange")
+	case SortByChangePercent:
+		return m.getText("sortChangePercent")
+	case SortByQuantity:
+		return m.getText("sortQuantity")
+	case SortByTodayProfit:
+		return m.getText("sortTodayProfit")
+	case SortByTotalProfit:
+		return m.getText("sortTotalProfit")
+	case SortByProfitRate:
+		return m.getText("sortProfitRate")
+	case SortByMarketValue:
+		return m.getText("sortMarketValue")
+	case SortByTag:
+		return m.getText("sortTag")
+	case SortByTurnoverRate:
+		return m.getText("sortTurnoverRate")
+	case SortByVolume:
+		return m.getText("sortVolume")
+	default:
+		return "Unknown"
+	}
+}
+
+// 获取排序方向的显示名称
+func (m *Model) getSortDirectionName(direction SortDirection) string {
+	if direction == SortAsc {
+		return m.getText("sortAsc")
+	}
+	return m.getText("sortDesc")
+}
+
+// 获取持股列表可用的排序字段
+func (m *Model) getPortfolioSortFields() []SortField {
+	return []SortField{
+		SortByCode, SortByName, SortByPrice, SortByCostPrice,
+		SortByChange, SortByChangePercent, SortByQuantity,
+		SortByTodayProfit, SortByTotalProfit, SortByProfitRate, SortByMarketValue,
+	}
+}
+
+// 获取自选列表可用的排序字段
+func (m *Model) getWatchlistSortFields() []SortField {
+	return []SortField{
+		SortByCode, SortByName, SortByPrice, SortByTag,
+		SortByChangePercent, SortByTurnoverRate, SortByVolume,
+	}
+}
+
+// 查找排序字段在字段列表中的索引，如果找不到返回0
+func (m *Model) findSortFieldIndex(field SortField, isPortfolio bool) int {
+	var fields []SortField
+	if isPortfolio {
+		fields = m.getPortfolioSortFields()
+	} else {
+		fields = m.getWatchlistSortFields()
+	}
+	
+	for i, f := range fields {
+		if f == field {
+			return i
+		}
+	}
+	
+	// 如果没找到当前排序字段，返回0（第一个字段）
+	return 0
+}
+
+// 生成带排序指示器的持股列表表头
+func (m *Model) getPortfolioHeaderWithSortIndicator() table.Row {
+	var baseHeaders table.Row
+	if m.language == Chinese {
+		baseHeaders = table.Row{"", "代码", "名称", "昨收价", "现价", "成本价", "开盘", "最高", "最低", "持股数", "今日涨幅", "今日盈亏", "持仓盈亏", "盈亏率", "市值"}
+	} else {
+		baseHeaders = table.Row{"", "Code", "Name", "PrevClose", "Price", "Cost", "Open", "High", "Low", "Quantity", "Today%", "TodayP&L", "PositionP&L", "P&LRate", "Value"}
+	}
+
+	// 排序字段到表头列索引的映射（跳过第一列的光标列）
+	sortFieldToColumnIndex := map[SortField]int{
+		SortByCode:         1,  // 代码
+		SortByName:         2,  // 名称
+		SortByPrice:        4,  // 现价
+		SortByCostPrice:    5,  // 成本价
+		SortByChangePercent: 10, // 今日涨幅
+		SortByTodayProfit:  11, // 今日盈亏
+		SortByTotalProfit:  12, // 持仓盈亏
+		SortByProfitRate:   13, // 盈亏率
+		SortByMarketValue:  14, // 市值
+		SortByQuantity:     9,  // 持股数
+	}
+
+	// 添加排序指示器（只有在已排序状态下才显示）
+	if m.portfolioIsSorted {
+		if columnIndex, exists := sortFieldToColumnIndex[m.portfolioSortField]; exists {
+			sortIndicator := "↑"
+			if m.portfolioSortDirection == SortDesc {
+				sortIndicator = "↓"
+			}
+			baseHeaders[columnIndex] = fmt.Sprintf("%s %s", baseHeaders[columnIndex], sortIndicator)
+		}
+	}
+
+	return baseHeaders
+}
+
+// 生成带排序指示器的自选列表表头
+func (m *Model) getWatchlistHeaderWithSortIndicator() table.Row {
+	var baseHeaders table.Row
+	if m.language == Chinese {
+		baseHeaders = table.Row{"", "标签", "代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"}
+	} else {
+		baseHeaders = table.Row{"", "Tag", "Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"}
+	}
+
+	// 排序字段到表头列索引的映射（跳过第一列的光标列）
+	sortFieldToColumnIndex := map[SortField]int{
+		SortByTag:           1,  // 标签
+		SortByCode:          2,  // 代码
+		SortByName:          3,  // 名称
+		SortByPrice:         4,  // 现价
+		SortByChangePercent: 9,  // 今日涨幅
+		SortByTurnoverRate:  10, // 换手率
+		SortByVolume:        11, // 成交量
+	}
+
+	// 添加排序指示器（只有在已排序状态下才显示）
+	if m.watchlistIsSorted {
+		if columnIndex, exists := sortFieldToColumnIndex[m.watchlistSortField]; exists {
+			sortIndicator := "↑"
+			if m.watchlistSortDirection == SortDesc {
+				sortIndicator = "↓"
+			}
+			baseHeaders[columnIndex] = fmt.Sprintf("%s %s", baseHeaders[columnIndex], sortIndicator)
+		}
+	}
+
+	return baseHeaders
+}
+
+// 处理持股列表排序
+func (m *Model) handlePortfolioSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	sortFields := m.getPortfolioSortFields()
+	
+	switch msg.String() {
+	case "up", "k", "w":
+		if m.portfolioSortCursor > 0 {
+			m.portfolioSortCursor--
+		}
+	case "down", "j", "s":
+		if m.portfolioSortCursor < len(sortFields)-1 {
+			m.portfolioSortCursor++
+		}
+	case "enter", " ":
+		// 切换排序方向或应用排序
+		selectedField := sortFields[m.portfolioSortCursor]
+		if m.portfolioSortField == selectedField {
+			// 切换排序方向
+			if m.portfolioSortDirection == SortAsc {
+				m.portfolioSortDirection = SortDesc
+			} else {
+				m.portfolioSortDirection = SortAsc
+			}
+		} else {
+			// 设置新的排序字段，默认升序
+			m.portfolioSortField = selectedField
+			m.portfolioSortDirection = SortAsc
+		}
+		// 执行排序并标记为已排序状态
+		m.bubbleSortPortfolio(m.portfolioSortField, m.portfolioSortDirection)
+		m.portfolioIsSorted = true
+		m.resetPortfolioCursor()
+		// 返回持股列表页面
+		m.state = Monitoring
+		m.message = ""
+		return m, nil
+	case "c", "C":
+		// 清除当前排序 - 重新加载原始数据顺序
+		m.portfolioIsSorted = false
+		// 清除排序字段和方向状态
+		m.portfolioSortField = SortByCode // 重置为默认值
+		m.portfolioSortDirection = SortAsc // 重置为默认值
+		// 重新加载原始数据顺序
+		m.portfolio = loadPortfolio()
+		m.resetPortfolioCursor()
+		// 返回持股列表页面
+		m.state = Monitoring
+		m.message = m.getText("sortCleared")
+		return m, nil
+	case "esc", "q":
+		// 返回持股列表页面
+		m.state = Monitoring
+		m.message = ""
+		return m, nil
+	}
+	return m, nil
+}
+
+// 处理自选列表排序
+func (m *Model) handleWatchlistSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	sortFields := m.getWatchlistSortFields()
+	
+	switch msg.String() {
+	case "up", "k", "w":
+		if m.watchlistSortCursor > 0 {
+			m.watchlistSortCursor--
+		}
+	case "down", "j", "s":
+		if m.watchlistSortCursor < len(sortFields)-1 {
+			m.watchlistSortCursor++
+		}
+	case "enter", " ":
+		// 切换排序方向或应用排序
+		selectedField := sortFields[m.watchlistSortCursor]
+		if m.watchlistSortField == selectedField {
+			// 切换排序方向
+			if m.watchlistSortDirection == SortAsc {
+				m.watchlistSortDirection = SortDesc
+			} else {
+				m.watchlistSortDirection = SortAsc
+			}
+		} else {
+			// 设置新的排序字段，默认升序
+			m.watchlistSortField = selectedField
+			m.watchlistSortDirection = SortAsc
+		}
+		// 执行排序并标记为已排序状态
+		m.bubbleSortWatchlist(m.watchlistSortField, m.watchlistSortDirection)
+		m.watchlistIsSorted = true
+		m.resetWatchlistCursor()
+		// 返回自选列表页面
+		m.state = WatchlistViewing
+		m.message = ""
+		return m, nil
+	case "c", "C":
+		// 清除当前排序 - 重新加载原始数据顺序
+		m.watchlistIsSorted = false
+		// 清除排序字段和方向状态
+		m.watchlistSortField = SortByCode // 重置为默认值
+		m.watchlistSortDirection = SortAsc // 重置为默认值
+		// 重新加载原始数据顺序
+		m.watchlist = loadWatchlist()
+		m.resetWatchlistCursor()
+		// 返回自选列表页面
+		m.state = WatchlistViewing
+		m.message = m.getText("sortCleared")
+		return m, nil
+	case "esc", "q":
+		// 返回自选列表页面
+		m.state = WatchlistViewing
+		m.message = ""
+		return m, nil
+	}
+	return m, nil
+}
+
+// 排序菜单视图 - 持股列表
+func (m *Model) viewPortfolioSorting() string {
+	s := m.getText("sortTitle") + "\n\n"
+	s += m.getText("selectSortField") + "\n\n"
+	
+	sortFields := m.getPortfolioSortFields()
+	for i, field := range sortFields {
+		prefix := "  "
+		if i == m.portfolioSortCursor {
+			prefix = "► "
+		}
+		
+		fieldName := m.getSortFieldName(field)
+		if m.portfolioIsSorted && m.portfolioSortField == field {
+			// 显示当前排序状态（只有在已排序时才显示）
+			directionName := m.getSortDirectionName(m.portfolioSortDirection)
+			s += fmt.Sprintf("%s%s (%s)\n", prefix, fieldName, directionName)
+		} else {
+			s += fmt.Sprintf("%s%s\n", prefix, fieldName)
+		}
+	}
+	
+	s += "\n" + m.getText("sortHelp") + "\n"
+	return s
+}
+
+// 测试排序功能的示例函数  
+func testSortingFeatures() {
+	fmt.Println("=== 排序功能测试 ===")
+	
+	// 创建测试数据
+	model := &Model{
+		portfolio: Portfolio{
+			Stocks: []Stock{
+				{Code: "SH601138", Name: "工业富联", Price: 71.36, CostPrice: 48.282, Quantity: 400},
+				{Code: "SZ000880", Name: "潍柴重机", Price: 32.85, CostPrice: 32.772, Quantity: 140},
+				{Code: "SH600143", Name: "金发科技", Price: 20.85, CostPrice: 21.72, Quantity: 100},
+			},
+		},
+		watchlist: Watchlist{
+			Stocks: []WatchlistStock{
+				{Code: "SH600410", Name: "华胜天成", Tag: "-"},
+				{Code: "SH600519", Name: "贵州茅台", Tag: "-"},
+				{Code: "SZ001309", Name: "德明利", Tag: "趋势"},
+			},
+		},
+		language: Chinese,
+	}
+
+	fmt.Println("\n原始持股列表:")
+	for i, stock := range model.portfolio.Stocks {
+		fmt.Printf("%d. %s (%s) - 现价: %.3f\n", 
+			i+1, stock.Name, stock.Code, stock.Price)
+	}
+
+	// 按代码升序排序
+	fmt.Println("\n按代码升序排序后:")
+	model.bubbleSortPortfolio(SortByCode, SortAsc)
+	for i, stock := range model.portfolio.Stocks {
+		fmt.Printf("%d. %s (%s) - 现价: %.3f\n", 
+			i+1, stock.Name, stock.Code, stock.Price)
+	}
+
+	fmt.Println("\n原始自选列表:")
+	for i, stock := range model.watchlist.Stocks {
+		fmt.Printf("%d. %s (%s) - 标签: %s\n", 
+			i+1, stock.Name, stock.Code, stock.Tag)
+	}
+
+	// 按名称升序排序
+	fmt.Println("\n按名称升序排序后:")
+	model.bubbleSortWatchlist(SortByName, SortAsc)
+	for i, stock := range model.watchlist.Stocks {
+		fmt.Printf("%d. %s (%s) - 标签: %s\n", 
+			i+1, stock.Name, stock.Code, stock.Tag)
+	}
+
+	fmt.Println("\n排序功能测试完成！")
+}
+
+// 排序菜单视图 - 自选列表
+func (m *Model) viewWatchlistSorting() string {
+	s := m.getText("sortTitle") + "\n\n"
+	s += m.getText("selectSortField") + "\n\n"
+	
+	sortFields := m.getWatchlistSortFields()
+	for i, field := range sortFields {
+		prefix := "  "
+		if i == m.watchlistSortCursor {
+			prefix = "► "
+		}
+		
+		fieldName := m.getSortFieldName(field)
+		if m.watchlistIsSorted && m.watchlistSortField == field {
+			// 显示当前排序状态（只有在已排序时才显示）
+			directionName := m.getSortDirectionName(m.watchlistSortDirection)
+			s += fmt.Sprintf("%s%s (%s)\n", prefix, fieldName, directionName)
+		} else {
+			s += fmt.Sprintf("%s%s\n", prefix, fieldName)
+		}
+	}
+	
+	s += "\n" + m.getText("sortHelp") + "\n"
+	return s
+}
+
