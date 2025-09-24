@@ -1121,7 +1121,8 @@ func (m *Model) viewMonitoring() string {
 			// 计算今日涨幅：应该基于昨收价，而不是开盘价
 			var todayChangeStr string
 			// 使用change_percent字段，这是基于昨收价计算的涨跌幅
-			if stock.ChangePercent != 0 {
+			// 当数据有效时显示百分比（包括0.00%），只有无法获取数据时才显示"-"
+			if stock.PrevClose > 0 && stock.Price > 0 {
 				todayChangeStr = m.formatProfitRateWithColorZeroLang(stock.ChangePercent)
 			} else {
 				todayChangeStr = "-"
