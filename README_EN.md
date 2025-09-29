@@ -12,7 +12,8 @@ Stock Monitor is a command-line terminal stock monitoring tool designed for inve
 ### 🎯 Core Features
 
 - **🔄 Real-time Monitoring** - 5-second interval automatic price refresh, capture every trading moment
-- **📊 Professional Analysis** - 14-column detailed data display including OHLC, today's P&L, position P&L, P&L rate analysis, and market value statistics
+- **📊 Professional Analysis** - 18-column detailed data display including OHLC, today's P&L, position P&L, P&L rate analysis, market value statistics, and fund flow
+- **💰 Fund Flow Data** - Integrated AKShare for main net inflow, super large orders, large orders, medium orders, small orders and other 6-dimensional fund data ⭐ v4.6 New
 - **🎨 Smart Display** - Professional stock software color standards: red for gains, green for losses, white for neutral
 - **💼 Portfolio Management** - Complete position management with add, edit, and delete stock operations
 - **🌐 Global Markets** - Support for A-shares, US stocks, Hong Kong stocks and other major market code formats
@@ -563,6 +564,64 @@ System adopts professional stock software color standards:
 
 ## 📈 Version History
 
+### 🌟 v4.6 - Fund Flow Data Integration & Async Optimization 🚀 **AKShare Data Enhancement Update**
+
+**📊 Fund Flow Data Integration**:
+- ✅ **AKShare Integration**: Successfully integrated AKShare library for real-time fund flow data
+- ✅ **6-Dimensional Fund Analysis**: Main net inflow, super large orders, large orders, medium orders, small orders, net inflow ratio
+- ✅ **Smart Unit Display**: Automatically selects 10K/100M yuan units for more intuitive data presentation
+- ✅ **Professional Data Interpretation**: Positive values (inflow/red), negative values (outflow/green), zero values (balanced/white)
+
+**⚡ Async Optimization Architecture**:
+- ✅ **Non-blocking Acquisition**: Fund flow data fetched asynchronously, real-time price refresh unaffected
+- ✅ **Smart Caching Mechanism**: Memory cache avoids repeated requests, improves response speed
+- ✅ **Batch Processing**: Each stock fetched with 200ms intervals, respects API limits
+- ✅ **Incremental Updates**: Each stock displays immediately upon completion, no need to wait for all
+
+**🎯 User Experience Optimization**:
+- ✅ **No Interface Lag**: Async acquisition ensures interface remains smooth and responsive
+- ✅ **Timed Auto-updates**: Fund flow data automatically updates every 1 minute
+- ✅ **18-Column Data Display**: Watchlist expanded to 18 columns with complete fund flow information
+- ✅ **Real-time Data Sync**: Fund flow synchronized with stock price data updates
+
+**🔧 Technical Architecture Highlights**:
+- ✅ **Python Script Invocation**: Go program calls Python scripts to fetch AKShare data
+- ✅ **Virtual Environment Management**: Independent Python environment ensures dependency isolation
+- ✅ **Async Task Scheduling**: Uses Goroutines and Channels for async data processing
+- ✅ **Error Fault Tolerance**: Complete error handling mechanism, graceful degradation on API failures
+
+**📋 New Data Fields** (A-shares only):
+```
+Main Net Inflow | Super Large | Large | Medium | Small | Net Inflow Ratio
+```
+
+**💡 Data Analysis Value**:
+- 🎯 **Main Fund Monitoring**: Real-time tracking of institutional and large investor fund flows
+- 📈 **Market Sentiment Analysis**: Judge market buying/selling sentiment through fund flows
+- 🔍 **Investment Decision Support**: Make smarter investment decisions combining price and fund flow data
+- 📊 **Risk Warning**: Timely alerts for potential risks when funds flow out significantly
+
+**⌨️ Related Function Access**:
+```
+Watchlist Page → Automatically displays fund flow data
+Debug Mode → View detailed data acquisition logs
+```
+
+**🔄 Advantages vs v4.5**:
+| Feature | v4.5 Sorting | v4.6 Fund Flow |
+|---------|-------------|----------------|
+| Data Dimensions | ✅ Price data sorting | ✅ Price + fund flow dual analysis |
+| Interface Response | ✅ Smooth sorting | ✅ Async acquisition without lag |
+| Data Value | ✅ Technical analysis support | ✅ Technical + fundamental dual support |
+| Investment Decisions | ✅ Basic data analysis | ✅ Deep fund flow analysis |
+
+---
+
+### 📅 Historical Versions
+
+<details>
+<summary>🔽 Click to view historical version details</summary>
+
 ### 🌟 v4.5 - Advanced Sorting System & Interaction Optimization 🚀 **Professional Sorting Update**
 
 **📊 Bubble Sort System**:
@@ -616,13 +675,6 @@ ESC/Q: Return to list page
 - 📊 **Change Monitoring**: Sort by "Today's Change%" descending to focus on daily hot stocks
 - 🔤 **Code Sorting**: Sort by "Stock Code" ascending for quick lookup of specific stocks
 - 🏷️ **Tag Grouping**: Sort watchlist by "Tag" for categorized viewing
-
----
-
-### 📅 Historical Versions
-
-<details>
-<summary>🔽 Click to view historical version details</summary>
 
 ### 🌟 v4.4 - Watchlist Tag Grouping Feature 🚀 **Smart Grouping Update**
 
