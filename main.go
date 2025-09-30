@@ -446,6 +446,11 @@ type Model struct {
 	availableTags      []string // 所有可用的标签列表
 	tagInput           string   // 标签输入框内容
 	
+	// Performance optimization - cached filtered watchlist
+	cachedFilteredWatchlist     []WatchlistStock // 缓存的过滤后自选列表
+	cachedFilterTag             string           // 缓存的过滤标签
+	isFilteredWatchlistValid    bool             // 缓存是否有效
+	
 	// For sorting - 持股列表排序状态
 	portfolioSortField     SortField     // 持股列表当前排序字段
 	portfolioSortDirection SortDirection // 持股列表当前排序方向
@@ -2570,20 +2575,20 @@ func (m *Model) scrollWatchlistUp() {
 	// 向上翻页：显示更早的股票，光标也向上移动
 	if m.watchlistCursor > 0 {
 		m.watchlistCursor--
+		// 获取一次过滤后的列表，避免重复调用
+		filteredStocks := m.getFilteredWatchlist()
+		m.adjustWatchlistScroll(filteredStocks)
 	}
-	// 基于过滤后的列表调整滚动
-	filteredStocks := m.getFilteredWatchlist()
-	m.adjustWatchlistScroll(filteredStocks)
 }
 
 func (m *Model) scrollWatchlistDown() {
-	// 向下翻页：显示更新的股票，光标也向下移动
+	// 获取一次过滤后的列表，避免重复调用
 	filteredStocks := m.getFilteredWatchlist()
+	// 向下翻页：显示更新的股票，光标也向下移动
 	if m.watchlistCursor < len(filteredStocks)-1 {
 		m.watchlistCursor++
+		m.adjustWatchlistScroll(filteredStocks)
 	}
-	// 基于过滤后的列表调整滚动
-	m.adjustWatchlistScroll(filteredStocks)
 }
 
 func (m *Model) scrollWatchlistToTop() {
@@ -3151,12 +3156,19 @@ func (m *Model) getAvailableTags() []string {
 	return tags
 }
 
-// 根据标签过滤自选股票
+// 根据标签过滤自选股票（带缓存优化）
 func (m *Model) getFilteredWatchlist() []WatchlistStock {
+	// 如果没有过滤标签，直接返回完整列表
 	if m.selectedTag == "" {
 		return m.watchlist.Stocks
 	}
 	
+	// 检查缓存是否有效
+	if m.isFilteredWatchlistValid && m.cachedFilterTag == m.selectedTag {
+		return m.cachedFilteredWatchlist
+	}
+	
+	// 重新计算过滤结果并缓存
 	var filtered []WatchlistStock
 	for _, stock := range m.watchlist.Stocks {
 		if stock.Tag == m.selectedTag {
@@ -3164,7 +3176,19 @@ func (m *Model) getFilteredWatchlist() []WatchlistStock {
 		}
 	}
 	
+	// 更新缓存
+	m.cachedFilteredWatchlist = filtered
+	m.cachedFilterTag = m.selectedTag
+	m.isFilteredWatchlistValid = true
+	
 	return filtered
+}
+
+// 使缓存失效的辅助函数
+func (m *Model) invalidateWatchlistCache() {
+	m.isFilteredWatchlistValid = false
+	m.cachedFilteredWatchlist = nil
+	m.cachedFilterTag = ""
 }
 
 // 重置持股列表游标到第一只股票
@@ -3257,6 +3281,7 @@ func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 			
+			m.invalidateWatchlistCache() // 使缓存失效
 			m.saveWatchlist()
 			
 			if m.language == Chinese {
@@ -3304,12 +3329,14 @@ func (m *Model) handleWatchlistGroupSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		if m.cursor >= 0 && m.cursor < len(m.availableTags) {
 			m.selectedTag = m.availableTags[m.cursor]
 		}
+		m.invalidateWatchlistCache() // 使缓存失效
 		m.state = WatchlistViewing
 		m.message = ""
 		m.resetWatchlistCursor() // 重置游标到第一只股票（考虑过滤）
 		return m, nil
 	case "esc", "q":
 		m.selectedTag = ""  // 清除过滤
+		m.invalidateWatchlistCache() // 使缓存失效
 		m.state = WatchlistViewing
 		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.message = ""
@@ -3317,6 +3344,7 @@ func (m *Model) handleWatchlistGroupSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "c":
 		// 清除过滤，显示所有股票
 		m.selectedTag = ""
+		m.invalidateWatchlistCache() // 使缓存失效
 		m.state = WatchlistViewing
 		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.message = ""
@@ -3424,6 +3452,7 @@ func (m *Model) addToWatchlist(code, name string) bool {
 		Tag:  "-", // 默认标签
 	}
 	m.watchlist.Stocks = append(m.watchlist.Stocks, watchStock)
+	m.invalidateWatchlistCache() // 使缓存失效
 	m.watchlistIsSorted = false // 添加自选股票后重置自选列表排序状态
 	m.saveWatchlist()
 	return true
@@ -3433,6 +3462,7 @@ func (m *Model) addToWatchlist(code, name string) bool {
 func (m *Model) removeFromWatchlist(index int) {
 	if index >= 0 && index < len(m.watchlist.Stocks) {
 		m.watchlist.Stocks = append(m.watchlist.Stocks[:index], m.watchlist.Stocks[index+1:]...)
+		m.invalidateWatchlistCache() // 使缓存失效
 		m.saveWatchlist()
 		m.watchlistIsSorted = false // 删除自选股票后重置自选列表排序状态
 	}
@@ -3688,6 +3718,7 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// 清除标签过滤
 		if m.selectedTag != "" {
 			m.selectedTag = ""
+			m.invalidateWatchlistCache() // 使缓存失效
 			m.resetWatchlistCursor() // 重置游标到第一只股票
 			if m.language == Chinese {
 				m.message = "已清除标签过滤"
@@ -3697,20 +3728,22 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "up", "k", "w":
+		// 获取一次过滤后的列表，避免重复调用
 		filteredStocks := m.getFilteredWatchlist()
 		if m.watchlistCursor > 0 {
 			m.watchlistCursor--
+			// 只在光标移动时调整滚动
+			m.adjustWatchlistScroll(filteredStocks)
 		}
-		// 基于过滤后的列表调整滚动
-		m.adjustWatchlistScroll(filteredStocks)
 		return m, nil
 	case "down", "j":
+		// 获取一次过滤后的列表，避免重复调用
 		filteredStocks := m.getFilteredWatchlist()
 		if m.watchlistCursor < len(filteredStocks)-1 {
 			m.watchlistCursor++
+			// 只在光标移动时调整滚动
+			m.adjustWatchlistScroll(filteredStocks)
 		}
-		// 基于过滤后的列表调整滚动
-		m.adjustWatchlistScroll(filteredStocks)
 		return m, nil
 	}
 	return m, nil
