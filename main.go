@@ -37,17 +37,18 @@ type Stock struct {
 }
 
 type StockData struct {
-	Symbol        string  `json:"symbol"`
-	Name          string  `json:"name"`
-	Price         float64 `json:"price"`
-	Change        float64 `json:"change"`
-	ChangePercent float64 `json:"change_percent"`
-	StartPrice    float64 `json:"start_price"`
-	MaxPrice      float64 `json:"max_price"`
-	MinPrice      float64 `json:"min_price"`
-	PrevClose     float64 `json:"prev_close"` // 昨日收盘价
-	TurnoverRate  float64 `json:"turnover_rate"`
-	Volume        int64   `json:"volume"`
+	Symbol        string   `json:"symbol"`
+	Name          string   `json:"name"`
+	Price         float64  `json:"price"`
+	Change        float64  `json:"change"`
+	ChangePercent float64  `json:"change_percent"`
+	StartPrice    float64  `json:"start_price"`
+	MaxPrice      float64  `json:"max_price"`
+	MinPrice      float64  `json:"min_price"`
+	PrevClose     float64  `json:"prev_close"` // 昨日收盘价
+	TurnoverRate  float64  `json:"turnover_rate"`
+	Volume        int64    `json:"volume"`
+	FundFlow      FundFlow `json:"fund_flow"` // 资金流向数据
 }
 
 type Portfolio struct {
@@ -1602,11 +1603,24 @@ func formatPriceWithColor(currentPrice, prevClose float64) string {
 }
 
 func getStockInfo(symbol string) *StockData {
+	var stockData *StockData
+	
 	// 如果输入是中文，尝试通过API搜索
 	if containsChineseChars(symbol) {
-		return searchChineseStock(symbol)
+		stockData = searchChineseStock(symbol)
+	} else {
+		stockData = getStockPrice(symbol)
 	}
-	return getStockPrice(symbol)
+	
+	// 如果获取到股票数据且是中国股票，尝试获取资金流向数据
+	if stockData != nil && stockData.Symbol != "" && isChinaStock(stockData.Symbol) {
+		fundFlow := getFundFlowDataSync(stockData.Symbol)
+		if fundFlow != nil {
+			stockData.FundFlow = *fundFlow
+		}
+	}
+	
+	return stockData
 }
 
 // 检查字符串是否包含中文字符
@@ -2120,6 +2134,31 @@ func (m *Model) getFundFlowDataFromCache(symbol string) *FundFlow {
 	
 	// 如果缓存中没有数据，返回空数据
 	return &FundFlow{}
+}
+
+// 同步获取资金流向数据（用于搜索结果）
+func getFundFlowDataSync(symbol string) *FundFlow {
+	if !isChinaStock(symbol) {
+		return &FundFlow{}
+	}
+
+	// 调用Python脚本获取AKShare数据
+	cmd := exec.Command("venv/bin/python", "scripts/akshare_fund_flow.py", symbol)
+	output, err := cmd.Output()
+	if err != nil {
+		debugPrint("[错误] 同步获取资金流向失败 %s: %v\n", symbol, err)
+		return &FundFlow{}
+	}
+
+	var fundFlow FundFlow
+	err = json.Unmarshal(output, &fundFlow)
+	if err != nil {
+		debugPrint("[错误] 解析资金流向数据失败 %s: %v\n", symbol, err)
+		return &FundFlow{}
+	}
+
+	debugPrint("[调试] 同步获取资金流向成功 %s: 主力净流入 %.2f\n", symbol, fundFlow.MainNetInflow)
+	return &fundFlow
 }
 
 // 异步获取单个股票的资金流向数据
@@ -2990,6 +3029,65 @@ func (m *Model) viewSearchResult() string {
 		values = append(values, volumeStr)
 	}
 
+	// 资金流向数据（仅A股显示）
+	if isChinaStock(m.searchResult.Symbol) {
+		fundFlow := &m.searchResult.FundFlow
+		
+		// 主力净流入
+		if m.language == Chinese {
+			headers = append(headers, "主力净流入")
+		} else {
+			headers = append(headers, "Main Flow")
+		}
+		mainFlowStr := m.formatFundFlowWithColorAndUnit(fundFlow.MainNetInflow)
+		values = append(values, mainFlowStr)
+
+		// 超大单净流入
+		if m.language == Chinese {
+			headers = append(headers, "超大单")
+		} else {
+			headers = append(headers, "Super Large")
+		}
+		superLargeStr := m.formatFundFlowWithColorAndUnit(fundFlow.SuperLargeNetInflow)
+		values = append(values, superLargeStr)
+
+		// 大单净流入
+		if m.language == Chinese {
+			headers = append(headers, "大单")
+		} else {
+			headers = append(headers, "Large")
+		}
+		largeStr := m.formatFundFlowWithColorAndUnit(fundFlow.LargeNetInflow)
+		values = append(values, largeStr)
+
+		// 中单净流入
+		if m.language == Chinese {
+			headers = append(headers, "中单")
+		} else {
+			headers = append(headers, "Medium")
+		}
+		mediumStr := m.formatFundFlowWithColorAndUnit(fundFlow.MediumNetInflow)
+		values = append(values, mediumStr)
+
+		// 小单净流入
+		if m.language == Chinese {
+			headers = append(headers, "小单")
+		} else {
+			headers = append(headers, "Small")
+		}
+		smallStr := m.formatFundFlowWithColorAndUnit(fundFlow.SmallNetInflow)
+		values = append(values, smallStr)
+
+		// 净流入占比
+		if m.language == Chinese {
+			headers = append(headers, "净流入占比")
+		} else {
+			headers = append(headers, "Net Ratio")
+		}
+		flowRatioStr := m.formatProfitRateWithColorZeroLang(fundFlow.NetInflowRatio)
+		values = append(values, flowRatioStr)
+	}
+
 	// 添加表头和数据行
 	t.AppendHeader(table.Row(headers))
 	t.AppendRow(table.Row(values))
@@ -3616,6 +3714,65 @@ func (m *Model) viewSearchResultWithActions() string {
 		}
 		volumeStr := formatVolume(m.searchResult.Volume)
 		values = append(values, volumeStr)
+	}
+
+	// 资金流向数据（仅A股显示）
+	if isChinaStock(m.searchResult.Symbol) {
+		fundFlow := &m.searchResult.FundFlow
+		
+		// 主力净流入
+		if m.language == Chinese {
+			headers = append(headers, "主力净流入")
+		} else {
+			headers = append(headers, "Main Flow")
+		}
+		mainFlowStr := m.formatFundFlowWithColorAndUnit(fundFlow.MainNetInflow)
+		values = append(values, mainFlowStr)
+
+		// 超大单净流入
+		if m.language == Chinese {
+			headers = append(headers, "超大单")
+		} else {
+			headers = append(headers, "Super Large")
+		}
+		superLargeStr := m.formatFundFlowWithColorAndUnit(fundFlow.SuperLargeNetInflow)
+		values = append(values, superLargeStr)
+
+		// 大单净流入
+		if m.language == Chinese {
+			headers = append(headers, "大单")
+		} else {
+			headers = append(headers, "Large")
+		}
+		largeStr := m.formatFundFlowWithColorAndUnit(fundFlow.LargeNetInflow)
+		values = append(values, largeStr)
+
+		// 中单净流入
+		if m.language == Chinese {
+			headers = append(headers, "中单")
+		} else {
+			headers = append(headers, "Medium")
+		}
+		mediumStr := m.formatFundFlowWithColorAndUnit(fundFlow.MediumNetInflow)
+		values = append(values, mediumStr)
+
+		// 小单净流入
+		if m.language == Chinese {
+			headers = append(headers, "小单")
+		} else {
+			headers = append(headers, "Small")
+		}
+		smallStr := m.formatFundFlowWithColorAndUnit(fundFlow.SmallNetInflow)
+		values = append(values, smallStr)
+
+		// 净流入占比
+		if m.language == Chinese {
+			headers = append(headers, "净流入占比")
+		} else {
+			headers = append(headers, "Net Ratio")
+		}
+		flowRatioStr := m.formatProfitRateWithColorZeroLang(fundFlow.NetInflowRatio)
+		values = append(values, flowRatioStr)
 	}
 
 	// 添加表头和数据行
