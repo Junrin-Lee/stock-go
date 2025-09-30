@@ -179,223 +179,44 @@ const (
 // 文本映射结构
 type TextMap map[string]string
 
-// 语言文本映射
-var texts = map[Language]TextMap{
-	Chinese: {
-		"title":               "=== 股票监控系统 ===",
-		"stockList":           "持股列表",
-		"watchlist":           "自选股票",
-		"stockSearch":         "股票搜索",
-		"addStock":            "添加股票",
-		"editStock":           "修改股票",
-		"removeStock":         "删除股票",
-		"debugMode":           "调试模式",
-		"language":            "语言",
-		"exit":                "退出",
-		"on":                  "开启",
-		"off":                 "关闭",
-		"chinese":             "中文",
-		"english":             "English",
-		"keyHelp":             "使用方向键 ↑↓ 或 W/S 键选择，回车/空格确认，Q键退出",
-		"keyHelpWin":          "使用 W/S 键选择，回车确认，Q键退出",
-		"returnToMenu":        "ESC、Q键或M键返回主菜单",
-		"returnToMenuShort":   "ESC或Q键返回主菜单",
-		"returnEscOnly":       "ESC键返回",
-		"holdingsHelp":        "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票，A键添加股票，S键排序(升/降序) | ↑/↓:翻页",
-		"watchlistHelp":       "ESC、Q键或M键返回主菜单，A键添加股票，D键删除股票，S键排序(升/降序)，T键打标签，G键分组查看，C键清除过滤 | ↑/↓:翻页",
-		"monitoringTitle":     "=== 股票实时监控 ===",
-		"updateTime":          "更新时间(5s): %s",
-		"emptyPortfolio":      "投资组合为空",
-		"addStockFirst":       "请先添加股票到投资组合",
-		"total":               "总计",
-		"addingTitle":         "=== 添加股票 ===",
-		"enterCode":           "请输入股票代码: ",
-		"enterCost":           "请输入成本价: ",
-		"enterQuantity":       "请输入股票数量: ",
-		"codeFormat":          "支持格式: SH601138, 000001, AAPL 等",
-		"stockCode":           "股票代码: %s",
-		"stockName":           "股票名称: %s",
-		"currentPrice":        "当前价格: %.3f",
-		"openPrice":           "开盘价",
-		"highPrice":           "最高价",
-		"lowPrice":            "最低价",
-		"prevClose":           "昨收价",
-		"change":              "涨跌",
-		"costPrice":           "成本价: %s",
-		"codeRequired":        "股票代码不能为空",
-		"costRequired":        "成本价不能为空",
-		"quantityRequired":    "数量不能为空",
-		"invalidPrice":        "无效的价格格式",
-		"invalidQuantity":     "无效的数量格式",
-		"fetchingInfo":        "正在获取股票信息...",
-		"stockNotFound":       "无法获取股票 %s 的信息，请检查股票代码是否正确",
-		"addSuccess":          "成功添加股票: %s (%s)",
-		"removeTitle":         "=== 删除股票 ===",
-		"selectToRemove":      "选择要删除的股票:",
-		"navHelp":             "使用方向键选择，回车确认，ESC或Q键返回",
-		"removeSuccess":       "成功删除股票: %s (%s)",
-		"editTitle":           "=== 修改股票 ===",
-		"selectToEdit":        "选择要修改的股票:",
-		"currentCost":         "当前成本价: %.3f",
-		"enterNewCost":        "请输入新的成本价: ",
-		"newCost":             "新成本价: %.3f",
-		"currentQuantity":     "当前数量: %d",
-		"enterNewQuantity":    "请输入新的数量: ",
-		"editSuccess":         "成功修改股票 %s 的成本价和数量",
-		"searchTitle":         "=== 股票搜索 ===",
-		"enterSearch":         "请输入股票代码或名称: ",
-		"searchFormats":       "支持格式:\n• 中文名称: 贵州茅台, 苹果, 腾讯, 阿里巴巴 等\n• 中国股票: SH601138, 000001, SZ000002 等\n• 美股: AAPL, TSLA, MSFT 等\n• 港股: HK00700 等\n\n💡 提示: 中文检索成功率较低，建议优先使用股票代码检索",
-		"searchHelp":          "回车搜索，ESC键返回主菜单",
-		"searching":           "正在搜索股票信息...",
-		"searchNotFound":      "无法找到股票 %s 的信息，请检查输入是否正确",
-		"detailTitle":         "=== 股票详情信息 ===",
-		"noInfo":              "未找到股票信息",
-		"detailHelp":          "ESC或Q键返回主菜单，R键重新搜索",
-		"emptyCannotEdit":     "投资组合为空，无法修改股票",
-		"languageTitle":       "=== 语言选择 ===",
-		"selectLanguage":      "请选择您的语言:",
-		"languageHelp":        "使用方向键选择，回车确认，ESC或Q键返回主菜单",
-		"watchlistTitle":      "=== 自选实时监控 ===",
-		"emptyWatchlist":      "自选列表为空",
-		"addToWatchFirst":     "请先添加股票到自选列表",
-		"removeFromWatch":     "从自选列表删除",
-		"selectToRemoveWatch": "选择要从自选列表删除的股票:",
-		"removeWatchSuccess":  "成功从自选列表删除股票: %s (%s)",
-		"addToWatchlist":      "添加到自选",
-		"addToPortfolio":      "添加到持股列表",
-		"addWatchSuccess":     "成功添加到自选列表: %s (%s)",
-		"alreadyInWatch":      "股票 %s 已在自选列表中",
-		"actionHelp":          "1-添加到自选, 2-添加到持股列表, ESC或Q键返回主菜单, R键重新搜索",
-		"sortTitle":           "=== 排序设置 ===",
-		"selectSortField":     "选择排序字段:",
-		"sortCode":            "股票代码",
-		"sortName":            "股票名称", 
-		"sortPrice":           "现价",
-		"sortCostPrice":       "成本价",
-		"sortChange":          "涨跌额",
-		"sortChangePercent":   "涨跌幅",
-		"sortQuantity":        "持股数量",
-		"sortTodayProfit":     "今日盈亏",
-		"sortTotalProfit":     "持仓盈亏",
-		"sortProfitRate":      "盈亏率",
-		"sortMarketValue":     "市值",
-		"sortTag":             "标签",
-		"sortTurnoverRate":    "换手率",
-		"sortVolume":          "成交量",
-		"sortAsc":             "升序",
-		"sortDesc":            "降序",
-		"sortHelp":            "使用方向键选择排序字段，回车切换升序/降序，C键清除排序，ESC返回列表",
-		"sortCleared":         "排序已清除",
-		"sortedBy":            "排序: %s(%s)",
-	},
-	English: {
-		"title":               "=== Stock Monitor System ===",
-		"stockList":           "Holdings",
-		"watchlist":           "Watchlist",
-		"stockSearch":         "Stock Search",
-		"addStock":            "Add Stock",
-		"editStock":           "Edit Stock",
-		"removeStock":         "Remove Stock",
-		"debugMode":           "Debug Mode",
-		"language":            "Language",
-		"exit":                "Exit",
-		"on":                  "On",
-		"off":                 "Off",
-		"chinese":             "中文",
-		"english":             "English",
-		"keyHelp":             "Use arrow keys ↑↓ or W/S to select, Enter/Space to confirm, Q to exit",
-		"keyHelpWin":          "Use W/S keys to select, Enter to confirm, Q to exit",
-		"returnToMenu":        "ESC, Q or M to return to main menu",
-		"returnToMenuShort":   "ESC or Q to return to main menu",
-		"returnEscOnly":       "ESC to return",
-		"holdingsHelp":        "ESC, Q or M to return to main menu, E to edit stock, D to delete stock, A to add stock, S to sort(Asc/Desc) | ↑/↓:scroll",
-		"watchlistHelp":       "ESC, Q or M to return to main menu, A to add stock, D to delete stock, S to sort(Asc/Desc), T to tag, G to group view, C to clear filter | ↑/↓:scroll",
-		"monitoringTitle":     "=== Real-time Stock Monitor ===",
-		"updateTime":          "Update Time(5s): %s",
-		"emptyPortfolio":      "Portfolio is empty",
-		"addStockFirst":       "Please add stocks to your portfolio first",
-		"total":               "Total",
-		"addingTitle":         "=== Add Stock ===",
-		"enterCode":           "Enter stock code: ",
-		"enterCost":           "Enter cost price: ",
-		"enterQuantity":       "Enter quantity: ",
-		"codeFormat":          "Supported formats: SH601138, 000001, AAPL, etc.",
-		"stockCode":           "Stock Code: %s",
-		"stockName":           "Stock Name: %s",
-		"currentPrice":        "Current Price: %.3f",
-		"openPrice":           "Open Price",
-		"highPrice":           "High Price",
-		"lowPrice":            "Low Price",
-		"prevClose":           "Prev Close",
-		"change":              "Change",
-		"costPrice":           "Cost Price: %s",
-		"codeRequired":        "Stock code cannot be empty",
-		"costRequired":        "Cost price cannot be empty",
-		"quantityRequired":    "Quantity cannot be empty",
-		"invalidPrice":        "Invalid price format",
-		"invalidQuantity":     "Invalid quantity format",
-		"fetchingInfo":        "Fetching stock information...",
-		"stockNotFound":       "Unable to get information for stock %s, please check the code is correct",
-		"addSuccess":          "Successfully added stock: %s (%s)",
-		"removeTitle":         "=== Remove Stock ===",
-		"selectToRemove":      "Select stock to remove:",
-		"navHelp":             "Use arrow keys to select, Enter to confirm, ESC or Q to return",
-		"removeSuccess":       "Successfully removed stock: %s (%s)",
-		"editTitle":           "=== Edit Stock ===",
-		"selectToEdit":        "Select stock to edit:",
-		"currentCost":         "Current cost price: %.3f",
-		"enterNewCost":        "Enter new cost price: ",
-		"newCost":             "New cost price: %.3f",
-		"currentQuantity":     "Current quantity: %d",
-		"enterNewQuantity":    "Enter new quantity: ",
-		"editSuccess":         "Successfully edited stock %s cost price and quantity",
-		"searchTitle":         "=== Stock Search ===",
-		"enterSearch":         "Enter stock code or name: ",
-		"searchFormats":       "Supported formats:\n• Chinese names: 贵州茅台, Apple, Tencent, Alibaba, etc.\n• Chinese stocks: SH601138, 000001, SZ000002, etc.\n• US stocks: AAPL, TSLA, MSFT, etc.\n• Hong Kong stocks: HK00700, etc.\n\n💡 Tip: Chinese name searches have lower success rates, recommend using stock codes",
-		"searchHelp":          "Press Enter to search, ESC to return to main menu",
-		"searching":           "Searching stock information...",
-		"searchNotFound":      "Unable to find information for stock %s, please check your input is correct",
-		"detailTitle":         "=== Stock Detail Information ===",
-		"noInfo":              "No stock information found",
-		"detailHelp":          "ESC or Q to return to main menu, R to search again",
-		"emptyCannotEdit":     "Portfolio is empty, cannot edit stocks",
-		"languageTitle":       "=== Language Selection ===",
-		"selectLanguage":      "Please select your language:",
-		"languageHelp":        "Use arrow keys to select, Enter to confirm, ESC or Q to return to main menu",
-		"watchlistTitle":      "=== Real-time Stock Monitor ===",
-		"emptyWatchlist":      "Watchlist is empty",
-		"addToWatchFirst":     "Please add stocks to your watchlist first",
-		"removeFromWatch":     "Remove from Watchlist",
-		"selectToRemoveWatch": "Select stock to remove from watchlist:",
-		"removeWatchSuccess":  "Successfully removed stock from watchlist: %s (%s)",
-		"addToWatchlist":      "Add to Watchlist",
-		"addToPortfolio":      "Add to Holdings",
-		"addWatchSuccess":     "Successfully added to watchlist: %s (%s)",
-		"alreadyInWatch":      "Stock %s is already in watchlist",
-		"actionHelp":          "1-Add to Watchlist, 2-Add to Holdings, ESC or Q to return to main menu, R to search again",
-		"sortTitle":           "=== Sort Settings ===",
-		"selectSortField":     "Select sort field:",
-		"sortCode":            "Stock Code",
-		"sortName":            "Stock Name", 
-		"sortPrice":           "Current Price",
-		"sortCostPrice":       "Cost Price",
-		"sortChange":          "Change Amount",
-		"sortChangePercent":   "Change Percent",
-		"sortQuantity":        "Quantity",
-		"sortTodayProfit":     "Today's P&L",
-		"sortTotalProfit":     "Total P&L",
-		"sortProfitRate":      "P&L Rate",
-		"sortMarketValue":     "Market Value",
-		"sortTag":             "Tag",
-		"sortTurnoverRate":    "Turnover Rate",
-		"sortVolume":          "Volume",
-		"sortAsc":             "Ascending",
-		"sortDesc":            "Descending",
-		"sortHelp":            "Use arrow keys to select sort field, Enter to toggle Asc/Desc, C to clear sort, ESC to return to list",
-		"sortCleared":         "Sort cleared",
-		"sortedBy":            "Sorted by: %s(%s)",
-	},
+// i18n 配置
+var texts map[Language]TextMap
+
+// 加载 i18n 文件
+func loadI18nFiles() {
+	texts = make(map[Language]TextMap)
+	
+	// 读取中文配置
+	if zhData, err := os.ReadFile("i18n/zh.json"); err == nil {
+		var zhTexts TextMap
+		if err := json.Unmarshal(zhData, &zhTexts); err == nil {
+			texts[Chinese] = zhTexts
+		} else {
+			fmt.Printf("Warning: Failed to parse i18n/zh.json: %v\n", err)
+		}
+	} else {
+		fmt.Printf("Warning: Failed to read i18n/zh.json: %v\n", err)
+	}
+	
+	// 读取英文配置
+	if enData, err := os.ReadFile("i18n/en.json"); err == nil {
+		var enTexts TextMap
+		if err := json.Unmarshal(enData, &enTexts); err == nil {
+			texts[English] = enTexts
+		} else {
+			fmt.Printf("Warning: Failed to parse i18n/en.json: %v\n", err)
+		}
+	} else {
+		fmt.Printf("Warning: Failed to read i18n/en.json: %v\n", err)
+	}
+	
+	// 如果没有成功加载任何语言文件，退出程序
+	if len(texts) == 0 {
+		fmt.Println("Error: No i18n files could be loaded. Please ensure i18n/zh.json and i18n/en.json exist.")
+		os.Exit(1)
+	}
 }
+
 
 type Model struct {
 	state           AppState
@@ -509,6 +330,10 @@ func main() {
 	// 确保目录存在
 	os.MkdirAll("data", 0755)
 	os.MkdirAll("cmd/conf", 0755)
+	os.MkdirAll("i18n", 0755)
+
+	// 加载 i18n 文件
+	loadI18nFiles()
 
 	// 加载配置文件
 	config := loadConfig()
