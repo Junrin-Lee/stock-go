@@ -69,7 +69,7 @@ go mod download
 
 #### 3️⃣ Build Program
 ```bash
-go build -o cmd/stock-monitor main.go
+go build -o cmd/stock-monitor
 ```
 
 #### 4️⃣ Run Program

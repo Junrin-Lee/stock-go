@@ -69,7 +69,7 @@ go mod download
 
 #### 3️⃣ 编译程序
 ```bash
-go build -o cmd/stock-monitor main.go
+go build -o cmd/stock-monitor
 ```
 
 #### 4️⃣ 运行程序
