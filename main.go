@@ -69,16 +69,16 @@ type FundFlow struct {
 
 // 资金流向缓存条目
 type FundFlowCacheEntry struct {
-	Data        FundFlow  `json:"data"`         // 资金流向数据
-	UpdateTime  time.Time `json:"update_time"`  // 数据更新时间
-	IsUpdating  bool      `json:"is_updating"`  // 是否正在更新中
+	Data       FundFlow  `json:"data"`        // 资金流向数据
+	UpdateTime time.Time `json:"update_time"` // 数据更新时间
+	IsUpdating bool      `json:"is_updating"` // 是否正在更新中
 }
 
 // 自选股票数据结构
 type WatchlistStock struct {
 	Code     string   `json:"code"`
 	Name     string   `json:"name"`
-	Tag      string   `json:"tag"`      // 标签字段，默认为"-"
+	Tag      string   `json:"tag"`       // 标签字段，默认为"-"
 	FundFlow FundFlow `json:"fund_flow"` // 资金流向数据
 }
 
@@ -115,7 +115,6 @@ type UpdateConfig struct {
 	AutoUpdate      bool `yaml:"auto_update"`      // 是否自动更新
 }
 
-
 // 文本映射结构
 type TextMap map[string]string
 
@@ -125,7 +124,7 @@ var texts map[Language]TextMap
 // 加载 i18n 文件
 func loadI18nFiles() {
 	texts = make(map[Language]TextMap)
-	
+
 	// 读取中文配置
 	if zhData, err := os.ReadFile("i18n/zh.json"); err == nil {
 		var zhTexts TextMap
@@ -137,7 +136,7 @@ func loadI18nFiles() {
 	} else {
 		fmt.Printf("Warning: Failed to read i18n/zh.json: %v\n", err)
 	}
-	
+
 	// 读取英文配置
 	if enData, err := os.ReadFile("i18n/en.json"); err == nil {
 		var enTexts TextMap
@@ -149,14 +148,13 @@ func loadI18nFiles() {
 	} else {
 		fmt.Printf("Warning: Failed to read i18n/en.json: %v\n", err)
 	}
-	
+
 	// 如果没有成功加载任何语言文件，退出程序
 	if len(texts) == 0 {
 		fmt.Println("Error: No i18n files could be loaded. Please ensure i18n/zh.json and i18n/en.json exist.")
 		os.Exit(1)
 	}
 }
-
 
 type Model struct {
 	state           AppState
@@ -202,35 +200,35 @@ type Model struct {
 	watchlistScrollPos int // 自选列表滚动位置
 	portfolioCursor    int // 持股列表当前选中行
 	watchlistCursor    int // 自选列表当前选中行
-	
+
 	// For watchlist tagging and grouping
-	selectedTag        string   // 当前选择的标签过滤
-	availableTags      []string // 所有可用的标签列表
-	tagInput           string   // 标签输入框内容
-	
+	selectedTag   string   // 当前选择的标签过滤
+	availableTags []string // 所有可用的标签列表
+	tagInput      string   // 标签输入框内容
+
 	// Performance optimization - cached filtered watchlist
-	cachedFilteredWatchlist     []WatchlistStock // 缓存的过滤后自选列表
-	cachedFilterTag             string           // 缓存的过滤标签
-	isFilteredWatchlistValid    bool             // 缓存是否有效
-	
+	cachedFilteredWatchlist  []WatchlistStock // 缓存的过滤后自选列表
+	cachedFilterTag          string           // 缓存的过滤标签
+	isFilteredWatchlistValid bool             // 缓存是否有效
+
 	// For sorting - 持股列表排序状态
 	portfolioSortField     SortField     // 持股列表当前排序字段
 	portfolioSortDirection SortDirection // 持股列表当前排序方向
 	portfolioSortCursor    int           // 持股列表排序菜单光标位置
 	portfolioIsSorted      bool          // 持股列表是否已经应用了排序
-	
+
 	// For sorting - 自选列表排序状态
 	watchlistSortField     SortField     // 自选列表当前排序字段
 	watchlistSortDirection SortDirection // 自选列表当前排序方向
 	watchlistSortCursor    int           // 自选列表排序菜单光标位置
 	watchlistIsSorted      bool          // 自选列表是否已经应用了排序
-	
+
 	// For fund flow async data - 资金流向异步数据
-	fundFlowCache       map[string]*FundFlowCacheEntry // 资金流向数据缓存
-	fundFlowMutex       sync.RWMutex                   // 资金流向数据读写锁
-	fundFlowUpdateTime  time.Time                      // 上次更新资金流向数据的时间
-	fundFlowContext     context.Context                // 资金流向异步获取的上下文
-	fundFlowCancel      context.CancelFunc             // 取消资金流向异步获取的函数
+	fundFlowCache      map[string]*FundFlowCacheEntry // 资金流向数据缓存
+	fundFlowMutex      sync.RWMutex                   // 资金流向数据读写锁
+	fundFlowUpdateTime time.Time                      // 上次更新资金流向数据的时间
+	fundFlowContext    context.Context                // 资金流向异步获取的上下文
+	fundFlowCancel     context.CancelFunc             // 取消资金流向异步获取的函数
 }
 
 type tickMsg struct{}
@@ -315,7 +313,7 @@ func main() {
 
 	// 创建资金流向异步上下文
 	fundFlowCtx, fundFlowCancel := context.WithCancel(context.Background())
-	
+
 	m := Model{
 		state:              initialState,
 		currentMenuItem:    0,
@@ -326,11 +324,11 @@ func main() {
 		language:           language,
 		lastUpdate:         lastUpdate,
 		debugLogs:          make([]string, 0),
-		debugScrollPos:     0, // 初始滚动位置
-		portfolioScrollPos: 0, // 持股列表滚动位置
-		watchlistScrollPos: 0, // 自选列表滚动位置
-		portfolioCursor:    0, // 持股列表游标
-		watchlistCursor:    0, // 自选列表游标
+		debugScrollPos:     0,     // 初始滚动位置
+		portfolioScrollPos: 0,     // 持股列表滚动位置
+		watchlistScrollPos: 0,     // 自选列表滚动位置
+		portfolioCursor:    0,     // 持股列表游标
+		watchlistCursor:    0,     // 自选列表游标
 		portfolioIsSorted:  false, // 持股列表默认未排序状态
 		watchlistIsSorted:  false, // 自选列表默认未排序状态
 		// 资金流向缓存初始化
@@ -443,17 +441,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		if m.state == Monitoring || m.state == WatchlistViewing {
 			m.lastUpdate = time.Now()
-			
+
 			// 启动资金流向数据更新（如果在自选列表页面）
 			var cmds []tea.Cmd
 			cmds = append(cmds, m.tickCmd())
-			
+
 			if m.state == WatchlistViewing {
 				if fundFlowCmd := m.startFundFlowUpdates(); fundFlowCmd != nil {
 					cmds = append(cmds, fundFlowCmd)
 				}
 			}
-			
+
 			newModel, cmd = m, tea.Batch(cmds...)
 		} else {
 			newModel, cmd = m, nil
@@ -996,9 +994,9 @@ func (m *Model) viewMonitoring() string {
 
 			t.AppendRow(table.Row{
 				cursorCol,
-				stock.Code,                                                    // 代码
-				stock.Name,                                                    // 名称
-				fmt.Sprintf("%.3f", stock.PrevClose),                          // 昨收价（无颜色）
+				stock.Code,                           // 代码
+				stock.Name,                           // 名称
+				fmt.Sprintf("%.3f", stock.PrevClose), // 昨收价（无颜色）
 				m.formatPriceWithColorLang(stock.StartPrice, stock.PrevClose), // 开盘
 				m.formatPriceWithColorLang(stock.MaxPrice, stock.PrevClose),   // 最高
 				m.formatPriceWithColorLang(stock.MinPrice, stock.PrevClose),   // 最低
@@ -1009,7 +1007,7 @@ func (m *Model) viewMonitoring() string {
 				todayProfitStr,                                                // 今日盈亏（基于今日价格变化）
 				positionProfitStr,                                             // 持仓盈亏（基于成本价）
 				profitRateStr,                                                 // 盈亏率
-				fmt.Sprintf("%.2f", marketValue),                             // 市值
+				fmt.Sprintf("%.2f", marketValue),                              // 市值
 			})
 
 			// 在每个股票后添加分隔线（除了显示范围内的最后一个）
@@ -1254,10 +1252,10 @@ func (m *Model) formatFundFlowWithColorAndUnit(amount float64) string {
 	if abs(amount) < 1000 {
 		return "0"
 	}
-	
+
 	var formattedValue string
 	var unit string
-	
+
 	// 根据金额大小选择单位
 	if abs(amount) >= 100000000 { // 1亿以上显示为亿元
 		value := amount / 100000000
@@ -1276,7 +1274,7 @@ func (m *Model) formatFundFlowWithColorAndUnit(amount float64) string {
 		}
 		formattedValue = fmt.Sprintf("%.1f%s", value, unit)
 	}
-	
+
 	// 应用颜色逻辑
 	if m.language == English {
 		// 英文：绿色盈利，红色亏损
@@ -1369,14 +1367,14 @@ func formatPriceWithColor(currentPrice, prevClose float64) string {
 
 func getStockInfo(symbol string) *StockData {
 	var stockData *StockData
-	
+
 	// 如果输入是中文，尝试通过API搜索
 	if containsChineseChars(symbol) {
 		stockData = searchChineseStock(symbol)
 	} else {
 		stockData = getStockPrice(symbol)
 	}
-	
+
 	// 如果获取到股票数据且是中国股票，尝试获取资金流向数据
 	if stockData != nil && stockData.Symbol != "" && isChinaStock(stockData.Symbol) {
 		fundFlow := getFundFlowDataSync(stockData.Symbol)
@@ -1384,7 +1382,7 @@ func getStockInfo(symbol string) *StockData {
 			stockData.FundFlow = *fundFlow
 		}
 	}
-	
+
 	return stockData
 }
 
@@ -1892,11 +1890,11 @@ func (m *Model) getFundFlowDataFromCache(symbol string) *FundFlow {
 
 	m.fundFlowMutex.RLock()
 	defer m.fundFlowMutex.RUnlock()
-	
+
 	if entry, exists := m.fundFlowCache[symbol]; exists {
 		return &entry.Data
 	}
-	
+
 	// 如果缓存中没有数据，返回空数据
 	return &FundFlow{}
 }
@@ -1955,24 +1953,24 @@ func (m *Model) startFundFlowUpdates() tea.Cmd {
 	if time.Since(m.fundFlowUpdateTime) < time.Minute {
 		return nil // 还未到更新时间
 	}
-	
+
 	// 收集所有需要更新的股票代码
 	stockCodes := make([]string, 0)
-	
+
 	// 添加自选列表中的股票
 	for _, stock := range m.watchlist.Stocks {
 		if isChinaStock(stock.Code) {
 			stockCodes = append(stockCodes, stock.Code)
 		}
 	}
-	
+
 	if len(stockCodes) == 0 {
 		return nil
 	}
-	
+
 	// 更新开始时间
 	m.fundFlowUpdateTime = time.Now()
-	
+
 	// 逐个发起异步获取请求
 	var cmds []tea.Cmd
 	for _, code := range stockCodes {
@@ -1988,14 +1986,14 @@ func (m *Model) startFundFlowUpdates() tea.Cmd {
 			}
 		}
 		m.fundFlowMutex.Unlock()
-		
+
 		// 为每个股票添加一个延迟，避免同时请求太多
 		delay := time.Duration(len(cmds)) * 200 * time.Millisecond
 		cmds = append(cmds, tea.Tick(delay, func(t time.Time) tea.Msg {
 			return m.fetchFundFlowDataAsync(code)()
 		}))
 	}
-	
+
 	return tea.Batch(cmds...)
 }
 
@@ -2797,7 +2795,7 @@ func (m *Model) viewSearchResult() string {
 	// 资金流向数据（仅A股显示）
 	if isChinaStock(m.searchResult.Symbol) {
 		fundFlow := &m.searchResult.FundFlow
-		
+
 		// 主力净流入
 		if m.language == Chinese {
 			headers = append(headers, "主力净流入")
@@ -3004,18 +3002,18 @@ func (m *Model) saveWatchlist() {
 // 获取所有可用的标签
 func (m *Model) getAvailableTags() []string {
 	tagMap := make(map[string]bool)
-	
+
 	for _, stock := range m.watchlist.Stocks {
 		if stock.Tag != "" {
 			tagMap[stock.Tag] = true
 		}
 	}
-	
+
 	tags := make([]string, 0, len(tagMap))
 	for tag := range tagMap {
 		tags = append(tags, tag)
 	}
-	
+
 	return tags
 }
 
@@ -3025,12 +3023,12 @@ func (m *Model) getFilteredWatchlist() []WatchlistStock {
 	if m.selectedTag == "" {
 		return m.watchlist.Stocks
 	}
-	
+
 	// 检查缓存是否有效
 	if m.isFilteredWatchlistValid && m.cachedFilterTag == m.selectedTag {
 		return m.cachedFilteredWatchlist
 	}
-	
+
 	// 重新计算过滤结果并缓存
 	var filtered []WatchlistStock
 	for _, stock := range m.watchlist.Stocks {
@@ -3038,12 +3036,12 @@ func (m *Model) getFilteredWatchlist() []WatchlistStock {
 			filtered = append(filtered, stock)
 		}
 	}
-	
+
 	// 更新缓存
 	m.cachedFilteredWatchlist = filtered
 	m.cachedFilterTag = m.selectedTag
 	m.isFilteredWatchlistValid = true
-	
+
 	return filtered
 }
 
@@ -3093,19 +3091,19 @@ func (m *Model) resetWatchlistCursor() {
 func (m *Model) adjustWatchlistScroll(filteredStocks []WatchlistStock) {
 	maxWatchlistLines := m.config.Display.MaxLines
 	totalStocks := len(filteredStocks)
-	
+
 	if totalStocks <= maxWatchlistLines {
 		m.watchlistScrollPos = 0
 		return
 	}
-	
+
 	// 确保光标在可见范围内
 	endIndex := totalStocks - m.watchlistScrollPos
 	startIndex := endIndex - maxWatchlistLines
 	if startIndex < 0 {
 		startIndex = 0
 	}
-	
+
 	// 如果光标超出可见范围的上边界，调整滚动位置
 	if m.watchlistCursor < startIndex {
 		m.watchlistScrollPos = totalStocks - m.watchlistCursor - maxWatchlistLines
@@ -3113,7 +3111,7 @@ func (m *Model) adjustWatchlistScroll(filteredStocks []WatchlistStock) {
 			m.watchlistScrollPos = 0
 		}
 	}
-	
+
 	// 如果光标超出可见范围的下边界，调整滚动位置
 	if m.watchlistCursor >= endIndex {
 		m.watchlistScrollPos = totalStocks - m.watchlistCursor - 1
@@ -3128,14 +3126,14 @@ func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.tagInput == "" {
-			m.tagInput = "-"  // 默认标签
+			m.tagInput = "-" // 默认标签
 		}
-		
+
 		// 更新当前选中股票的标签（基于过滤后的列表）
 		filteredStocks := m.getFilteredWatchlist()
 		if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
 			stockToTag := filteredStocks[m.watchlistCursor]
-			
+
 			// 在原始列表中找到该股票并更新标签
 			for i, stock := range m.watchlist.Stocks {
 				if stock.Code == stockToTag.Code {
@@ -3143,19 +3141,19 @@ func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			
+
 			m.invalidateWatchlistCache() // 使缓存失效
 			m.saveWatchlist()
-			
+
 			if m.language == Chinese {
-				m.message = fmt.Sprintf("已将 %s 的标签设置为: %s", 
+				m.message = fmt.Sprintf("已将 %s 的标签设置为: %s",
 					stockToTag.Name, m.tagInput)
 			} else {
-				m.message = fmt.Sprintf("Tag for %s set to: %s", 
+				m.message = fmt.Sprintf("Tag for %s set to: %s",
 					stockToTag.Name, m.tagInput)
 			}
 		}
-		
+
 		m.state = WatchlistViewing
 		m.tagInput = ""
 		m.resetWatchlistCursor() // 重置游标到第一只股票
@@ -3198,7 +3196,7 @@ func (m *Model) handleWatchlistGroupSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.resetWatchlistCursor() // 重置游标到第一只股票（考虑过滤）
 		return m, nil
 	case "esc", "q":
-		m.selectedTag = ""  // 清除过滤
+		m.selectedTag = ""           // 清除过滤
 		m.invalidateWatchlistCache() // 使缓存失效
 		m.state = WatchlistViewing
 		m.resetWatchlistCursor() // 重置游标到第一只股票
@@ -3229,13 +3227,13 @@ func (m *Model) handleWatchlistGroupSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 // 打标签视图
 func (m *Model) viewWatchlistTagging() string {
 	var s string
-	
+
 	if m.language == Chinese {
 		s += "=== 设置标签 ===\n\n"
 	} else {
 		s += "=== Set Tag ===\n\n"
 	}
-	
+
 	filteredStocks := m.getFilteredWatchlist()
 	if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
 		stock := filteredStocks[m.watchlistCursor]
@@ -3251,20 +3249,20 @@ func (m *Model) viewWatchlistTagging() string {
 			s += "Press Enter to confirm, ESC or Q to cancel"
 		}
 	}
-	
+
 	return s
 }
 
 // 分组选择视图
 func (m *Model) viewWatchlistGroupSelect() string {
 	var s string
-	
+
 	if m.language == Chinese {
 		s += "=== 选择标签分组 ===\n\n"
 	} else {
 		s += "=== Select Tag Group ===\n\n"
 	}
-	
+
 	// 显示当前过滤状态
 	if m.selectedTag != "" {
 		if m.language == Chinese {
@@ -3273,7 +3271,7 @@ func (m *Model) viewWatchlistGroupSelect() string {
 			s += fmt.Sprintf("Current filter: %s\n\n", m.selectedTag)
 		}
 	}
-	
+
 	// 显示标签选项
 	for i, tag := range m.availableTags {
 		cursor := " "
@@ -3282,14 +3280,14 @@ func (m *Model) viewWatchlistGroupSelect() string {
 		}
 		s += fmt.Sprintf("%s %s\n", cursor, tag)
 	}
-	
+
 	s += "\n"
 	if m.language == Chinese {
 		s += "按Enter选择标签，C键清除过滤，ESC或Q键返回"
 	} else {
 		s += "Press Enter to select tag, C to clear filter, ESC or Q to return"
 	}
-	
+
 	return s
 }
 
@@ -3314,9 +3312,10 @@ func (m *Model) addToWatchlist(code, name string) bool {
 		Name: name,
 		Tag:  "-", // 默认标签
 	}
-	m.watchlist.Stocks = append(m.watchlist.Stocks, watchStock)
+	// 将新股票插入到列表首位，而不是末尾
+	m.watchlist.Stocks = append([]WatchlistStock{watchStock}, m.watchlist.Stocks...)
 	m.invalidateWatchlistCache() // 使缓存失效
-	m.watchlistIsSorted = false // 添加自选股票后重置自选列表排序状态
+	m.watchlistIsSorted = false  // 添加自选股票后重置自选列表排序状态
 	m.saveWatchlist()
 	return true
 }
@@ -3484,7 +3483,7 @@ func (m *Model) viewSearchResultWithActions() string {
 	// 资金流向数据（仅A股显示）
 	if isChinaStock(m.searchResult.Symbol) {
 		fundFlow := &m.searchResult.FundFlow
-		
+
 		// 主力净流入
 		if m.language == Chinese {
 			headers = append(headers, "主力净流入")
@@ -3571,11 +3570,11 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = m.getText("emptyWatchlist")
 			return m, nil
 		}
-		
+
 		// 获取要删除的股票（从过滤列表中）
 		if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
 			stockToRemove := filteredStocks[m.watchlistCursor]
-			
+
 			// 在原始列表中找到该股票并删除
 			for i, stock := range m.watchlist.Stocks {
 				if stock.Code == stockToRemove.Code {
@@ -3583,13 +3582,13 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			
+
 			// 调整光标位置（基于过滤后的列表）
 			newFilteredStocks := m.getFilteredWatchlist()
 			if m.watchlistCursor >= len(newFilteredStocks) && len(newFilteredStocks) > 0 {
 				m.watchlistCursor = len(newFilteredStocks) - 1
 			}
-			
+
 			m.message = fmt.Sprintf(m.getText("removeWatchSuccess"), stockToRemove.Name, stockToRemove.Code)
 		}
 		return m, nil
@@ -3641,7 +3640,7 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.selectedTag != "" {
 			m.selectedTag = ""
 			m.invalidateWatchlistCache() // 使缓存失效
-			m.resetWatchlistCursor() // 重置游标到第一只股票
+			m.resetWatchlistCursor()     // 重置游标到第一只股票
 			if m.language == Chinese {
 				m.message = "已清除标签过滤"
 			} else {
@@ -3674,7 +3673,7 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) viewWatchlistViewing() string {
 	s := m.getText("watchlistTitle") + "\n"
 	s += fmt.Sprintf(m.getText("updateTime"), m.lastUpdate.Format("2006-01-02 15:04:05")) + "\n"
-	
+
 	// 显示当前过滤状态
 	if m.selectedTag != "" {
 		if m.language == Chinese {
@@ -3687,7 +3686,7 @@ func (m *Model) viewWatchlistViewing() string {
 
 	// 获取过滤后的股票列表
 	filteredStocks := m.getFilteredWatchlist()
-	
+
 	if len(filteredStocks) == 0 {
 		if m.selectedTag != "" {
 			if m.language == Chinese {
@@ -3741,7 +3740,7 @@ func (m *Model) viewWatchlistViewing() string {
 		stockData := getStockPrice(watchStock.Code)
 		// 从缓存获取资金流向数据（非阻塞）
 		fundFlowData := m.getFundFlowDataFromCache(watchStock.Code)
-		
+
 		if stockData != nil {
 			// 计算今日涨幅：应该基于昨收价，而不是开盘价
 			var todayChangeStr string
@@ -3790,12 +3789,12 @@ func (m *Model) viewWatchlistViewing() string {
 				todayChangeStr,
 				turnoverStr,
 				volumeStr,
-				mainFlowStr,     // 主力净流入
-				superLargeStr,   // 超大单净流入
-				largeStr,        // 大单净流入
-				mediumStr,       // 中单净流入
-				smallStr,        // 小单净流入
-				flowRatioStr,    // 净流入占比
+				mainFlowStr,   // 主力净流入
+				superLargeStr, // 超大单净流入
+				largeStr,      // 大单净流入
+				mediumStr,     // 中单净流入
+				smallStr,      // 小单净流入
+				flowRatioStr,  // 净流入占比
 			})
 		} else {
 			// 如果无法获取数据，显示基本信息
@@ -3818,12 +3817,12 @@ func (m *Model) viewWatchlistViewing() string {
 				"-",
 				"-",
 				"-",
-				"-",  // 主力净流入
-				"-",  // 超大单净流入
-				"-",  // 大单净流入
-				"-",  // 中单净流入
-				"-",  // 小单净流入
-				"-",  // 净流入占比
+				"-", // 主力净流入
+				"-", // 超大单净流入
+				"-", // 大单净流入
+				"-", // 中单净流入
+				"-", // 小单净流入
+				"-", // 净流入占比
 			})
 		}
 
@@ -4009,11 +4008,11 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 func (m *Model) bubbleSortPortfolio(field SortField, direction SortDirection) {
 	stocks := m.portfolio.Stocks
 	n := len(stocks)
-	
+
 	for i := 0; i < n-1; i++ {
 		for j := 0; j < n-i-1; j++ {
 			shouldSwap := false
-			
+
 			switch field {
 			case SortByCode:
 				if direction == SortAsc {
@@ -4090,7 +4089,7 @@ func (m *Model) bubbleSortPortfolio(field SortField, direction SortDirection) {
 					shouldSwap = marketValueJ < marketValueJplus1
 				}
 			}
-			
+
 			if shouldSwap {
 				stocks[j], stocks[j+1] = stocks[j+1], stocks[j]
 			}
@@ -4103,25 +4102,25 @@ func (m *Model) bubbleSortWatchlist(field SortField, direction SortDirection) {
 	// 获取过滤后的自选列表
 	filteredStocks := m.getFilteredWatchlist()
 	n := len(filteredStocks)
-	
+
 	// 创建带实时数据的结构用于排序
 	type WatchStockWithData struct {
 		Stock WatchlistStock
 		Data  *StockData
 	}
-	
+
 	// 获取所有股票的实时数据
 	stocksWithData := make([]WatchStockWithData, n)
 	for i, stock := range filteredStocks {
 		stockData := getStockPrice(stock.Code)
 		stocksWithData[i] = WatchStockWithData{Stock: stock, Data: stockData}
 	}
-	
+
 	// 冒泡排序
 	for i := 0; i < n-1; i++ {
 		for j := 0; j < n-i-1; j++ {
 			shouldSwap := false
-			
+
 			switch field {
 			case SortByCode:
 				if direction == SortAsc {
@@ -4198,28 +4197,28 @@ func (m *Model) bubbleSortWatchlist(field SortField, direction SortDirection) {
 					shouldSwap = volumeJ < volumeJplus1
 				}
 			}
-			
+
 			if shouldSwap {
 				stocksWithData[j], stocksWithData[j+1] = stocksWithData[j+1], stocksWithData[j]
 			}
 		}
 	}
-	
+
 	// 将排序后的结果转换回原格式
 	sortedStocks := make([]WatchlistStock, n)
 	for i, stockWithData := range stocksWithData {
 		sortedStocks[i] = stockWithData.Stock
 	}
-	
+
 	// 更新自选列表的顺序
 	// 由于我们只对过滤后的列表排序，需要重新构建整个watchlist
 	newWatchlist := make([]WatchlistStock, 0, len(m.watchlist.Stocks))
-	
+
 	// 先添加排序后的过滤结果
 	for _, stock := range sortedStocks {
 		newWatchlist = append(newWatchlist, stock)
 	}
-	
+
 	// 再添加不在过滤条件内的股票
 	if m.selectedTag != "" {
 		for _, stock := range m.watchlist.Stocks {
@@ -4228,7 +4227,7 @@ func (m *Model) bubbleSortWatchlist(field SortField, direction SortDirection) {
 			}
 		}
 	}
-	
+
 	m.watchlist.Stocks = newWatchlist
 }
 
@@ -4301,13 +4300,13 @@ func (m *Model) findSortFieldIndex(field SortField, isPortfolio bool) int {
 	} else {
 		fields = m.getWatchlistSortFields()
 	}
-	
+
 	for i, f := range fields {
 		if f == field {
 			return i
 		}
 	}
-	
+
 	// 如果没找到当前排序字段，返回0（第一个字段）
 	return 0
 }
@@ -4324,16 +4323,16 @@ func (m *Model) getPortfolioHeaderWithSortIndicator() table.Row {
 	// 排序字段到表头列索引的映射（跳过第一列的光标列）
 	// 新顺序：代码，名称，昨收价，开盘，最高，最低，现价，成本价，持股数，今日涨幅，今日盈亏，持仓盈亏，盈亏率，市值
 	sortFieldToColumnIndex := map[SortField]int{
-		SortByCode:         1,  // 代码
-		SortByName:         2,  // 名称
-		SortByPrice:        7,  // 现价
-		SortByCostPrice:    8,  // 成本价
-		SortByQuantity:     9,  // 持股数
+		SortByCode:          1,  // 代码
+		SortByName:          2,  // 名称
+		SortByPrice:         7,  // 现价
+		SortByCostPrice:     8,  // 成本价
+		SortByQuantity:      9,  // 持股数
 		SortByChangePercent: 10, // 今日涨幅
-		SortByTodayProfit:  11, // 今日盈亏
-		SortByTotalProfit:  12, // 持仓盈亏
-		SortByProfitRate:   13, // 盈亏率
-		SortByMarketValue:  14, // 市值
+		SortByTodayProfit:   11, // 今日盈亏
+		SortByTotalProfit:   12, // 持仓盈亏
+		SortByProfitRate:    13, // 盈亏率
+		SortByMarketValue:   14, // 市值
 	}
 
 	// 添加排序指示器（只有在已排序状态下才显示）
@@ -4387,7 +4386,7 @@ func (m *Model) getWatchlistHeaderWithSortIndicator() table.Row {
 // 处理持股列表排序
 func (m *Model) handlePortfolioSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	sortFields := m.getPortfolioSortFields()
-	
+
 	switch msg.String() {
 	case "up", "k", "w":
 		if m.portfolioSortCursor > 0 {
@@ -4424,7 +4423,7 @@ func (m *Model) handlePortfolioSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// 清除当前排序 - 重新加载原始数据顺序
 		m.portfolioIsSorted = false
 		// 清除排序字段和方向状态
-		m.portfolioSortField = SortByCode // 重置为默认值
+		m.portfolioSortField = SortByCode  // 重置为默认值
 		m.portfolioSortDirection = SortAsc // 重置为默认值
 		// 重新加载原始数据顺序
 		m.portfolio = loadPortfolio()
@@ -4445,7 +4444,7 @@ func (m *Model) handlePortfolioSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // 处理自选列表排序
 func (m *Model) handleWatchlistSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	sortFields := m.getWatchlistSortFields()
-	
+
 	switch msg.String() {
 	case "up", "k", "w":
 		if m.watchlistSortCursor > 0 {
@@ -4482,7 +4481,7 @@ func (m *Model) handleWatchlistSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// 清除当前排序 - 重新加载原始数据顺序
 		m.watchlistIsSorted = false
 		// 清除排序字段和方向状态
-		m.watchlistSortField = SortByCode // 重置为默认值
+		m.watchlistSortField = SortByCode  // 重置为默认值
 		m.watchlistSortDirection = SortAsc // 重置为默认值
 		// 重新加载原始数据顺序
 		m.watchlist = loadWatchlist()
@@ -4504,14 +4503,14 @@ func (m *Model) handleWatchlistSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) viewPortfolioSorting() string {
 	s := m.getText("sortTitle") + "\n\n"
 	s += m.getText("selectSortField") + "\n\n"
-	
+
 	sortFields := m.getPortfolioSortFields()
 	for i, field := range sortFields {
 		prefix := "  "
 		if i == m.portfolioSortCursor {
 			prefix = "► "
 		}
-		
+
 		fieldName := m.getSortFieldName(field)
 		if m.portfolioIsSorted && m.portfolioSortField == field {
 			// 显示当前排序状态（只有在已排序时才显示）
@@ -4521,15 +4520,15 @@ func (m *Model) viewPortfolioSorting() string {
 			s += fmt.Sprintf("%s%s\n", prefix, fieldName)
 		}
 	}
-	
+
 	s += "\n" + m.getText("sortHelp") + "\n"
 	return s
 }
 
-// 测试排序功能的示例函数  
+// 测试排序功能的示例函数
 func testSortingFeatures() {
 	fmt.Println("=== 排序功能测试 ===")
-	
+
 	// 创建测试数据
 	model := &Model{
 		portfolio: Portfolio{
@@ -4551,7 +4550,7 @@ func testSortingFeatures() {
 
 	fmt.Println("\n原始持股列表:")
 	for i, stock := range model.portfolio.Stocks {
-		fmt.Printf("%d. %s (%s) - 现价: %.3f\n", 
+		fmt.Printf("%d. %s (%s) - 现价: %.3f\n",
 			i+1, stock.Name, stock.Code, stock.Price)
 	}
 
@@ -4559,13 +4558,13 @@ func testSortingFeatures() {
 	fmt.Println("\n按代码升序排序后:")
 	model.bubbleSortPortfolio(SortByCode, SortAsc)
 	for i, stock := range model.portfolio.Stocks {
-		fmt.Printf("%d. %s (%s) - 现价: %.3f\n", 
+		fmt.Printf("%d. %s (%s) - 现价: %.3f\n",
 			i+1, stock.Name, stock.Code, stock.Price)
 	}
 
 	fmt.Println("\n原始自选列表:")
 	for i, stock := range model.watchlist.Stocks {
-		fmt.Printf("%d. %s (%s) - 标签: %s\n", 
+		fmt.Printf("%d. %s (%s) - 标签: %s\n",
 			i+1, stock.Name, stock.Code, stock.Tag)
 	}
 
@@ -4573,7 +4572,7 @@ func testSortingFeatures() {
 	fmt.Println("\n按名称升序排序后:")
 	model.bubbleSortWatchlist(SortByName, SortAsc)
 	for i, stock := range model.watchlist.Stocks {
-		fmt.Printf("%d. %s (%s) - 标签: %s\n", 
+		fmt.Printf("%d. %s (%s) - 标签: %s\n",
 			i+1, stock.Name, stock.Code, stock.Tag)
 	}
 
@@ -4584,14 +4583,14 @@ func testSortingFeatures() {
 func (m *Model) viewWatchlistSorting() string {
 	s := m.getText("sortTitle") + "\n\n"
 	s += m.getText("selectSortField") + "\n\n"
-	
+
 	sortFields := m.getWatchlistSortFields()
 	for i, field := range sortFields {
 		prefix := "  "
 		if i == m.watchlistSortCursor {
 			prefix = "► "
 		}
-		
+
 		fieldName := m.getSortFieldName(field)
 		if m.watchlistIsSorted && m.watchlistSortField == field {
 			// 显示当前排序状态（只有在已排序时才显示）
@@ -4601,8 +4600,7 @@ func (m *Model) viewWatchlistSorting() string {
 			s += fmt.Sprintf("%s%s\n", prefix, fieldName)
 		}
 	}
-	
+
 	s += "\n" + m.getText("sortHelp") + "\n"
 	return s
 }
-
