@@ -564,6 +564,60 @@ System adopts professional stock software color standards:
 
 ## 📈 Version History
 
+### 🌟 v4.7 - Architecture Optimization & Internationalization Enhancement 🚀 **Code Refactoring Update**
+
+**🏗️ Code Architecture Optimization**:
+- ✅ **Constants Modularization**: Migrated system constants to independent `consts.go` file, improving code organization
+- ✅ **Internationalization Refactoring**: Completed i18n migration of text content, supporting `i18n/zh.json` and `i18n/en.json` bilingual configuration
+- ✅ **Main Program Simplification**: Refactored `main.go` main program, removed hardcoded text, improved code maintainability
+- ✅ **Build Configuration Optimization**: Updated Go build configuration, optimized compilation process and dependency management
+
+**🎯 User Experience Enhancement**:
+- ✅ **Watchlist Sorting Optimization**: Enhanced watchlist functionality, newly added stocks automatically appear at the top of the table
+- ✅ **Interface Interaction Optimization**: Improved stock addition workflow, providing more intuitive user operation experience
+- ✅ **Fund Flow Search Enhancement**: Optimized integration of search functionality with fund flow data display
+- ✅ **Cursor Cache Mechanism**: Added cursor position caching to improve interface navigation experience
+
+**🔧 Technical Architecture Highlights**:
+- ✅ **Modular Design**: Adopted modular architecture, separating constants, internationalization text, etc. into independent files
+- ✅ **Configuration File Management**: Comprehensive multi-language configuration file system supporting dynamic language switching
+- ✅ **Code Refactoring**: Significantly simplified main program code, improving readability and maintainability
+- ✅ **Build Optimization**: Optimized compilation workflow, reducing build time and package size
+
+**📋 Core Improvements**:
+```
+Code Architecture: Modular refactoring, improving code organization
+Internationalization: i18n configuration file support, enhancing multi-language experience
+User Experience: Watchlist sorting optimization, interface interaction enhancement
+Technical Debt: Cleanup of hardcoded text, improving code quality
+```
+
+**💡 Development Experience Enhancement**:
+- 🎯 **Development Efficiency**: Modular architecture improves development and maintenance efficiency
+- 🌐 **Internationalization Support**: Complete i18n system, facilitating addition of new language support
+- 🔍 **Code Quality**: Refactored code is more readable and maintainable
+- 📦 **Build Optimization**: Optimized build workflow, improving development experience
+
+**⌨️ Related Feature Changes**:
+```
+Watchlist Page → New stocks automatically sorted to top
+Language Switching → Complete i18n support based on JSON configuration files
+Search Functionality → Enhanced integration with fund flow data
+```
+
+**🔄 Advantages vs v4.6**:
+| Feature | v4.6 Fund Flow | v4.7 Architecture Optimization |
+|---------|-------------|--------------------------------|
+| Code Structure | ✅ Complete features but centralized code | ✅ Modular refactoring, clear architecture |
+| Internationalization | ✅ Basic multi-language support | ✅ Complete i18n configuration system |
+| User Experience | ✅ Rich fund flow data | ✅ Fund flow + interface interaction dual optimization |
+| Development Experience | ✅ Feature-oriented development | ✅ Architecture-oriented, easy maintenance and extension |
+
+### 📅 Historical Versions
+
+<details>
+<summary>🔽 Click to view historical version details</summary>
+
 ### 🌟 v4.6 - Fund Flow Data Integration & Async Optimization 🚀 **AKShare Data Enhancement Update**
 
 **📊 Fund Flow Data Integration**:
@@ -614,12 +668,6 @@ Debug Mode → View detailed data acquisition logs
 | Interface Response | ✅ Smooth sorting | ✅ Async acquisition without lag |
 | Data Value | ✅ Technical analysis support | ✅ Technical + fundamental dual support |
 | Investment Decisions | ✅ Basic data analysis | ✅ Deep fund flow analysis |
-
----
-
-### 📅 Historical Versions
-
-<details>
 <summary>🔽 Click to view historical version details</summary>
 
 ### 🌟 v4.5 - Advanced Sorting System & Interaction Optimization 🚀 **Professional Sorting Update**

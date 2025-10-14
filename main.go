@@ -74,6 +74,13 @@ type FundFlowCacheEntry struct {
 	IsUpdating bool      `json:"is_updating"` // 是否正在更新中
 }
 
+// 股价缓存条目结构
+type StockPriceCacheEntry struct {
+	Data       *StockData `json:"data"`        // 股价数据
+	UpdateTime time.Time  `json:"update_time"` // 数据更新时间
+	IsUpdating bool       `json:"is_updating"` // 是否正在更新中
+}
+
 // 自选股票数据结构
 type WatchlistStock struct {
 	Code     string   `json:"code"`
@@ -202,9 +209,10 @@ type Model struct {
 	watchlistCursor    int // 自选列表当前选中行
 
 	// For watchlist tagging and grouping
-	selectedTag   string   // 当前选择的标签过滤
-	availableTags []string // 所有可用的标签列表
-	tagInput      string   // 标签输入框内容
+	selectedTag     string   // 当前选择的标签过滤
+	availableTags   []string // 所有可用的标签列表
+	tagInput        string   // 标签输入框内容
+	tagSelectCursor int      // 标签选择界面的游标位置
 
 	// Performance optimization - cached filtered watchlist
 	cachedFilteredWatchlist  []WatchlistStock // 缓存的过滤后自选列表
@@ -229,6 +237,11 @@ type Model struct {
 	fundFlowUpdateTime time.Time                      // 上次更新资金流向数据的时间
 	fundFlowContext    context.Context                // 资金流向异步获取的上下文
 	fundFlowCancel     context.CancelFunc             // 取消资金流向异步获取的函数
+
+	// For stock price async data - 股价异步数据
+	stockPriceCache      map[string]*StockPriceCacheEntry // 股价数据缓存
+	stockPriceMutex      sync.RWMutex                     // 股价数据读写锁
+	stockPriceUpdateTime time.Time                        // 上次更新股价数据的时间
 }
 
 type tickMsg struct{}
@@ -237,6 +250,13 @@ type tickMsg struct{}
 type fundFlowUpdateMsg struct {
 	Symbol string
 	Data   *FundFlow
+	Error  error
+}
+
+// 股价数据更新消息
+type stockPriceUpdateMsg struct {
+	Symbol string
+	Data   *StockData
 	Error  error
 }
 
@@ -336,6 +356,9 @@ func main() {
 		fundFlowUpdateTime: time.Time{}, // 初始化为零时间
 		fundFlowContext:    fundFlowCtx,
 		fundFlowCancel:     fundFlowCancel,
+		// 股价缓存初始化
+		stockPriceCache:      make(map[string]*StockPriceCacheEntry),
+		stockPriceUpdateTime: time.Time{}, // 初始化为零时间
 	}
 
 	// 根据语言设置菜单项
@@ -429,6 +452,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel, cmd = m.handleWatchlistViewing(msg)
 		case WatchlistTagging:
 			newModel, cmd = m.handleWatchlistTagging(msg)
+		case WatchlistTagSelect:
+			newModel, cmd = m.handleWatchlistTagSelect(msg)
 		case WatchlistGroupSelect:
 			newModel, cmd = m.handleWatchlistGroupSelect(msg)
 		case PortfolioSorting:
@@ -442,9 +467,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state == Monitoring || m.state == WatchlistViewing {
 			m.lastUpdate = time.Now()
 
-			// 启动资金流向数据更新（如果在自选列表页面）
+			// 启动异步数据更新
 			var cmds []tea.Cmd
 			cmds = append(cmds, m.tickCmd())
+
+			// 启动股价数据更新（持股和自选页面都需要）
+			if stockPriceCmd := m.startStockPriceUpdates(); stockPriceCmd != nil {
+				cmds = append(cmds, stockPriceCmd)
+			}
 
 			if m.state == WatchlistViewing {
 				if fundFlowCmd := m.startFundFlowUpdates(); fundFlowCmd != nil {
@@ -482,6 +512,34 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.fundFlowMutex.Unlock()
 			debugPrint("[错误] 资金流向数据更新失败: %s, %v\n", msg.Symbol, msg.Error)
+		}
+		newModel, cmd = m, nil
+	case stockPriceUpdateMsg:
+		// 处理股价数据更新
+		if msg.Error == nil && msg.Data != nil {
+			// 更新缓存
+			m.stockPriceMutex.Lock()
+			if entry, exists := m.stockPriceCache[msg.Symbol]; exists {
+				entry.Data = msg.Data
+				entry.UpdateTime = time.Now()
+				entry.IsUpdating = false
+			} else {
+				m.stockPriceCache[msg.Symbol] = &StockPriceCacheEntry{
+					Data:       msg.Data,
+					UpdateTime: time.Now(),
+					IsUpdating: false,
+				}
+			}
+			m.stockPriceMutex.Unlock()
+			debugPrint("[信息] 股价缓存已更新: %s\n", msg.Symbol)
+		} else {
+			// 更新失败，标记为未更新状态
+			m.stockPriceMutex.Lock()
+			if entry, exists := m.stockPriceCache[msg.Symbol]; exists {
+				entry.IsUpdating = false
+			}
+			m.stockPriceMutex.Unlock()
+			debugPrint("[错误] 股价数据更新失败: %s, %v\n", msg.Symbol, msg.Error)
 		}
 		newModel, cmd = m, nil
 	default:
@@ -523,6 +581,8 @@ func (m *Model) View() string {
 		mainContent = m.viewWatchlistViewing()
 	case WatchlistTagging:
 		mainContent = m.viewWatchlistTagging()
+	case WatchlistTagSelect:
+		mainContent = m.viewWatchlistTagSelect()
 	case WatchlistGroupSelect:
 		mainContent = m.viewWatchlistGroupSelect()
 	case PortfolioSorting:
@@ -707,7 +767,14 @@ func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 		if containsChineseChars(m.input) {
 			stockData = searchChineseStock(m.input)
 		} else {
+			// 对于非中文输入，先尝试直接获取价格，然后尝试搜索
 			stockData = getStockPrice(m.input)
+
+			// 如果直接获取失败，尝试作为搜索关键词搜索
+			if stockData == nil || stockData.Price <= 0 {
+				debugPrint("[调试] 添加股票时直接获取价格失败，尝试通过搜索查找: %s\n", m.input)
+				stockData = searchStockBySymbol(m.input)
+			}
 		}
 
 		if stockData == nil || stockData.Name == "" {
@@ -822,17 +889,20 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = "" // 清除消息
 		return m, nil
 	case "e":
-		// 直接修改光标指向的股票
+		// 编辑当前光标指向的股票
 		if len(m.portfolio.Stocks) == 0 {
-			m.message = m.getText("emptyCannotEdit")
+			m.message = m.getText("emptyPortfolio")
 			return m, nil
 		}
-		// 直接进入修改当前光标指向的股票
+		m.logUserAction("从持股列表进入编辑股票页面")
 		m.previousState = m.state // 记录当前状态
 		m.state = EditingStock
-		m.editingStep = 1                        // 直接跳到输入成本价步骤
-		m.selectedStockIndex = m.portfolioCursor // 使用当前光标位置
-		m.input = fmt.Sprintf("%.3f", m.portfolio.Stocks[m.portfolioCursor].CostPrice)
+		m.editingStep = 1 // 开始编辑成本价
+		m.selectedStockIndex = m.portfolioCursor
+		m.tempCode = m.portfolio.Stocks[m.portfolioCursor].Code
+		m.tempCost = ""
+		m.tempQuantity = ""
+		m.input = fmt.Sprintf("%.2f", m.portfolio.Stocks[m.portfolioCursor].CostPrice) // 预填充当前成本价
 		m.message = ""
 		return m, nil
 	case "d":
@@ -908,7 +978,6 @@ func (m *Model) viewMonitoring() string {
 
 	var totalMarketValue float64
 	var totalCost float64
-	var totalTodayProfit float64
 
 	// 显示滚动信息
 	totalStocks := len(m.portfolio.Stocks)
@@ -937,7 +1006,8 @@ func (m *Model) viewMonitoring() string {
 	// 首先计算所有股票的总计（用于汇总行）
 	for i := range m.portfolio.Stocks {
 		stock := &m.portfolio.Stocks[i]
-		stockData := getStockPrice(stock.Code)
+		// 从缓存获取股价数据（非阻塞）
+		stockData := m.getStockPriceFromCache(stock.Code)
 		if stockData != nil {
 			stock.Price = stockData.Price
 			stock.Change = stockData.Change
@@ -951,11 +1021,9 @@ func (m *Model) viewMonitoring() string {
 		if stock.Price > 0 {
 			marketValue := stock.Price * float64(stock.Quantity)
 			cost := stock.CostPrice * float64(stock.Quantity)
-			todayProfit := stock.Change * float64(stock.Quantity)
 
 			totalMarketValue += marketValue
 			totalCost += cost
-			totalTodayProfit += todayProfit
 		}
 	}
 
@@ -964,10 +1032,7 @@ func (m *Model) viewMonitoring() string {
 		stock := &m.portfolio.Stocks[i]
 
 		if stock.Price > 0 {
-			// 今日盈亏：今日价格变化带来的盈亏 = (现价 - 昨收价) × 持股数
-			todayProfit := stock.Change * float64(stock.Quantity)
-			// 持仓盈亏：基于成本价的实时盈亏状态
-			positionProfit := (stock.Price - stock.CostPrice) * float64(stock.Quantity)
+			positionProfit := stock.CalculatePositionProfit()
 			profitRate := ((stock.Price - stock.CostPrice) / stock.CostPrice) * 100
 			marketValue := stock.Price * float64(stock.Quantity)
 
@@ -982,7 +1047,6 @@ func (m *Model) viewMonitoring() string {
 			}
 
 			// 使用多语言颜色显示函数
-			todayProfitStr := m.formatProfitWithColorZeroLang(todayProfit)
 			positionProfitStr := m.formatProfitWithColorZeroLang(positionProfit)
 			profitRateStr := m.formatProfitRateWithColorZeroLang(profitRate)
 
@@ -1004,7 +1068,6 @@ func (m *Model) viewMonitoring() string {
 				fmt.Sprintf("%.3f", stock.CostPrice),                          // 成本价（无颜色）
 				stock.Quantity,                                                // 持股数
 				todayChangeStr,                                                // 今日涨幅
-				todayProfitStr,                                                // 今日盈亏（基于今日价格变化）
 				positionProfitStr,                                             // 持仓盈亏（基于成本价）
 				profitRateStr,                                                 // 盈亏率
 				fmt.Sprintf("%.2f", marketValue),                              // 市值
@@ -1034,7 +1097,6 @@ func (m *Model) viewMonitoring() string {
 				fmt.Sprintf("%.3f", stock.CostPrice), // 成本价
 				stock.Quantity,                       // 持股数
 				"-",                                  // 今日涨幅
-				"-",                                  // 今日盈亏
 				"-",                                  // 持仓盈亏
 				"-",                                  // 盈亏率
 				"-",                                  // 市值
@@ -1065,7 +1127,6 @@ func (m *Model) viewMonitoring() string {
 		"",                 // 最低
 		"",                 // 持股数
 		"",                 // 今日涨幅
-		m.formatProfitWithColorLang(totalTodayProfit),     // 今日盈亏（总今日盈亏）
 		m.formatProfitWithColorLang(totalPortfolioProfit), // 持仓盈亏（总持仓盈亏）
 		m.formatProfitRateWithColorLang(totalProfitRate),  // 盈亏率（总盈亏率）
 		fmt.Sprintf("%.2f", totalMarketValue),             // 市值（总市值）
@@ -1167,6 +1228,22 @@ func saveConfig(config Config) error {
 	return os.WriteFile(configFile, data, 0644)
 }
 
+// 计算股票的持仓盈亏
+func (s *Stock) CalculatePositionProfit() float64 {
+	// 使用简化的加权平均成本价计算
+	return (s.Price - s.CostPrice) * float64(s.Quantity)
+}
+
+// 计算股票的加权平均成本价
+func (s *Stock) CalculateWeightedAverageCost() float64 {
+	return s.CostPrice // 直接返回成本价
+}
+
+// 计算总持股数量
+func (s *Stock) CalculateTotalQuantity() int {
+	return s.Quantity // 直接返回持股数量
+}
+
 func loadPortfolio() Portfolio {
 	data, err := os.ReadFile(dataFile)
 	if err != nil {
@@ -1179,20 +1256,6 @@ func loadPortfolio() Portfolio {
 		return Portfolio{Stocks: []Stock{}}
 	}
 	return portfolio
-}
-
-func formatProfitWithColor(profit float64) string {
-	if profit >= 0 {
-		return text.FgRed.Sprintf("+%.2f", profit)
-	}
-	return text.FgGreen.Sprintf("%.2f", profit)
-}
-
-func formatProfitRateWithColor(rate float64) string {
-	if rate >= 0 {
-		return text.FgRed.Sprintf("+%.2f%%", rate)
-	}
-	return text.FgGreen.Sprintf("%.2f%%", rate)
 }
 
 // 支持多语言的颜色显示函数
@@ -1244,6 +1307,24 @@ func (m *Model) formatProfitRateWithColorZeroLang(rate float64) string {
 	}
 	// 否则使用语言相关颜色逻辑
 	return m.formatProfitRateWithColorLang(rate)
+}
+
+// 格式化资金流向数据，自动选择万元或亿元单位，支持股票类型检测
+func (m *Model) formatFundFlowWithColorAndUnitForStock(amount float64, symbol string) string {
+	// 对于非A股（如美股），显示 "-" 表示数据不可用
+	if !isChinaStock(symbol) {
+		return "-"
+	}
+	return m.formatFundFlowWithColorAndUnit(amount)
+}
+
+// 格式化盈亏率数据，支持股票类型检测
+func (m *Model) formatProfitRateWithColorZeroLangForStock(rate float64, symbol string) string {
+	// 对于非A股（如美股），显示 "-" 表示数据不可用
+	if !isChinaStock(symbol) {
+		return "-"
+	}
+	return m.formatProfitRateWithColorZeroLang(rate)
 }
 
 // 格式化资金流向数据，自动选择万元或亿元单位
@@ -1320,23 +1401,6 @@ func (m *Model) formatPriceWithColorLang(currentPrice, prevClose float64) string
 }
 
 // 根据数值本身判断颜色显示：0时显示白色，正数红色，负数绿色
-func formatProfitWithColorZero(profit float64) string {
-	// 当数值接近0时（考虑浮点数精度），显示白色（无颜色）
-	if abs(profit) < 0.001 {
-		return fmt.Sprintf("%.2f", profit)
-	}
-	// 否则使用原有颜色逻辑
-	return formatProfitWithColor(profit)
-}
-
-func formatProfitRateWithColorZero(rate float64) string {
-	// 当数值接近0时（考虑浮点数精度），显示白色（无颜色）
-	if abs(rate) < 0.001 {
-		return fmt.Sprintf("%.2f%%", rate)
-	}
-	// 否则使用原有颜色逻辑
-	return formatProfitRateWithColor(rate)
-}
 
 // 辅助函数：计算浮点数绝对值
 func abs(x float64) float64 {
@@ -1346,25 +1410,6 @@ func abs(x float64) float64 {
 	return x
 }
 
-// 基于昨收价比较的价格颜色显示函数
-func formatPriceWithColor(currentPrice, prevClose float64) string {
-	if prevClose == 0 {
-		// 如果昨收价为0，直接显示价格不加颜色
-		return fmt.Sprintf("%.3f", currentPrice)
-	}
-
-	if currentPrice > prevClose {
-		// 高于昨收价显示红色
-		return text.FgRed.Sprintf("%.3f", currentPrice)
-	} else if currentPrice < prevClose {
-		// 低于昨收价显示绿色
-		return text.FgGreen.Sprintf("%.3f", currentPrice)
-	} else {
-		// 等于昨收价显示白色（无颜色）
-		return fmt.Sprintf("%.3f", currentPrice)
-	}
-}
-
 func getStockInfo(symbol string) *StockData {
 	var stockData *StockData
 
@@ -1372,7 +1417,14 @@ func getStockInfo(symbol string) *StockData {
 	if containsChineseChars(symbol) {
 		stockData = searchChineseStock(symbol)
 	} else {
+		// 对于非中文输入，先尝试直接获取价格，然后尝试搜索
 		stockData = getStockPrice(symbol)
+
+		// 如果直接获取失败，尝试作为搜索关键词搜索
+		if stockData == nil || stockData.Price <= 0 {
+			debugPrint("[调试] 直接获取股票价格失败，尝试通过搜索查找: %s\n", symbol)
+			stockData = searchStockBySymbol(symbol)
+		}
 	}
 
 	// 如果获取到股票数据且是中国股票，尝试获取资金流向数据
@@ -1394,6 +1446,101 @@ func containsChineseChars(s string) bool {
 		}
 	}
 	return false
+}
+
+// 通过符号搜索股票（支持美股等国际股票）
+func searchStockBySymbol(symbol string) *StockData {
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	debugPrint("[调试] 开始通过符号搜索股票: %s\n", symbol)
+
+	// 策略1: 使用TwelveData搜索API
+	result := searchStockByTwelveDataAPI(symbol)
+	if result != nil && result.Price > 0 {
+		debugPrint("[调试] TwelveData符号搜索成功找到: %s (%s)\n", result.Name, result.Symbol)
+		return result
+	}
+
+	// 策略2: 尝试腾讯API（可能支持部分国际股票）
+	result = searchStockByTencentAPI(symbol)
+	if result != nil && result.Price > 0 {
+		debugPrint("[调试] 腾讯符号搜索成功找到: %s (%s)\n", result.Name, result.Symbol)
+		return result
+	}
+
+	// 策略3: 尝试新浪API（可能支持部分国际股票）
+	result = searchStockBySinaAPI(symbol)
+	if result != nil && result.Price > 0 {
+		debugPrint("[调试] 新浪符号搜索成功找到: %s (%s)\n", result.Name, result.Symbol)
+		return result
+	}
+
+	debugPrint("[调试] 所有符号搜索策略都失败，未找到股票数据\n")
+	return nil
+}
+
+// 使用TwelveData搜索API查找股票
+func searchStockByTwelveDataAPI(keyword string) *StockData {
+	debugPrint("[调试] 使用TwelveData搜索API查找: %s\n", keyword)
+
+	// 先尝试符号搜索
+	searchUrl := fmt.Sprintf("https://api.twelvedata.com/symbol_search?symbol=%s&apikey=demo", keyword)
+	debugPrint("[调试] TwelveData搜索请求URL: %s\n", searchUrl)
+
+	client := &http.Client{Timeout: 8 * time.Second}
+	resp, err := client.Get(searchUrl)
+	if err != nil {
+		debugPrint("[错误] TwelveData搜索API HTTP请求失败: %v\n", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		debugPrint("[错误] TwelveData搜索API读取响应失败: %v\n", err)
+		return nil
+	}
+
+	debugPrint("[调试] TwelveData搜索响应: %s\n", string(body))
+
+	var searchResult struct {
+		Data []struct {
+			Symbol         string `json:"symbol"`
+			InstrumentName string `json:"instrument_name"`
+			Exchange       string `json:"exchange"`
+			Country        string `json:"country"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &searchResult); err != nil {
+		debugPrint("[错误] TwelveData搜索JSON解析失败: %v\n", err)
+		return nil
+	}
+
+	if len(searchResult.Data) == 0 {
+		debugPrint("[调试] TwelveData搜索未找到匹配结果\n")
+		return nil
+	}
+
+	// 选择第一个匹配的结果，优先选择美国市场的股票
+	var selectedSymbol, selectedName string
+	for _, item := range searchResult.Data {
+		if item.Country == "United States" && item.Exchange == "NASDAQ" {
+			selectedSymbol = item.Symbol
+			selectedName = item.InstrumentName
+			break
+		}
+	}
+
+	// 如果没有找到美国NASDAQ的，就用第一个结果
+	if selectedSymbol == "" {
+		selectedSymbol = searchResult.Data[0].Symbol
+		selectedName = searchResult.Data[0].InstrumentName
+	}
+
+	debugPrint("[调试] TwelveData搜索选择股票: %s (%s)\n", selectedName, selectedSymbol)
+
+	// 获取股票报价
+	return tryTwelveDataAPI(selectedSymbol)
 }
 
 // 通过API搜索中文股票名称
@@ -1482,7 +1629,7 @@ func parseSearchResults(content, keyword string) *StockData {
 	debugPrint("[调试] 开始解析搜索结果\n")
 
 	// 尝试解析新的腾讯格式 (v_hint=)
-	result := parseTencentHintFormat(content, keyword)
+	result := parseTencentHintFormat(content)
 	if result != nil {
 		return result
 	}
@@ -1498,7 +1645,7 @@ func parseSearchResults(content, keyword string) *StockData {
 }
 
 // 解析腾讯Hint格式的搜索结果
-func parseTencentHintFormat(content, keyword string) *StockData {
+func parseTencentHintFormat(content string) *StockData {
 	// 格式: v_hint="sz~000880~潍柴重机~wczj~GP-A"
 	debugPrint("[调试] 尝试解析腾讯Hint格式\n")
 
@@ -1899,6 +2046,20 @@ func (m *Model) getFundFlowDataFromCache(symbol string) *FundFlow {
 	return &FundFlow{}
 }
 
+// 从缓存获取股价数据（非阻塞）
+func (m *Model) getStockPriceFromCache(symbol string) *StockData {
+	m.stockPriceMutex.RLock()
+	defer m.stockPriceMutex.RUnlock()
+	if entry, exists := m.stockPriceCache[symbol]; exists {
+		// 检查缓存是否过期（超过30秒）
+		if time.Since(entry.UpdateTime) < 30*time.Second {
+			return entry.Data
+		}
+	}
+	// 如果缓存中没有数据或已过期，返回nil，触发异步更新
+	return nil
+}
+
 // 同步获取资金流向数据（用于搜索结果）
 func getFundFlowDataSync(symbol string) *FundFlow {
 	if !isChinaStock(symbol) {
@@ -1995,6 +2156,93 @@ func (m *Model) startFundFlowUpdates() tea.Cmd {
 	}
 
 	return tea.Batch(cmds...)
+}
+
+// 启动股价异步更新
+func (m *Model) startStockPriceUpdates() tea.Cmd {
+	// 检查是否需要开始新的更新周期
+	if time.Since(m.stockPriceUpdateTime) < 5*time.Second {
+		return nil // 还未到更新时间
+	}
+
+	// 收集所有需要更新的股票代码
+	stockCodes := make([]string, 0)
+
+	// 添加自选列表中的股票
+	filteredStocks := m.getFilteredWatchlist()
+	for _, stock := range filteredStocks {
+		stockCodes = append(stockCodes, stock.Code)
+	}
+
+	// 添加持股列表中的股票
+	for _, stock := range m.portfolio.Stocks {
+		stockCodes = append(stockCodes, stock.Code)
+	}
+
+	if len(stockCodes) == 0 {
+		return nil
+	}
+
+	// 去重股票代码
+	uniqueCodes := make(map[string]bool)
+	var uniqueStockCodes []string
+	for _, code := range stockCodes {
+		if !uniqueCodes[code] {
+			uniqueCodes[code] = true
+			uniqueStockCodes = append(uniqueStockCodes, code)
+		}
+	}
+
+	// 更新开始时间
+	m.stockPriceUpdateTime = time.Now()
+
+	// 逐个发起异步获取请求
+	var cmds []tea.Cmd
+	for _, code := range uniqueStockCodes {
+		// 标记正在更新
+		m.stockPriceMutex.Lock()
+		if entry, exists := m.stockPriceCache[code]; exists {
+			entry.IsUpdating = true
+		} else {
+			m.stockPriceCache[code] = &StockPriceCacheEntry{
+				Data:       nil,
+				UpdateTime: time.Time{},
+				IsUpdating: true,
+			}
+		}
+		m.stockPriceMutex.Unlock()
+
+		// 为每个股票添加一个延迟，避免同时请求太多
+		delay := time.Duration(len(cmds)) * 100 * time.Millisecond
+		cmds = append(cmds, tea.Tick(delay, func(t time.Time) tea.Msg {
+			return m.fetchStockPriceAsync(code)()
+		}))
+	}
+
+	return tea.Batch(cmds...)
+}
+
+// 异步获取股价数据
+func (m *Model) fetchStockPriceAsync(symbol string) tea.Cmd {
+	return func() tea.Msg {
+		data := getStockPrice(symbol)
+
+		// 更新缓存
+		m.stockPriceMutex.Lock()
+		defer m.stockPriceMutex.Unlock()
+
+		m.stockPriceCache[symbol] = &StockPriceCacheEntry{
+			Data:       data,
+			UpdateTime: time.Now(),
+			IsUpdating: false,
+		}
+
+		return stockPriceUpdateMsg{
+			Symbol: symbol,
+			Data:   data,
+			Error:  nil,
+		}
+	}
 }
 
 func getStockPrice(symbol string) *StockData {
@@ -2147,105 +2395,399 @@ func convertStockSymbolForTencent(symbol string) string {
 }
 
 func tryFinnhubAPI(symbol string) *StockData {
-	convertedSymbol := convertStockSymbolForFinnhub(symbol)
-	debugPrint("[调试] Finnhub - 原始代码: %s -> 转换后: %s\n", symbol, convertedSymbol)
+	// 策略1: 尝试TwelveData API
+	data := tryTwelveDataAPI(symbol)
+	if data != nil && data.Price > 0 {
+		return data
+	}
 
-	stockName := getFinnhubStockName(convertedSymbol)
+	// 策略2: 尝试免费的 FMP API (无需API key的基础数据)
+	data = tryFMPFreeAPI(symbol)
+	if data != nil && data.Price > 0 {
+		return data
+	}
 
-	url := fmt.Sprintf("https://finnhub.io/api/v1/quote?symbol=%s&token=demo", convertedSymbol)
-	debugPrint("[调试] Finnhub请求URL: %s\n", url)
+	// 策略3: 尝试Yahoo Finance API
+	data = tryYahooFinanceAPI(symbol)
+	if data != nil && data.Price > 0 {
+		return data
+	}
+
+	debugPrint("[调试] 所有美股API都失败，建议配置有效的API key\n")
+	return &StockData{Symbol: symbol, Price: 0}
+}
+
+func tryTwelveDataAPI(symbol string) *StockData {
+	convertedSymbol := strings.ToUpper(strings.TrimSpace(symbol))
+	debugPrint("[调试] TwelveData - 原始代码: %s -> 转换后: %s\n", symbol, convertedSymbol)
+
+	// 使用TwelveData API获取股票报价
+	url := fmt.Sprintf("https://api.twelvedata.com/quote?symbol=%s&apikey=demo", convertedSymbol)
+	debugPrint("[调试] TwelveData请求URL: %s\n", url)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		debugPrint("[错误] Finnhub HTTP请求失败: %v\n", err)
+		debugPrint("[错误] TwelveData HTTP请求失败: %v\n", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debugPrint("[错误] Finnhub读取响应失败: %v\n", err)
+		debugPrint("[错误] TwelveData读取响应失败: %v\n", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
+
+	debugPrint("[调试] TwelveData响应: %s\n", string(body))
 
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		debugPrint("[错误] Finnhub JSON解析失败: %v\n", err)
+		debugPrint("[错误] TwelveData JSON解析失败: %v\n", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
-	current, currentOk := result["c"].(float64)
-	previous, prevOk := result["pc"].(float64)
-
-	if !currentOk || !prevOk || current <= 0 {
-		debugPrint("[调试] Finnhub数据无效或为空\n")
+	// 检查是否有错误信息
+	if errMsg, hasErr := result["message"]; hasErr {
+		debugPrint("[调试] TwelveData API错误: %v\n", errMsg)
 		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	// 解析股票数据
+	name, _ := result["name"].(string)
+	if name == "" {
+		name = symbol
+	}
+
+	closeStr, closeOk := result["close"].(string)
+	prevCloseStr, prevOk := result["previous_close"].(string)
+
+	if !closeOk || !prevOk {
+		debugPrint("[调试] TwelveData数据无效或为空\n")
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	current, err := strconv.ParseFloat(closeStr, 64)
+	if err != nil {
+		debugPrint("[错误] TwelveData price解析失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	previous, err := strconv.ParseFloat(prevCloseStr, 64)
+	if err != nil {
+		debugPrint("[错误] TwelveData previous_close解析失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	if current <= 0 {
+		debugPrint("[调试] TwelveData价格无效\n")
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	// 解析开盘价、最高价、最低价、成交量
+	var openPrice, maxPrice, minPrice float64
+	var volume int64
+
+	if openStr, ok := result["open"].(string); ok {
+		openPrice, _ = strconv.ParseFloat(openStr, 64)
+	}
+	if highStr, ok := result["high"].(string); ok {
+		maxPrice, _ = strconv.ParseFloat(highStr, 64)
+	}
+	if lowStr, ok := result["low"].(string); ok {
+		minPrice, _ = strconv.ParseFloat(lowStr, 64)
+	}
+	if volumeStr, ok := result["volume"].(string); ok {
+		volume, _ = strconv.ParseInt(volumeStr, 10, 64)
 	}
 
 	change := current - previous
-	changePercent := (change / previous) * 100
+	changePercent := 0.0
+	if previous > 0 {
+		changePercent = (change / previous) * 100
+	}
 
-	debugPrint("[调试] Finnhub获取成功 - 名称: %s, 价格: %.2f, 涨跌: %.2f (%.2f%%)\n", stockName, current, change, changePercent)
+	debugPrint("[调试] TwelveData获取成功 - 名称: %s, 价格: %.2f, 涨跌: %.2f (%.2f%%), 开: %.2f, 高: %.2f, 低: %.2f, 量: %d\n",
+		name, current, change, changePercent, openPrice, maxPrice, minPrice, volume)
 
 	return &StockData{
 		Symbol:        symbol,
-		Name:          stockName,
+		Name:          name,
 		Price:         current,
 		Change:        change,
 		ChangePercent: changePercent,
+		StartPrice:    openPrice,
+		MaxPrice:      maxPrice,
+		MinPrice:      minPrice,
 		PrevClose:     previous,
-		TurnoverRate:  0,
-		Volume:        0,
+		TurnoverRate:  0, // TwelveData不提供换手率
+		Volume:        volume,
 	}
 }
 
-func convertStockSymbolForFinnhub(symbol string) string {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+// 使用免费的Financial Modeling Prep API (不需要API key的基础功能)
+func tryFMPFreeAPI(symbol string) *StockData {
+	convertedSymbol := strings.ToUpper(strings.TrimSpace(symbol))
+	debugPrint("[调试] FMPFree - 查找股票: %s\n", convertedSymbol)
 
-	if strings.HasPrefix(symbol, "SH") {
-		return strings.TrimPrefix(symbol, "SH") + ".SS"
-	} else if strings.HasPrefix(symbol, "SZ") {
-		return strings.TrimPrefix(symbol, "SZ") + ".SZ"
-	} else if strings.HasPrefix(symbol, "HK") {
-		return strings.TrimPrefix(symbol, "HK") + ".HK"
-	}
-
-	if len(symbol) == 6 && strings.HasPrefix(symbol, "6") {
-		return symbol + ".SS"
-	} else if len(symbol) == 6 && (strings.HasPrefix(symbol, "0") || strings.HasPrefix(symbol, "3")) {
-		return symbol + ".SZ"
-	}
-
-	return symbol
-}
-
-func getFinnhubStockName(symbol string) string {
-	url := fmt.Sprintf("https://finnhub.io/api/v1/stock/profile2?symbol=%s&token=demo", symbol)
+	// 尝试使用免费的实时报价接口
+	url := fmt.Sprintf("https://financialmodelingprep.com/api/v3/quote/%s", convertedSymbol)
+	debugPrint("[调试] FMPFree请求URL: %s\n", url)
 
 	client := &http.Client{Timeout: 8 * time.Second}
-	resp, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		debugPrint("[调试] 无法获取股票名称\n")
-		return symbol
+		debugPrint("[错误] FMPFree请求创建失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	// 添加用户代理避免被阻止
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; StockMonitor/1.0)")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		debugPrint("[错误] FMPFree HTTP请求失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return symbol
+		debugPrint("[错误] FMPFree读取响应失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
 	}
 
-	var result map[string]any
-	if err := json.Unmarshal(body, &result); err != nil {
-		return symbol
+	debugPrint("[调试] FMPFree响应: %s\n", string(body))
+
+	// 检查是否是错误响应
+	if strings.Contains(string(body), "Error Message") {
+		debugPrint("[调试] FMPFree返回错误信息\n")
+		return &StockData{Symbol: symbol, Price: 0}
 	}
 
-	if name, ok := result["name"].(string); ok && name != "" {
-		return name
+	var results []map[string]any
+	if err := json.Unmarshal(body, &results); err != nil {
+		debugPrint("[错误] FMPFree JSON解析失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
 	}
 
-	return symbol
+	if len(results) == 0 {
+		debugPrint("[调试] FMPFree无返回数据\n")
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	result := results[0]
+
+	// 解析价格数据
+	var price, previousClose, dayLow, dayHigh, open float64
+	var volume int64
+	var name string
+
+	if p, ok := result["price"].(float64); ok {
+		price = p
+	}
+	if pc, ok := result["previousClose"].(float64); ok {
+		previousClose = pc
+	}
+	if low, ok := result["dayLow"].(float64); ok {
+		dayLow = low
+	}
+	if high, ok := result["dayHigh"].(float64); ok {
+		dayHigh = high
+	}
+	if o, ok := result["open"].(float64); ok {
+		open = o
+	}
+	if vol, ok := result["volume"].(float64); ok {
+		volume = int64(vol)
+	}
+	if n, ok := result["name"].(string); ok {
+		name = n
+	}
+
+	if name == "" {
+		name = symbol
+	}
+
+	if price <= 0 {
+		debugPrint("[调试] FMPFree价格无效\n")
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	change := price - previousClose
+	changePercent := 0.0
+	if previousClose > 0 {
+		changePercent = (change / previousClose) * 100
+	}
+
+	debugPrint("[调试] FMPFree获取成功 - 名称: %s, 价格: %.2f, 涨跌: %.2f (%.2f%%)\n",
+		name, price, change, changePercent)
+
+	return &StockData{
+		Symbol:        symbol,
+		Name:          name,
+		Price:         price,
+		Change:        change,
+		ChangePercent: changePercent,
+		StartPrice:    open,
+		MaxPrice:      dayHigh,
+		MinPrice:      dayLow,
+		PrevClose:     previousClose,
+		TurnoverRate:  0,
+		Volume:        volume,
+	}
+}
+
+// 使用Yahoo Finance API作为备用方案
+func tryYahooFinanceAPI(symbol string) *StockData {
+	convertedSymbol := strings.ToUpper(strings.TrimSpace(symbol))
+	debugPrint("[调试] Yahoo - 查找股票: %s\n", convertedSymbol)
+
+	// 使用Yahoo Finance的chart API接口，这个接口更稳定
+	url := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=1d", convertedSymbol)
+	debugPrint("[调试] Yahoo请求URL: %s\n", url)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		debugPrint("[错误] Yahoo请求创建失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	// 添加完整的浏览器请求头以避免被阻止
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Cache-Control", "no-cache")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		debugPrint("[错误] Yahoo HTTP请求失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 429 {
+		debugPrint("[调试] Yahoo API限流\n")
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		debugPrint("[错误] Yahoo读取响应失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	debugPrint("[调试] Yahoo响应: %s\n", string(body)[:200])
+
+	var yahooResp struct {
+		Chart struct {
+			Result []struct {
+				Meta struct {
+					Symbol               string  `json:"symbol"`
+					LongName             string  `json:"longName"`
+					ShortName            string  `json:"shortName"`
+					RegularMarketPrice   float64 `json:"regularMarketPrice"`
+					ChartPreviousClose   float64 `json:"chartPreviousClose"`
+					RegularMarketDayHigh float64 `json:"regularMarketDayHigh"`
+					RegularMarketDayLow  float64 `json:"regularMarketDayLow"`
+					RegularMarketVolume  int64   `json:"regularMarketVolume"`
+				} `json:"meta"`
+				Indicators struct {
+					Quote []struct {
+						Open   []float64 `json:"open"`
+						High   []float64 `json:"high"`
+						Low    []float64 `json:"low"`
+						Close  []float64 `json:"close"`
+						Volume []int64   `json:"volume"`
+					} `json:"quote"`
+				} `json:"indicators"`
+			} `json:"result"`
+			Error any `json:"error"`
+		} `json:"chart"`
+	}
+
+	if err := json.Unmarshal(body, &yahooResp); err != nil {
+		debugPrint("[错误] Yahoo JSON解析失败: %v\n", err)
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	if yahooResp.Chart.Error != nil {
+		debugPrint("[调试] Yahoo返回错误: %v\n", yahooResp.Chart.Error)
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	if len(yahooResp.Chart.Result) == 0 {
+		debugPrint("[调试] Yahoo无返回数据\n")
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	result := yahooResp.Chart.Result[0]
+	meta := result.Meta
+
+	if meta.RegularMarketPrice <= 0 {
+		debugPrint("[调试] Yahoo价格无效\n")
+		return &StockData{Symbol: symbol, Price: 0}
+	}
+
+	// 获取开盘价、最高价、最低价
+	var openPrice, highPrice, lowPrice float64
+	var volume int64
+
+	if len(result.Indicators.Quote) > 0 && len(result.Indicators.Quote[0].Open) > 0 {
+		openPrice = result.Indicators.Quote[0].Open[0]
+	}
+	if len(result.Indicators.Quote) > 0 && len(result.Indicators.Quote[0].High) > 0 {
+		highPrice = result.Indicators.Quote[0].High[0]
+	}
+	if len(result.Indicators.Quote) > 0 && len(result.Indicators.Quote[0].Low) > 0 {
+		lowPrice = result.Indicators.Quote[0].Low[0]
+	}
+	if len(result.Indicators.Quote) > 0 && len(result.Indicators.Quote[0].Volume) > 0 {
+		volume = result.Indicators.Quote[0].Volume[0]
+	}
+
+	// 如果没有从indicators获取到数据，使用meta中的数据
+	if highPrice == 0 {
+		highPrice = meta.RegularMarketDayHigh
+	}
+	if lowPrice == 0 {
+		lowPrice = meta.RegularMarketDayLow
+	}
+	if volume == 0 {
+		volume = meta.RegularMarketVolume
+	}
+
+	change := meta.RegularMarketPrice - meta.ChartPreviousClose
+	changePercent := 0.0
+	if meta.ChartPreviousClose > 0 {
+		changePercent = (change / meta.ChartPreviousClose) * 100
+	}
+
+	name := meta.LongName
+	if name == "" {
+		name = meta.ShortName
+	}
+	if name == "" {
+		name = symbol
+	}
+
+	debugPrint("[调试] Yahoo获取成功 - 名称: %s, 价格: %.2f, 涨跌: %.2f (%.2f%%), 开: %.2f, 高: %.2f, 低: %.2f, 量: %d\n",
+		name, meta.RegularMarketPrice, change, changePercent, openPrice, highPrice, lowPrice, volume)
+
+	return &StockData{
+		Symbol:        symbol,
+		Name:          name,
+		Price:         meta.RegularMarketPrice,
+		Change:        change,
+		ChangePercent: changePercent,
+		StartPrice:    openPrice,
+		MaxPrice:      highPrice,
+		MinPrice:      lowPrice,
+		PrevClose:     meta.ChartPreviousClose,
+		TurnoverRate:  0,
+		Volume:        volume,
+	}
 }
 
 func min(a, b int) int {
@@ -2263,14 +2805,6 @@ func debugPrint(format string, args ...any) {
 		timestamp := time.Now().Format("15:04:05")
 		logMsg := fmt.Sprintf("[%s] %s", timestamp, fmt.Sprintf(format, args...))
 		globalModel.addDebugLog(logMsg)
-	}
-}
-
-func (m *Model) debugPrint(format string, args ...any) {
-	if m.debugMode {
-		timestamp := time.Now().Format("15:04:05")
-		logMsg := fmt.Sprintf("[%s] %s", timestamp, fmt.Sprintf(format, args...))
-		m.addDebugLog(logMsg)
 	}
 }
 
@@ -2357,20 +2891,6 @@ func (m *Model) scrollPortfolioDown() {
 	}
 }
 
-func (m *Model) scrollPortfolioToTop() {
-	if len(m.portfolio.Stocks) > 0 {
-		m.portfolioScrollPos = len(m.portfolio.Stocks) - 1
-		m.portfolioCursor = 0 // 指向最早的股票
-	}
-}
-
-func (m *Model) scrollPortfolioToBottom() {
-	m.portfolioScrollPos = 0
-	if len(m.portfolio.Stocks) > 0 {
-		m.portfolioCursor = len(m.portfolio.Stocks) - 1 // 指向最新的股票
-	}
-}
-
 // ========== 自选列表滚动控制方法 ==========
 
 func (m *Model) scrollWatchlistUp() {
@@ -2389,22 +2909,6 @@ func (m *Model) scrollWatchlistDown() {
 	// 向下翻页：显示更新的股票，光标也向下移动
 	if m.watchlistCursor < len(filteredStocks)-1 {
 		m.watchlistCursor++
-		m.adjustWatchlistScroll(filteredStocks)
-	}
-}
-
-func (m *Model) scrollWatchlistToTop() {
-	filteredStocks := m.getFilteredWatchlist()
-	if len(filteredStocks) > 0 {
-		m.watchlistCursor = 0 // 指向第一个股票
-		m.adjustWatchlistScroll(filteredStocks)
-	}
-}
-
-func (m *Model) scrollWatchlistToBottom() {
-	filteredStocks := m.getFilteredWatchlist()
-	if len(filteredStocks) > 0 {
-		m.watchlistCursor = len(filteredStocks) - 1 // 指向最后一个股票
 		m.adjustWatchlistScroll(filteredStocks)
 	}
 }
@@ -3291,6 +3795,128 @@ func (m *Model) viewWatchlistGroupSelect() string {
 	return s
 }
 
+// 处理自选股票标签选择
+func (m *Model) handleWatchlistTagSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		// 根据当前选择的选项来执行操作
+		if m.tagSelectCursor == len(m.availableTags) {
+			// 选择了"手动输入新标签"选项
+			m.state = WatchlistTagging
+			m.tagInput = ""
+			return m, nil
+		} else if m.tagSelectCursor >= 0 && m.tagSelectCursor < len(m.availableTags) {
+			// 选择了现有标签
+			selectedTag := m.availableTags[m.tagSelectCursor]
+
+			// 更新当前选中股票的标签（基于过滤后的列表）
+			filteredStocks := m.getFilteredWatchlist()
+			if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+				stockToTag := filteredStocks[m.watchlistCursor]
+
+				// 在原始列表中找到该股票并更新标签
+				for i, stock := range m.watchlist.Stocks {
+					if stock.Code == stockToTag.Code {
+						m.watchlist.Stocks[i].Tag = selectedTag
+						break
+					}
+				}
+
+				m.invalidateWatchlistCache() // 使缓存失效
+				m.saveWatchlist()
+
+				if m.language == Chinese {
+					m.message = fmt.Sprintf("已将 %s 的标签设置为: %s",
+						stockToTag.Name, selectedTag)
+				} else {
+					m.message = fmt.Sprintf("Tag for %s set to: %s",
+						stockToTag.Name, selectedTag)
+				}
+			}
+
+			m.state = WatchlistViewing
+			m.tagInput = ""
+			m.resetWatchlistCursor() // 重置游标到第一只股票
+			return m, nil
+		}
+		return m, nil
+	case "esc", "q":
+		m.state = WatchlistViewing
+		m.tagInput = ""
+		m.message = ""
+		m.resetWatchlistCursor() // 重置游标到第一只股票
+		return m, nil
+	case "up", "k", "w":
+		if m.tagSelectCursor > 0 {
+			m.tagSelectCursor--
+		}
+		return m, nil
+	case "down", "j", "s":
+		maxCursor := len(m.availableTags) // 包括"手动输入新标签"选项
+		if m.tagSelectCursor < maxCursor {
+			m.tagSelectCursor++
+		}
+		return m, nil
+	}
+	return m, nil
+}
+
+// 标签选择视图
+func (m *Model) viewWatchlistTagSelect() string {
+	var s string
+
+	if m.language == Chinese {
+		s += "=== 选择或输入标签 ===\n\n"
+	} else {
+		s += "=== Select or Enter Tag ===\n\n"
+	}
+
+	filteredStocks := m.getFilteredWatchlist()
+	if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+		stock := filteredStocks[m.watchlistCursor]
+		if m.language == Chinese {
+			s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
+			s += fmt.Sprintf("当前标签: %s\n\n", stock.Tag)
+		} else {
+			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
+			s += fmt.Sprintf("Current tag: %s\n\n", stock.Tag)
+		}
+	}
+
+	// 显示现有标签选项
+	if len(m.availableTags) > 0 {
+		if m.language == Chinese {
+			s += "现有标签:\n"
+		} else {
+			s += "Existing tags:\n"
+		}
+
+		for i, tag := range m.availableTags {
+			cursor := "  "
+			if i == m.tagSelectCursor {
+				cursor = "► "
+			}
+			s += fmt.Sprintf("%s%s\n", cursor, tag)
+		}
+		s += "\n"
+	}
+
+	// 添加"手动输入新标签"选项
+	cursor := "  "
+	if m.tagSelectCursor == len(m.availableTags) {
+		cursor = "► "
+	}
+	if m.language == Chinese {
+		s += fmt.Sprintf("%s手动输入新标签\n\n", cursor)
+		s += "用↑↓键选择，Enter确认，ESC或Q键取消"
+	} else {
+		s += fmt.Sprintf("%sManually enter new tag\n\n", cursor)
+		s += "Use ↑↓ to select, Enter to confirm, ESC or Q to cancel"
+	}
+
+	return s
+}
+
 // 检查股票是否已在自选列表中
 func (m *Model) isStockInWatchlist(code string) bool {
 	for _, stock := range m.watchlist.Stocks {
@@ -3610,13 +4236,16 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = ""
 		return m, nil
 	case "t":
-		// 给当前选中的股票打标签
+		// 给当前选中的股票打标签 - 先进入标签选择界面
 		filteredStocks := m.getFilteredWatchlist()
 		if len(filteredStocks) == 0 {
 			m.message = m.getText("emptyWatchlist")
 			return m, nil
 		}
-		m.state = WatchlistTagging
+		// 获取所有可用标签
+		m.availableTags = m.getAvailableTags()
+		m.state = WatchlistTagSelect
+		m.tagSelectCursor = 0
 		m.tagInput = ""
 		m.message = ""
 		return m, nil
@@ -3736,8 +4365,8 @@ func (m *Model) viewWatchlistViewing() string {
 
 	for i := startIndex; i < endIndex; i++ {
 		watchStock := filteredStocks[i]
-		// 获取实时股价数据
-		stockData := getStockPrice(watchStock.Code)
+		// 从缓存获取股价数据（非阻塞）
+		stockData := m.getStockPriceFromCache(watchStock.Code)
 		// 从缓存获取资金流向数据（非阻塞）
 		fundFlowData := m.getFundFlowDataFromCache(watchStock.Code)
 
@@ -3762,13 +4391,13 @@ func (m *Model) viewWatchlistViewing() string {
 			// 成交量显示
 			volumeStr := formatVolume(stockData.Volume)
 
-			// 格式化资金流向数据，带单位显示
-			mainFlowStr := m.formatFundFlowWithColorAndUnit(fundFlowData.MainNetInflow)
-			superLargeStr := m.formatFundFlowWithColorAndUnit(fundFlowData.SuperLargeNetInflow)
-			largeStr := m.formatFundFlowWithColorAndUnit(fundFlowData.LargeNetInflow)
-			mediumStr := m.formatFundFlowWithColorAndUnit(fundFlowData.MediumNetInflow)
-			smallStr := m.formatFundFlowWithColorAndUnit(fundFlowData.SmallNetInflow)
-			flowRatioStr := m.formatProfitRateWithColorZeroLang(fundFlowData.NetInflowRatio)
+			// 格式化资金流向数据，带单位显示，对非A股显示"-"
+			mainFlowStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.MainNetInflow, watchStock.Code)
+			superLargeStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.SuperLargeNetInflow, watchStock.Code)
+			largeStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.LargeNetInflow, watchStock.Code)
+			mediumStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.MediumNetInflow, watchStock.Code)
+			smallStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.SmallNetInflow, watchStock.Code)
+			flowRatioStr := m.formatProfitRateWithColorZeroLangForStock(fundFlowData.NetInflowRatio, watchStock.Code)
 
 			// 光标列 - 检查光标是否在当前可见范围内且指向此行
 			cursorCol := ""
@@ -4056,14 +4685,6 @@ func (m *Model) bubbleSortPortfolio(field SortField, direction SortDirection) {
 				} else {
 					shouldSwap = stocks[j].Quantity < stocks[j+1].Quantity
 				}
-			case SortByTodayProfit:
-				todayProfitJ := stocks[j].Change * float64(stocks[j].Quantity)
-				todayProfitJplus1 := stocks[j+1].Change * float64(stocks[j+1].Quantity)
-				if direction == SortAsc {
-					shouldSwap = todayProfitJ > todayProfitJplus1
-				} else {
-					shouldSwap = todayProfitJ < todayProfitJplus1
-				}
 			case SortByTotalProfit:
 				totalProfitJ := (stocks[j].Price - stocks[j].CostPrice) * float64(stocks[j].Quantity)
 				totalProfitJplus1 := (stocks[j+1].Price - stocks[j+1].CostPrice) * float64(stocks[j+1].Quantity)
@@ -4248,8 +4869,6 @@ func (m *Model) getSortFieldName(field SortField) string {
 		return m.getText("sortChangePercent")
 	case SortByQuantity:
 		return m.getText("sortQuantity")
-	case SortByTodayProfit:
-		return m.getText("sortTodayProfit")
 	case SortByTotalProfit:
 		return m.getText("sortTotalProfit")
 	case SortByProfitRate:
@@ -4280,7 +4899,7 @@ func (m *Model) getPortfolioSortFields() []SortField {
 	return []SortField{
 		SortByCode, SortByName, SortByPrice, SortByCostPrice,
 		SortByChange, SortByChangePercent, SortByQuantity,
-		SortByTodayProfit, SortByTotalProfit, SortByProfitRate, SortByMarketValue,
+		SortByTotalProfit, SortByProfitRate, SortByMarketValue,
 	}
 }
 
@@ -4315,13 +4934,13 @@ func (m *Model) findSortFieldIndex(field SortField, isPortfolio bool) int {
 func (m *Model) getPortfolioHeaderWithSortIndicator() table.Row {
 	var baseHeaders table.Row
 	if m.language == Chinese {
-		baseHeaders = table.Row{"", "代码", "名称", "昨收价", "开盘", "最高", "最低", "现价", "成本价", "持股数", "今日涨幅", "今日盈亏", "持仓盈亏", "盈亏率", "市值"}
+		baseHeaders = table.Row{"", "代码", "名称", "昨收价", "开盘", "最高", "最低", "现价", "成本价", "持股数", "今日涨幅", "持仓盈亏", "盈亏率", "市值"}
 	} else {
-		baseHeaders = table.Row{"", "Code", "Name", "PrevClose", "Open", "High", "Low", "Price", "Cost", "Quantity", "Today%", "TodayP&L", "PositionP&L", "P&LRate", "Value"}
+		baseHeaders = table.Row{"", "Code", "Name", "PrevClose", "Open", "High", "Low", "Price", "Cost", "Quantity", "Today%", "PositionP&L", "P&LRate", "Value"}
 	}
 
 	// 排序字段到表头列索引的映射（跳过第一列的光标列）
-	// 新顺序：代码，名称，昨收价，开盘，最高，最低，现价，成本价，持股数，今日涨幅，今日盈亏，持仓盈亏，盈亏率，市值
+	// 新顺序：代码，名称，昨收价，开盘，最高，最低，现价，成本价，持股数，今日涨幅，持仓盈亏，盈亏率，市值
 	sortFieldToColumnIndex := map[SortField]int{
 		SortByCode:          1,  // 代码
 		SortByName:          2,  // 名称
@@ -4329,10 +4948,9 @@ func (m *Model) getPortfolioHeaderWithSortIndicator() table.Row {
 		SortByCostPrice:     8,  // 成本价
 		SortByQuantity:      9,  // 持股数
 		SortByChangePercent: 10, // 今日涨幅
-		SortByTodayProfit:   11, // 今日盈亏
-		SortByTotalProfit:   12, // 持仓盈亏
-		SortByProfitRate:    13, // 盈亏率
-		SortByMarketValue:   14, // 市值
+		SortByTotalProfit:   11, // 持仓盈亏
+		SortByProfitRate:    12, // 盈亏率
+		SortByMarketValue:   13, // 市值
 	}
 
 	// 添加排序指示器（只有在已排序状态下才显示）
@@ -4523,60 +5141,6 @@ func (m *Model) viewPortfolioSorting() string {
 
 	s += "\n" + m.getText("sortHelp") + "\n"
 	return s
-}
-
-// 测试排序功能的示例函数
-func testSortingFeatures() {
-	fmt.Println("=== 排序功能测试 ===")
-
-	// 创建测试数据
-	model := &Model{
-		portfolio: Portfolio{
-			Stocks: []Stock{
-				{Code: "SH601138", Name: "工业富联", Price: 71.36, CostPrice: 48.282, Quantity: 400},
-				{Code: "SZ000880", Name: "潍柴重机", Price: 32.85, CostPrice: 32.772, Quantity: 140},
-				{Code: "SH600143", Name: "金发科技", Price: 20.85, CostPrice: 21.72, Quantity: 100},
-			},
-		},
-		watchlist: Watchlist{
-			Stocks: []WatchlistStock{
-				{Code: "SH600410", Name: "华胜天成", Tag: "-"},
-				{Code: "SH600519", Name: "贵州茅台", Tag: "-"},
-				{Code: "SZ001309", Name: "德明利", Tag: "趋势"},
-			},
-		},
-		language: Chinese,
-	}
-
-	fmt.Println("\n原始持股列表:")
-	for i, stock := range model.portfolio.Stocks {
-		fmt.Printf("%d. %s (%s) - 现价: %.3f\n",
-			i+1, stock.Name, stock.Code, stock.Price)
-	}
-
-	// 按代码升序排序
-	fmt.Println("\n按代码升序排序后:")
-	model.bubbleSortPortfolio(SortByCode, SortAsc)
-	for i, stock := range model.portfolio.Stocks {
-		fmt.Printf("%d. %s (%s) - 现价: %.3f\n",
-			i+1, stock.Name, stock.Code, stock.Price)
-	}
-
-	fmt.Println("\n原始自选列表:")
-	for i, stock := range model.watchlist.Stocks {
-		fmt.Printf("%d. %s (%s) - 标签: %s\n",
-			i+1, stock.Name, stock.Code, stock.Tag)
-	}
-
-	// 按名称升序排序
-	fmt.Println("\n按名称升序排序后:")
-	model.bubbleSortWatchlist(SortByName, SortAsc)
-	for i, stock := range model.watchlist.Stocks {
-		fmt.Printf("%d. %s (%s) - 标签: %s\n",
-			i+1, stock.Name, stock.Code, stock.Tag)
-	}
-
-	fmt.Println("\n排序功能测试完成！")
 }
 
 // 排序菜单视图 - 自选列表
