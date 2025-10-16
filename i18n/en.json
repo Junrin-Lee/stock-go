@@ -19,7 +19,7 @@
   "returnToMenuShort": "ESC or Q to return to main menu",
   "returnEscOnly": "ESC to return",
   "holdingsHelp": "ESC, Q or M to return to main menu, E to edit stock, D to delete stock, A to add stock, S to sort(Asc/Desc) | ↑/↓:scroll",
-  "watchlistHelp": "ESC, Q or M to return to main menu, A to add stock, D to delete stock, S to sort(Asc/Desc), T to tag, G to group view, C to clear filter | ↑/↓:scroll",
+  "watchlistHelp": "ESC, Q or M to return to main menu, A to add stock, D to delete stock, S to sort(Asc/Desc), T to manage tags, G to group view, C to clear filter | ↑/↓:scroll",
   "monitoringTitle": "=== Real-time Stock Monitor ===",
   "updateTime": "Update Time(5s): %s",
   "emptyPortfolio": "Portfolio is empty",

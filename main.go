@@ -85,7 +85,7 @@ type StockPriceCacheEntry struct {
 type WatchlistStock struct {
 	Code     string   `json:"code"`
 	Name     string   `json:"name"`
-	Tag      string   `json:"tag"`       // 标签字段，默认为"-"
+	Tags     []string `json:"tags"`      // 标签字段，支持多个标签
 	FundFlow FundFlow `json:"fund_flow"` // 资金流向数据
 }
 
@@ -209,10 +209,14 @@ type Model struct {
 	watchlistCursor    int // 自选列表当前选中行
 
 	// For watchlist tagging and grouping
-	selectedTag     string   // 当前选择的标签过滤
-	availableTags   []string // 所有可用的标签列表
-	tagInput        string   // 标签输入框内容
-	tagSelectCursor int      // 标签选择界面的游标位置
+	selectedTag      string   // 当前选择的标签过滤
+	availableTags    []string // 所有可用的标签列表
+	tagInput         string   // 标签输入框内容
+	tagSelectCursor  int      // 标签选择界面的游标位置
+	currentStockTags []string // 当前选中股票的标签列表（用于删除管理）
+	tagManageCursor  int      // 标签管理界面的游标位置
+	tagRemoveCursor  int      // 标签删除选择界面的游标位置
+	isInRemoveMode   bool     // 是否处于删除模式
 
 	// Performance optimization - cached filtered watchlist
 	cachedFilteredWatchlist  []WatchlistStock // 缓存的过滤后自选列表
@@ -454,6 +458,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel, cmd = m.handleWatchlistTagging(msg)
 		case WatchlistTagSelect:
 			newModel, cmd = m.handleWatchlistTagSelect(msg)
+		case WatchlistTagManage:
+			newModel, cmd = m.handleWatchlistTagManage(msg)
+		case WatchlistTagRemoveSelect:
+			newModel, cmd = m.handleWatchlistTagRemoveSelect(msg)
 		case WatchlistGroupSelect:
 			newModel, cmd = m.handleWatchlistGroupSelect(msg)
 		case PortfolioSorting:
@@ -583,6 +591,10 @@ func (m *Model) View() string {
 		mainContent = m.viewWatchlistTagging()
 	case WatchlistTagSelect:
 		mainContent = m.viewWatchlistTagSelect()
+	case WatchlistTagManage:
+		mainContent = m.viewWatchlistTagManage()
+	case WatchlistTagRemoveSelect:
+		mainContent = m.viewWatchlistTagRemoveSelect()
 	case WatchlistGroupSelect:
 		mainContent = m.viewWatchlistGroupSelect()
 	case PortfolioSorting:
@@ -3471,6 +3483,19 @@ func (m *Model) viewLanguageSelection() string {
 
 // ========== 自选股票相关功能 ==========
 
+// 兼容性结构体 - 用于处理旧格式数据
+type WatchlistStockLegacy struct {
+	Code     string   `json:"code"`
+	Name     string   `json:"name"`
+	Tag      string   `json:"tag,omitempty"`  // 旧格式的单个标签
+	Tags     []string `json:"tags,omitempty"` // 新格式的多个标签
+	FundFlow FundFlow `json:"fund_flow"`      // 资金流向数据
+}
+
+type WatchlistLegacy struct {
+	Stocks []WatchlistStockLegacy `json:"stocks"`
+}
+
 // 加载自选股票列表
 func loadWatchlist() Watchlist {
 	data, err := os.ReadFile(watchlistFile)
@@ -3478,17 +3503,35 @@ func loadWatchlist() Watchlist {
 		return Watchlist{Stocks: []WatchlistStock{}}
 	}
 
-	var watchlist Watchlist
-	err = json.Unmarshal(data, &watchlist)
+	// 先尝试用兼容性结构体加载数据
+	var legacyWatchlist WatchlistLegacy
+	err = json.Unmarshal(data, &legacyWatchlist)
 	if err != nil {
 		return Watchlist{Stocks: []WatchlistStock{}}
 	}
 
-	// 为旧数据添加默认标签
-	for i := range watchlist.Stocks {
-		if watchlist.Stocks[i].Tag == "" {
-			watchlist.Stocks[i].Tag = "-"
+	// 转换为新格式
+	var watchlist Watchlist
+	for _, legacyStock := range legacyWatchlist.Stocks {
+		newStock := WatchlistStock{
+			Code:     legacyStock.Code,
+			Name:     legacyStock.Name,
+			FundFlow: legacyStock.FundFlow,
 		}
+
+		// 处理标签字段的兼容性
+		if len(legacyStock.Tags) > 0 {
+			// 新格式：直接使用 Tags 数组
+			newStock.Tags = legacyStock.Tags
+		} else if legacyStock.Tag != "" {
+			// 旧格式：将单个 Tag 转换为 Tags 数组
+			newStock.Tags = []string{legacyStock.Tag}
+		} else {
+			// 没有标签：使用默认标签
+			newStock.Tags = []string{"-"}
+		}
+
+		watchlist.Stocks = append(watchlist.Stocks, newStock)
 	}
 
 	return watchlist
@@ -3508,8 +3551,10 @@ func (m *Model) getAvailableTags() []string {
 	tagMap := make(map[string]bool)
 
 	for _, stock := range m.watchlist.Stocks {
-		if stock.Tag != "" {
-			tagMap[stock.Tag] = true
+		for _, tag := range stock.Tags {
+			if tag != "" && tag != "-" {
+				tagMap[tag] = true
+			}
 		}
 	}
 
@@ -3519,6 +3564,78 @@ func (m *Model) getAvailableTags() []string {
 	}
 
 	return tags
+}
+
+// 检查股票是否包含指定标签
+func (stock *WatchlistStock) hasTag(tag string) bool {
+	for _, t := range stock.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// 添加标签到股票（避免重复）
+func (stock *WatchlistStock) addTag(tag string) {
+	if tag == "" || tag == "-" {
+		return
+	}
+	if !stock.hasTag(tag) {
+		stock.Tags = append(stock.Tags, tag)
+	}
+}
+
+// 移除股票的标签
+func (stock *WatchlistStock) removeTag(tag string) {
+	for i, t := range stock.Tags {
+		if t == tag {
+			stock.Tags = append(stock.Tags[:i], stock.Tags[i+1:]...)
+			break
+		}
+	}
+}
+
+// 获取股票标签的显示字符串
+func (stock *WatchlistStock) getTagsDisplay() string {
+	if len(stock.Tags) == 0 {
+		return "-"
+	}
+
+	// 过滤掉空标签和默认标签
+	var validTags []string
+	for _, tag := range stock.Tags {
+		if tag != "" && tag != "-" {
+			validTags = append(validTags, tag)
+		}
+	}
+
+	if len(validTags) == 0 {
+		return "-"
+	}
+
+	if len(validTags) == 1 {
+		return validTags[0]
+	}
+
+	// 多个标签时，用逗号分隔，但如果太长则显示数量
+	display := validTags[0]
+	if len(validTags) > 1 {
+		totalLen := len(display)
+		for _, tag := range validTags[1:] {
+			totalLen += len(tag) + 1 // +1 for comma
+		}
+
+		if totalLen > 15 { // 如果总长度超过15字符，显示数量
+			return fmt.Sprintf("%s+%d", validTags[0], len(validTags)-1)
+		} else {
+			for _, tag := range validTags[1:] {
+				display += "," + tag
+			}
+		}
+	}
+
+	return display
 }
 
 // 根据标签过滤自选股票（带缓存优化）
@@ -3536,7 +3653,7 @@ func (m *Model) getFilteredWatchlist() []WatchlistStock {
 	// 重新计算过滤结果并缓存
 	var filtered []WatchlistStock
 	for _, stock := range m.watchlist.Stocks {
-		if stock.Tag == m.selectedTag {
+		if stock.hasTag(m.selectedTag) {
 			filtered = append(filtered, stock)
 		}
 	}
@@ -3630,7 +3747,11 @@ func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.tagInput == "" {
-			m.tagInput = "-" // 默认标签
+			// 回到标签管理界面
+			m.availableTags = m.getAvailableTags()
+			m.state = WatchlistTagManage
+			m.tagManageCursor = 0
+			return m, nil
 		}
 
 		// 更新当前选中股票的标签（基于过滤后的列表）
@@ -3638,10 +3759,29 @@ func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
 			stockToTag := filteredStocks[m.watchlistCursor]
 
-			// 在原始列表中找到该股票并更新标签
+			// 在原始列表中找到该股票并添加标签
 			for i, stock := range m.watchlist.Stocks {
 				if stock.Code == stockToTag.Code {
-					m.watchlist.Stocks[i].Tag = m.tagInput
+					// 处理多个标签（逗号分隔）
+					newTags := strings.Split(m.tagInput, ",")
+					for _, tag := range newTags {
+						tag = strings.TrimSpace(tag)
+						if tag != "" && tag != "-" {
+							m.watchlist.Stocks[i].addTag(tag)
+						}
+					}
+					// 如果没有有效标签，确保至少有默认标签
+					if len(m.watchlist.Stocks[i].Tags) == 0 {
+						m.watchlist.Stocks[i].Tags = []string{"-"}
+					}
+
+					// 更新当前股票标签列表
+					m.currentStockTags = make([]string, 0)
+					for _, tag := range m.watchlist.Stocks[i].Tags {
+						if tag != "" && tag != "-" {
+							m.currentStockTags = append(m.currentStockTags, tag)
+						}
+					}
 					break
 				}
 			}
@@ -3650,23 +3790,27 @@ func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.saveWatchlist()
 
 			if m.language == Chinese {
-				m.message = fmt.Sprintf("已将 %s 的标签设置为: %s",
+				m.message = fmt.Sprintf("已为 %s 添加标签: %s",
 					stockToTag.Name, m.tagInput)
 			} else {
-				m.message = fmt.Sprintf("Tag for %s set to: %s",
+				m.message = fmt.Sprintf("Added tags to %s: %s",
 					stockToTag.Name, m.tagInput)
 			}
 		}
 
-		m.state = WatchlistViewing
+		// 回到标签管理界面，更新可用标签列表
+		m.availableTags = m.getAvailableTags()
+		m.state = WatchlistTagManage
+		m.tagManageCursor = 0
 		m.tagInput = ""
-		m.resetWatchlistCursor() // 重置游标到第一只股票
 		return m, nil
 	case "esc", "q":
-		m.state = WatchlistViewing
+		// 回到标签管理界面
+		m.availableTags = m.getAvailableTags()
+		m.state = WatchlistTagManage
+		m.tagManageCursor = 0
 		m.tagInput = ""
 		m.message = ""
-		m.resetWatchlistCursor() // 重置游标到第一只股票
 		return m, nil
 	case "backspace":
 		if len(m.tagInput) > 0 {
@@ -3743,13 +3887,13 @@ func (m *Model) viewWatchlistTagging() string {
 		stock := filteredStocks[m.watchlistCursor]
 		if m.language == Chinese {
 			s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("当前标签: %s\n\n", stock.Tag)
-			s += "请输入新标签: " + m.tagInput + "_\n\n"
+			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay())
+			s += "请输入新标签(多个标签用逗号分隔): " + m.tagInput + "_\n\n"
 			s += "按Enter确认，ESC或Q键取消"
 		} else {
 			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("Current tag: %s\n\n", stock.Tag)
-			s += "Enter new tag: " + m.tagInput + "_\n\n"
+			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay())
+			s += "Enter new tags (comma separated): " + m.tagInput + "_\n\n"
 			s += "Press Enter to confirm, ESC or Q to cancel"
 		}
 	}
@@ -3814,10 +3958,10 @@ func (m *Model) handleWatchlistTagSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
 				stockToTag := filteredStocks[m.watchlistCursor]
 
-				// 在原始列表中找到该股票并更新标签
+				// 在原始列表中找到该股票并添加标签
 				for i, stock := range m.watchlist.Stocks {
 					if stock.Code == stockToTag.Code {
-						m.watchlist.Stocks[i].Tag = selectedTag
+						m.watchlist.Stocks[i].addTag(selectedTag)
 						break
 					}
 				}
@@ -3826,10 +3970,10 @@ func (m *Model) handleWatchlistTagSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.saveWatchlist()
 
 				if m.language == Chinese {
-					m.message = fmt.Sprintf("已将 %s 的标签设置为: %s",
+					m.message = fmt.Sprintf("已为 %s 添加标签: %s",
 						stockToTag.Name, selectedTag)
 				} else {
-					m.message = fmt.Sprintf("Tag for %s set to: %s",
+					m.message = fmt.Sprintf("Added tag to %s: %s",
 						stockToTag.Name, selectedTag)
 				}
 			}
@@ -3837,6 +3981,41 @@ func (m *Model) handleWatchlistTagSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = WatchlistViewing
 			m.tagInput = ""
 			m.resetWatchlistCursor() // 重置游标到第一只股票
+			return m, nil
+		}
+		return m, nil
+	case "d":
+		// 进入标签删除选择模式
+		filteredStocks := m.getFilteredWatchlist()
+		if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+			stockToModify := filteredStocks[m.watchlistCursor]
+
+			// 获取该股票的有效标签（排除默认标签）
+			var validTags []string
+			for _, stock := range m.watchlist.Stocks {
+				if stock.Code == stockToModify.Code {
+					for _, tag := range stock.Tags {
+						if tag != "" && tag != "-" {
+							validTags = append(validTags, tag)
+						}
+					}
+					break
+				}
+			}
+
+			if len(validTags) == 0 {
+				if m.language == Chinese {
+					m.message = fmt.Sprintf("%s 没有可删除的标签", stockToModify.Name)
+				} else {
+					m.message = fmt.Sprintf("%s has no tags to remove", stockToModify.Name)
+				}
+				return m, nil
+			}
+
+			// 设置删除标签的状态
+			m.currentStockTags = validTags
+			m.tagRemoveCursor = 0
+			m.state = WatchlistTagRemoveSelect
 			return m, nil
 		}
 		return m, nil
@@ -3866,9 +4045,9 @@ func (m *Model) viewWatchlistTagSelect() string {
 	var s string
 
 	if m.language == Chinese {
-		s += "=== 选择或输入标签 ===\n\n"
+		s += "=== 管理标签 ===\n\n"
 	} else {
-		s += "=== Select or Enter Tag ===\n\n"
+		s += "=== Manage Tags ===\n\n"
 	}
 
 	filteredStocks := m.getFilteredWatchlist()
@@ -3876,19 +4055,59 @@ func (m *Model) viewWatchlistTagSelect() string {
 		stock := filteredStocks[m.watchlistCursor]
 		if m.language == Chinese {
 			s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("当前标签: %s\n\n", stock.Tag)
+			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay())
+
+			// 显示该股票的标签，供删除使用
+			if len(stock.Tags) > 0 {
+				hasValidTags := false
+				for _, tag := range stock.Tags {
+					if tag != "" && tag != "-" {
+						hasValidTags = true
+						break
+					}
+				}
+				if hasValidTags {
+					s += "当前标签(按D键删除):\n"
+					for _, tag := range stock.Tags {
+						if tag != "" && tag != "-" {
+							s += fmt.Sprintf("  • %s\n", tag)
+						}
+					}
+					s += "\n"
+				}
+			}
 		} else {
 			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("Current tag: %s\n\n", stock.Tag)
+			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay())
+
+			// 显示该股票的标签，供删除使用
+			if len(stock.Tags) > 0 {
+				hasValidTags := false
+				for _, tag := range stock.Tags {
+					if tag != "" && tag != "-" {
+						hasValidTags = true
+						break
+					}
+				}
+				if hasValidTags {
+					s += "Current tags (press D to remove):\n"
+					for _, tag := range stock.Tags {
+						if tag != "" && tag != "-" {
+							s += fmt.Sprintf("  • %s\n", tag)
+						}
+					}
+					s += "\n"
+				}
+			}
 		}
 	}
 
 	// 显示现有标签选项
 	if len(m.availableTags) > 0 {
 		if m.language == Chinese {
-			s += "现有标签:\n"
+			s += "可添加的系统标签:\n"
 		} else {
-			s += "Existing tags:\n"
+			s += "Available system tags to add:\n"
 		}
 
 		for i, tag := range m.availableTags {
@@ -3908,10 +4127,365 @@ func (m *Model) viewWatchlistTagSelect() string {
 	}
 	if m.language == Chinese {
 		s += fmt.Sprintf("%s手动输入新标签\n\n", cursor)
-		s += "用↑↓键选择，Enter确认，ESC或Q键取消"
+		s += "操作: ↑↓选择 Enter添加标签 D进入删除模式 ESC/Q取消"
 	} else {
 		s += fmt.Sprintf("%sManually enter new tag\n\n", cursor)
-		s += "Use ↑↓ to select, Enter to confirm, ESC or Q to cancel"
+		s += "Actions: ↑↓ select, Enter add tag, D enter remove mode, ESC/Q cancel"
+	}
+
+	return s
+}
+
+// ========== 新的标签管理界面 ==========
+
+// 处理标签管理界面
+func (m *Model) handleWatchlistTagManage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q":
+		m.state = WatchlistViewing
+		m.message = ""
+		m.resetWatchlistCursor()
+		return m, nil
+	case "n":
+		// 手动输入新标签
+		m.state = WatchlistTagging
+		m.tagInput = ""
+		return m, nil
+	case "d":
+		// 删除当前选中的标签（如果当前股票拥有该标签）
+		if len(m.availableTags) == 0 {
+			if m.language == Chinese {
+				m.message = "没有可删除的标签"
+			} else {
+				m.message = "No tags to remove"
+			}
+			return m, nil
+		}
+
+		// 获取当前选中的标签
+		selectedTag := m.availableTags[m.tagManageCursor]
+
+		// 检查当前股票是否拥有这个标签
+		filteredStocks := m.getFilteredWatchlist()
+		if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+			currentStock := filteredStocks[m.watchlistCursor]
+
+			// 查找并删除标签
+			stockFound := false
+			for i, stock := range m.watchlist.Stocks {
+				if stock.Code == currentStock.Code {
+					if stock.hasTag(selectedTag) {
+						m.watchlist.Stocks[i].removeTag(selectedTag)
+						m.saveWatchlist()
+						m.invalidateWatchlistCache()
+
+						// 更新当前股票标签列表
+						m.currentStockTags = make([]string, 0)
+						for _, tag := range m.watchlist.Stocks[i].Tags {
+							if tag != "" && tag != "-" {
+								m.currentStockTags = append(m.currentStockTags, tag)
+							}
+						}
+
+						// 更新可用标签列表
+						m.availableTags = m.getAvailableTags()
+
+						// 调整光标位置
+						if m.tagManageCursor >= len(m.availableTags) && len(m.availableTags) > 0 {
+							m.tagManageCursor = len(m.availableTags) - 1
+						}
+
+						if m.language == Chinese {
+							m.message = fmt.Sprintf("已删除标签: %s", selectedTag)
+						} else {
+							m.message = fmt.Sprintf("Removed tag: %s", selectedTag)
+						}
+						stockFound = true
+					} else {
+						if m.language == Chinese {
+							m.message = fmt.Sprintf("该股票没有标签: %s", selectedTag)
+						} else {
+							m.message = fmt.Sprintf("Stock doesn't have tag: %s", selectedTag)
+						}
+						stockFound = true
+					}
+					break
+				}
+			}
+
+			if !stockFound {
+				if m.language == Chinese {
+					m.message = "找不到对应的股票"
+				} else {
+					m.message = "Stock not found"
+				}
+			}
+		}
+		return m, nil
+	case "up", "k", "w":
+		if len(m.availableTags) > 0 && m.tagManageCursor > 0 {
+			m.tagManageCursor--
+		}
+		return m, nil
+	case "down", "j", "s":
+		if len(m.availableTags) > 0 && m.tagManageCursor < len(m.availableTags)-1 {
+			m.tagManageCursor++
+		}
+		return m, nil
+	case "enter":
+		// 为当前股票添加选中的标签
+		if len(m.availableTags) == 0 {
+			if m.language == Chinese {
+				m.message = "没有可添加的标签，按N键创建新标签"
+			} else {
+				m.message = "No tags to add, press N to create new tag"
+			}
+			return m, nil
+		}
+
+		selectedTag := m.availableTags[m.tagManageCursor]
+
+		// 获取当前选中的股票
+		filteredStocks := m.getFilteredWatchlist()
+		if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+			currentStock := filteredStocks[m.watchlistCursor]
+
+			// 查找并添加标签
+			stockFound := false
+			for i, stock := range m.watchlist.Stocks {
+				if stock.Code == currentStock.Code {
+					if !stock.hasTag(selectedTag) {
+						m.watchlist.Stocks[i].addTag(selectedTag)
+						m.saveWatchlist()
+						m.invalidateWatchlistCache()
+
+						// 更新当前股票标签列表
+						m.currentStockTags = make([]string, 0)
+						for _, tag := range m.watchlist.Stocks[i].Tags {
+							if tag != "" && tag != "-" {
+								m.currentStockTags = append(m.currentStockTags, tag)
+							}
+						}
+
+						if m.language == Chinese {
+							m.message = fmt.Sprintf("已添加标签: %s", selectedTag)
+						} else {
+							m.message = fmt.Sprintf("Added tag: %s", selectedTag)
+						}
+					} else {
+						if m.language == Chinese {
+							m.message = fmt.Sprintf("该股票已有标签: %s", selectedTag)
+						} else {
+							m.message = fmt.Sprintf("Stock already has tag: %s", selectedTag)
+						}
+					}
+					stockFound = true
+					break
+				}
+			}
+
+			if !stockFound {
+				if m.language == Chinese {
+					m.message = "找不到对应的股票"
+				} else {
+					m.message = "Stock not found"
+				}
+			}
+		}
+		return m, nil
+	}
+	return m, nil
+}
+
+// 处理标签删除选择界面
+func (m *Model) handleWatchlistTagRemoveSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q":
+		m.state = WatchlistTagManage
+		return m, nil
+	case "enter":
+		if m.tagRemoveCursor >= 0 && m.tagRemoveCursor < len(m.currentStockTags) {
+			tagToRemove := m.currentStockTags[m.tagRemoveCursor]
+
+			// 从当前股票中删除选中的标签
+			filteredStocks := m.getFilteredWatchlist()
+			if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+				stockToModify := filteredStocks[m.watchlistCursor]
+
+				// 在原始列表中找到该股票并删除指定标签
+				for i, stock := range m.watchlist.Stocks {
+					if stock.Code == stockToModify.Code {
+						m.watchlist.Stocks[i].removeTag(tagToRemove)
+						// 如果删除后没有标签，添加默认标签
+						if len(m.watchlist.Stocks[i].Tags) == 0 {
+							m.watchlist.Stocks[i].Tags = []string{"-"}
+						}
+						break
+					}
+				}
+
+				m.invalidateWatchlistCache()
+				m.saveWatchlist()
+
+				// 更新当前股票标签列表
+				m.currentStockTags = make([]string, 0)
+				for _, stock := range m.watchlist.Stocks {
+					if stock.Code == stockToModify.Code {
+						for _, tag := range stock.Tags {
+							if tag != "" && tag != "-" {
+								m.currentStockTags = append(m.currentStockTags, tag)
+							}
+						}
+						break
+					}
+				}
+
+				if m.language == Chinese {
+					m.message = fmt.Sprintf("已从 %s 删除标签: %s", stockToModify.Name, tagToRemove)
+				} else {
+					m.message = fmt.Sprintf("Removed tag from %s: %s", stockToModify.Name, tagToRemove)
+				}
+
+				// 如果没有更多标签可删除，返回标签管理界面
+				if len(m.currentStockTags) == 0 {
+					m.state = WatchlistTagManage
+				} else {
+					// 调整光标位置
+					if m.tagRemoveCursor >= len(m.currentStockTags) {
+						m.tagRemoveCursor = len(m.currentStockTags) - 1
+					}
+				}
+			}
+		}
+		return m, nil
+	case "up", "k", "w":
+		if m.tagRemoveCursor > 0 {
+			m.tagRemoveCursor--
+		}
+		return m, nil
+	case "down", "j", "s":
+		if m.tagRemoveCursor < len(m.currentStockTags)-1 {
+			m.tagRemoveCursor++
+		}
+		return m, nil
+	}
+	return m, nil
+}
+
+// 标签管理界面视图
+func (m *Model) viewWatchlistTagManage() string {
+	var s string
+
+	if m.language == Chinese {
+		s += "=== 标签管理 ===\n\n"
+	} else {
+		s += "=== Tag Management ===\n\n"
+	}
+
+	filteredStocks := m.getFilteredWatchlist()
+	if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+		stock := filteredStocks[m.watchlistCursor]
+		if m.language == Chinese {
+			s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
+			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay())
+		} else {
+			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
+			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay())
+		}
+
+		// 显示所有可用标签，标记当前股票拥有的标签
+		if len(m.availableTags) > 0 {
+			if m.language == Chinese {
+				s += "所有可用标签:\n"
+			} else {
+				s += "All available tags:\n"
+			}
+
+			for i, tag := range m.availableTags {
+				cursor := "  "
+				if i == m.tagManageCursor {
+					cursor = "► "
+				}
+
+				// 检查当前股票是否拥有这个标签
+				hasTag := stock.hasTag(tag)
+				status := ""
+				if hasTag {
+					if m.language == Chinese {
+						status = " ✓ (已拥有)"
+					} else {
+						status = " ✓ (owned)"
+					}
+				}
+
+				s += fmt.Sprintf("%s%s%s\n", cursor, tag, status)
+			}
+			s += "\n"
+		} else {
+			if m.language == Chinese {
+				s += "暂无可用标签，按N键创建新标签\n\n"
+			} else {
+				s += "No available tags, press N to create new tag\n\n"
+			}
+		}
+
+		// 操作提示
+		if m.language == Chinese {
+			s += "操作说明:\n"
+			s += "  ↑↓ - 选择标签\n"
+			s += "  Enter - 添加/切换选中标签\n"
+			s += "  D - 删除选中标签(如果当前股票拥有)\n"
+			s += "  N - 创建新标签\n"
+			s += "  ESC/Q - 返回自选列表\n"
+		} else {
+			s += "Actions:\n"
+			s += "  ↑↓ - Select tag\n"
+			s += "  Enter - Add/toggle selected tag\n"
+			s += "  D - Remove selected tag (if owned by current stock)\n"
+			s += "  N - Create new tag\n"
+			s += "  ESC/Q - Return to watchlist\n"
+		}
+	}
+
+	return s
+}
+
+// 标签删除选择界面视图
+func (m *Model) viewWatchlistTagRemoveSelect() string {
+	var s string
+
+	if m.language == Chinese {
+		s += "=== 选择要删除的标签 ===\n\n"
+	} else {
+		s += "=== Select Tag to Remove ===\n\n"
+	}
+
+	filteredStocks := m.getFilteredWatchlist()
+	if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
+		stock := filteredStocks[m.watchlistCursor]
+		if m.language == Chinese {
+			s += fmt.Sprintf("股票: %s (%s)\n\n", stock.Name, stock.Code)
+			s += "请选择要删除的标签:\n\n"
+		} else {
+			s += fmt.Sprintf("Stock: %s (%s)\n\n", stock.Name, stock.Code)
+			s += "Select tag to remove:\n\n"
+		}
+
+		// 显示可删除的标签
+		for i, tag := range m.currentStockTags {
+			cursor := "  "
+			if i == m.tagRemoveCursor {
+				cursor = "► "
+			}
+			s += fmt.Sprintf("%s%s\n", cursor, tag)
+		}
+
+		s += "\n"
+		if m.language == Chinese {
+			s += "操作: ↑↓选择标签 Enter删除 ESC/Q取消"
+		} else {
+			s += "Actions: ↑↓ select tag, Enter remove, ESC/Q cancel"
+		}
 	}
 
 	return s
@@ -3936,7 +4510,7 @@ func (m *Model) addToWatchlist(code, name string) bool {
 	watchStock := WatchlistStock{
 		Code: code,
 		Name: name,
-		Tag:  "-", // 默认标签
+		Tags: []string{"-"}, // 默认标签
 	}
 	// 将新股票插入到列表首位，而不是末尾
 	m.watchlist.Stocks = append([]WatchlistStock{watchStock}, m.watchlist.Stocks...)
@@ -4236,17 +4810,28 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = ""
 		return m, nil
 	case "t":
-		// 给当前选中的股票打标签 - 先进入标签选择界面
+		// 给当前选中的股票管理标签 - 进入标签管理界面
 		filteredStocks := m.getFilteredWatchlist()
 		if len(filteredStocks) == 0 {
 			m.message = m.getText("emptyWatchlist")
 			return m, nil
 		}
+
+		// 获取当前选中股票的标签信息
+		currentStock := filteredStocks[m.watchlistCursor]
+		m.currentStockTags = make([]string, 0)
+		for _, tag := range currentStock.Tags {
+			if tag != "" && tag != "-" {
+				m.currentStockTags = append(m.currentStockTags, tag)
+			}
+		}
+
 		// 获取所有可用标签
 		m.availableTags = m.getAvailableTags()
-		m.state = WatchlistTagSelect
-		m.tagSelectCursor = 0
+		m.state = WatchlistTagManage
+		m.tagManageCursor = 0
 		m.tagInput = ""
+		m.isInRemoveMode = false
 		m.message = ""
 		return m, nil
 	case "g":
@@ -4407,7 +4992,7 @@ func (m *Model) viewWatchlistViewing() string {
 
 			t.AppendRow(table.Row{
 				cursorCol,
-				watchStock.Tag, // 显示标签
+				watchStock.getTagsDisplay(), // 显示标签
 				watchStock.Code,
 				watchStock.Name,
 				m.formatPriceWithColorLang(stockData.Price, stockData.PrevClose),
@@ -4435,7 +5020,7 @@ func (m *Model) viewWatchlistViewing() string {
 
 			t.AppendRow(table.Row{
 				cursorCol,
-				watchStock.Tag, // 显示标签
+				watchStock.getTagsDisplay(), // 显示标签
 				watchStock.Code,
 				watchStock.Name,
 				"-",
@@ -4757,9 +5342,9 @@ func (m *Model) bubbleSortWatchlist(field SortField, direction SortDirection) {
 				}
 			case SortByTag:
 				if direction == SortAsc {
-					shouldSwap = stocksWithData[j].Stock.Tag > stocksWithData[j+1].Stock.Tag
+					shouldSwap = stocksWithData[j].Stock.getTagsDisplay() > stocksWithData[j+1].Stock.getTagsDisplay()
 				} else {
-					shouldSwap = stocksWithData[j].Stock.Tag < stocksWithData[j+1].Stock.Tag
+					shouldSwap = stocksWithData[j].Stock.getTagsDisplay() < stocksWithData[j+1].Stock.getTagsDisplay()
 				}
 			case SortByPrice:
 				priceJ := float64(0)
@@ -4843,7 +5428,7 @@ func (m *Model) bubbleSortWatchlist(field SortField, direction SortDirection) {
 	// 再添加不在过滤条件内的股票
 	if m.selectedTag != "" {
 		for _, stock := range m.watchlist.Stocks {
-			if stock.Tag != m.selectedTag {
+			if !stock.hasTag(m.selectedTag) {
 				newWatchlist = append(newWatchlist, stock)
 			}
 		}

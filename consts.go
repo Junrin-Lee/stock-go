@@ -32,11 +32,13 @@ const (
 	WatchlistViewing
 	SearchResultWithActions
 	WatchlistSearchConfirm
-	WatchlistTagging     // 自选股票打标签状态
-	WatchlistTagSelect   // 自选股票标签选择状态
-	WatchlistGroupSelect // 自选股票分组选择状态
-	PortfolioSorting     // 持股列表排序状态
-	WatchlistSorting     // 自选列表排序状态
+	WatchlistTagging         // 自选股票打标签状态
+	WatchlistTagSelect       // 自选股票标签选择状态
+	WatchlistTagManage       // 自选股票标签管理状态（显示当前股票的所有标签）
+	WatchlistTagRemoveSelect // 自选股票标签删除选择状态
+	WatchlistGroupSelect     // 自选股票分组选择状态
+	PortfolioSorting         // 持股列表排序状态
+	WatchlistSorting         // 自选列表排序状态
 )
 
 // 排序字段枚举

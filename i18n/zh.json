@@ -19,7 +19,7 @@
   "returnToMenuShort": "ESC或Q键返回主菜单",
   "returnEscOnly": "ESC键返回",
   "holdingsHelp": "ESC、Q键或M键返回主菜单，E键修改股票，D键删除股票，A键添加股票，S键排序(升/降序) | ↑/↓:翻页",
-  "watchlistHelp": "ESC、Q键或M键返回主菜单，A键添加股票，D键删除股票，S键排序(升/降序)，T键打标签，G键分组查看，C键清除过滤 | ↑/↓:翻页",
+  "watchlistHelp": "ESC、Q键或M键返回主菜单，A键添加股票，D键删除股票，S键排序(升/降序)，T键管理标签，G键分组查看，C键清除过滤 | ↑/↓:翻页",
   "monitoringTitle": "=== 股票实时监控 ===",
   "updateTime": "更新时间(5s): %s",
   "emptyPortfolio": "投资组合为空",
