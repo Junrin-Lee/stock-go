@@ -276,7 +276,7 @@ func (m *Model) getText(key string) string {
 	return key // 最后备用返回key本身
 }
 
-// 获取菜单项
+// 获取主菜单项
 func (m *Model) getMenuItems() []string {
 	return []string{
 		m.getText("stockList"),
@@ -694,7 +694,7 @@ func (m *Model) viewMainMenu() string {
 			prefix = "► "
 		}
 
-		if i == 3 { // 调试模式
+		if item == "debugMode" {
 			debugStatus := m.getText("off")
 			if m.debugMode {
 				debugStatus = m.getText("on")
@@ -717,7 +717,7 @@ func (m *Model) viewMainMenu() string {
 	} else {
 		s += m.getText("keyHelp") + "\n"
 	}
-	s += "=========================\n"
+	s += "==================================================\n"
 
 	if m.message != "" {
 		s += "\n" + m.message + "\n"
@@ -1894,7 +1894,7 @@ func searchStockBySinaAPI(keyword string) *StockData {
 	}
 
 	content := string(body)
-	debugPrint("[调试] 新浪财经搜索API响应: %s\n", content[:min(200, len(content))])
+	debugPrint("[调试] 新浪财经搜索API响应: %s\n", content)
 
 	// 解析新浪搜索结果
 	return parseSinaSearchResults(content, keyword)
@@ -2690,7 +2690,7 @@ func tryYahooFinanceAPI(symbol string) *StockData {
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
-	debugPrint("[调试] Yahoo响应: %s\n", string(body)[:200])
+	debugPrint("[调试] Yahoo响应: %s\n", string(body))
 
 	var yahooResp struct {
 		Chart struct {
