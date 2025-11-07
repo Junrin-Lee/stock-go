@@ -646,7 +646,22 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.message = ""
 		m.lastUpdate = time.Now()
-		return m, m.tickCmd()
+
+		// 立即启动数据更新，而不等待定时器
+		var cmds []tea.Cmd
+		cmds = append(cmds, m.tickCmd())
+
+		// 强制启动股价数据更新
+		if stockPriceCmd := m.startStockPriceUpdates(); stockPriceCmd != nil {
+			cmds = append(cmds, stockPriceCmd)
+		}
+
+		// 强制启动资金流向数据更新
+		if fundFlowCmd := m.startFundFlowUpdates(); fundFlowCmd != nil {
+			cmds = append(cmds, fundFlowCmd)
+		}
+
+		return m, tea.Batch(cmds...)
 	case 2: // 股票搜索
 		m.logUserAction("进入股票搜索页面")
 		m.state = SearchingStock
@@ -2097,29 +2112,6 @@ func getFundFlowDataSync(symbol string) *FundFlow {
 	return &fundFlow
 }
 
-// 异步获取单个股票的资金流向数据
-func (m *Model) fetchFundFlowDataAsync(symbol string) tea.Cmd {
-	return tea.Tick(time.Millisecond, func(t time.Time) tea.Msg {
-		// 调用Python脚本获取AKShare数据
-		cmd := exec.Command("venv/bin/python", "scripts/akshare_fund_flow.py", symbol)
-		output, err := cmd.Output()
-		if err != nil {
-			debugPrint("[错误] AKShare资金流向获取失败 %s: %v\n", symbol, err)
-			return fundFlowUpdateMsg{Symbol: symbol, Data: nil, Error: err}
-		}
-
-		var fundFlow FundFlow
-		err = json.Unmarshal(output, &fundFlow)
-		if err != nil {
-			debugPrint("[错误] 解析资金流向数据失败 %s: %v\n", symbol, err)
-			return fundFlowUpdateMsg{Symbol: symbol, Data: nil, Error: err}
-		}
-
-		debugPrint("[信息] 资金流向数据获取成功: %s\n", symbol)
-		return fundFlowUpdateMsg{Symbol: symbol, Data: &fundFlow, Error: nil}
-	})
-}
-
 // 启动异步资金流向数据更新（1分钟间隔）
 func (m *Model) startFundFlowUpdates() tea.Cmd {
 	// 检查是否需要开始新的更新周期
@@ -2162,8 +2154,27 @@ func (m *Model) startFundFlowUpdates() tea.Cmd {
 
 		// 为每个股票添加一个延迟，避免同时请求太多
 		delay := time.Duration(len(cmds)) * 200 * time.Millisecond
+		// 修复闭包问题：将code变量复制到局部变量
+		stockCode := code
 		cmds = append(cmds, tea.Tick(delay, func(t time.Time) tea.Msg {
-			return m.fetchFundFlowDataAsync(code)()
+			// 直接在这里执行获取操作
+			// 调用Python脚本获取AKShare数据
+			cmd := exec.Command("venv/bin/python", "scripts/akshare_fund_flow.py", stockCode)
+			output, err := cmd.Output()
+			if err != nil {
+				debugPrint("[错误] AKShare资金流向获取失败 %s: %v\n", stockCode, err)
+				return fundFlowUpdateMsg{Symbol: stockCode, Data: nil, Error: err}
+			}
+
+			var fundFlow FundFlow
+			err = json.Unmarshal(output, &fundFlow)
+			if err != nil {
+				debugPrint("[错误] 解析资金流向数据失败 %s: %v\n", stockCode, err)
+				return fundFlowUpdateMsg{Symbol: stockCode, Data: nil, Error: err}
+			}
+
+			debugPrint("[信息] 资金流向数据获取成功: %s\n", stockCode)
+			return fundFlowUpdateMsg{Symbol: stockCode, Data: &fundFlow, Error: nil}
 		}))
 	}
 
@@ -2174,6 +2185,7 @@ func (m *Model) startFundFlowUpdates() tea.Cmd {
 func (m *Model) startStockPriceUpdates() tea.Cmd {
 	// 检查是否需要开始新的更新周期
 	if time.Since(m.stockPriceUpdateTime) < 5*time.Second {
+		debugPrint("[调试] 股价更新间隔未到，跳过更新 (距上次更新: %v)\n", time.Since(m.stockPriceUpdateTime))
 		return nil // 还未到更新时间
 	}
 
@@ -2192,6 +2204,7 @@ func (m *Model) startStockPriceUpdates() tea.Cmd {
 	}
 
 	if len(stockCodes) == 0 {
+		debugPrint("[调试] 没有需要更新的股票代码，跳过股价更新\n")
 		return nil
 	}
 
@@ -2207,6 +2220,8 @@ func (m *Model) startStockPriceUpdates() tea.Cmd {
 
 	// 更新开始时间
 	m.stockPriceUpdateTime = time.Now()
+
+	debugPrint("[调试] 开始股价异步更新，共 %d 个股票代码\n", len(uniqueStockCodes))
 
 	// 逐个发起异步获取请求
 	var cmds []tea.Cmd
@@ -2226,35 +2241,44 @@ func (m *Model) startStockPriceUpdates() tea.Cmd {
 
 		// 为每个股票添加一个延迟，避免同时请求太多
 		delay := time.Duration(len(cmds)) * 100 * time.Millisecond
+		// 修复闭包问题：将code变量复制到局部变量
+		stockCode := code
 		cmds = append(cmds, tea.Tick(delay, func(t time.Time) tea.Msg {
-			return m.fetchStockPriceAsync(code)()
+			// 直接在这里执行获取操作，而不是返回Command
+			data := getStockPrice(stockCode)
+
+			// 更新缓存
+			m.stockPriceMutex.Lock()
+			defer m.stockPriceMutex.Unlock()
+
+			// 只有在成功获取数据时才更新缓存
+			if data != nil && data.Price > 0 {
+				m.stockPriceCache[stockCode] = &StockPriceCacheEntry{
+					Data:       data,
+					UpdateTime: time.Now(),
+					IsUpdating: false,
+				}
+			} else {
+				// 获取失败时，标记为不在更新状态，但不更新缓存，这样下次还会尝试获取
+				if entry, exists := m.stockPriceCache[stockCode]; exists {
+					entry.IsUpdating = false
+				}
+			}
+
+			var err error
+			if data == nil || data.Price <= 0 {
+				err = fmt.Errorf("failed to get stock price for %s", stockCode)
+			}
+
+			return stockPriceUpdateMsg{
+				Symbol: stockCode,
+				Data:   data,
+				Error:  err,
+			}
 		}))
 	}
 
 	return tea.Batch(cmds...)
-}
-
-// 异步获取股价数据
-func (m *Model) fetchStockPriceAsync(symbol string) tea.Cmd {
-	return func() tea.Msg {
-		data := getStockPrice(symbol)
-
-		// 更新缓存
-		m.stockPriceMutex.Lock()
-		defer m.stockPriceMutex.Unlock()
-
-		m.stockPriceCache[symbol] = &StockPriceCacheEntry{
-			Data:       data,
-			UpdateTime: time.Now(),
-			IsUpdating: false,
-		}
-
-		return stockPriceUpdateMsg{
-			Symbol: symbol,
-			Data:   data,
-			Error:  nil,
-		}
-	}
 }
 
 func getStockPrice(symbol string) *StockData {
