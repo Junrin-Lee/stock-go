@@ -2192,9 +2192,8 @@ func (m *Model) startStockPriceUpdates() tea.Cmd {
 	// 收集所有需要更新的股票代码
 	stockCodes := make([]string, 0)
 
-	// 添加自选列表中的股票
-	filteredStocks := m.getFilteredWatchlist()
-	for _, stock := range filteredStocks {
+	// 添加自选列表中的股票 - 注意：这里应该获取所有自选股票，而不是过滤后的
+	for _, stock := range m.watchlist.Stocks {
 		stockCodes = append(stockCodes, stock.Code)
 	}
 
@@ -3156,6 +3155,8 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = WatchlistViewing
 			m.resetWatchlistCursor() // 重置游标到第一只股票
 			m.searchFromWatchlist = false
+			m.message = ""
+			return m, m.tickCmd() // 重启定时器
 		} else {
 			m.state = MainMenu
 		}
@@ -3866,14 +3867,14 @@ func (m *Model) handleWatchlistGroupSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.state = WatchlistViewing
 		m.message = ""
 		m.resetWatchlistCursor() // 重置游标到第一只股票（考虑过滤）
-		return m, nil
+		return m, m.tickCmd() // 重启定时器
 	case "esc", "q":
 		m.selectedTag = ""           // 清除过滤
 		m.invalidateWatchlistCache() // 使缓存失效
 		m.state = WatchlistViewing
 		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.message = ""
-		return m, nil
+		return m, m.tickCmd() // 重启定时器
 	case "c":
 		// 清除过滤，显示所有股票
 		m.selectedTag = ""
@@ -3881,7 +3882,7 @@ func (m *Model) handleWatchlistGroupSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.state = WatchlistViewing
 		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.message = ""
-		return m, nil
+		return m, m.tickCmd() // 重启定时器
 	case "up", "k", "w":
 		if m.cursor > 0 {
 			m.cursor--
@@ -4005,7 +4006,7 @@ func (m *Model) handleWatchlistTagSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = WatchlistViewing
 			m.tagInput = ""
 			m.resetWatchlistCursor() // 重置游标到第一只股票
-			return m, nil
+			return m, m.tickCmd() // 重启定时器
 		}
 		return m, nil
 	case "d":
@@ -4048,7 +4049,7 @@ func (m *Model) handleWatchlistTagSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.tagInput = ""
 		m.message = ""
 		m.resetWatchlistCursor() // 重置游标到第一只股票
-		return m, nil
+		return m, m.tickCmd() // 重启定时器
 	case "up", "k", "w":
 		if m.tagSelectCursor > 0 {
 			m.tagSelectCursor--
@@ -4169,7 +4170,7 @@ func (m *Model) handleWatchlistTagManage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = WatchlistViewing
 		m.message = ""
 		m.resetWatchlistCursor()
-		return m, nil
+		return m, m.tickCmd() // 重启定时器
 	case "n":
 		// 手动输入新标签
 		m.state = WatchlistTagging
@@ -5119,7 +5120,7 @@ func (m *Model) handleWatchlistSearchConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.searchFromWatchlist = false
 		m.message = ""
-		return m, nil
+		return m, m.tickCmd() // 重启定时器
 	case "enter":
 		// 确认添加到自选列表
 		if m.searchResult != nil {
@@ -5242,224 +5243,7 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 	return s
 }
 
-// 冒泡排序算法 - 持股列表排序
-func (m *Model) bubbleSortPortfolio(field SortField, direction SortDirection) {
-	stocks := m.portfolio.Stocks
-	n := len(stocks)
 
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			shouldSwap := false
-
-			switch field {
-			case SortByCode:
-				if direction == SortAsc {
-					shouldSwap = stocks[j].Code > stocks[j+1].Code
-				} else {
-					shouldSwap = stocks[j].Code < stocks[j+1].Code
-				}
-			case SortByName:
-				if direction == SortAsc {
-					shouldSwap = stocks[j].Name > stocks[j+1].Name
-				} else {
-					shouldSwap = stocks[j].Name < stocks[j+1].Name
-				}
-			case SortByPrice:
-				if direction == SortAsc {
-					shouldSwap = stocks[j].Price > stocks[j+1].Price
-				} else {
-					shouldSwap = stocks[j].Price < stocks[j+1].Price
-				}
-			case SortByCostPrice:
-				if direction == SortAsc {
-					shouldSwap = stocks[j].CostPrice > stocks[j+1].CostPrice
-				} else {
-					shouldSwap = stocks[j].CostPrice < stocks[j+1].CostPrice
-				}
-			case SortByChange:
-				if direction == SortAsc {
-					shouldSwap = stocks[j].Change > stocks[j+1].Change
-				} else {
-					shouldSwap = stocks[j].Change < stocks[j+1].Change
-				}
-			case SortByChangePercent:
-				if direction == SortAsc {
-					shouldSwap = stocks[j].ChangePercent > stocks[j+1].ChangePercent
-				} else {
-					shouldSwap = stocks[j].ChangePercent < stocks[j+1].ChangePercent
-				}
-			case SortByQuantity:
-				if direction == SortAsc {
-					shouldSwap = stocks[j].Quantity > stocks[j+1].Quantity
-				} else {
-					shouldSwap = stocks[j].Quantity < stocks[j+1].Quantity
-				}
-			case SortByTotalProfit:
-				totalProfitJ := (stocks[j].Price - stocks[j].CostPrice) * float64(stocks[j].Quantity)
-				totalProfitJplus1 := (stocks[j+1].Price - stocks[j+1].CostPrice) * float64(stocks[j+1].Quantity)
-				if direction == SortAsc {
-					shouldSwap = totalProfitJ > totalProfitJplus1
-				} else {
-					shouldSwap = totalProfitJ < totalProfitJplus1
-				}
-			case SortByProfitRate:
-				profitRateJ := ((stocks[j].Price - stocks[j].CostPrice) / stocks[j].CostPrice) * 100
-				profitRateJplus1 := ((stocks[j+1].Price - stocks[j+1].CostPrice) / stocks[j+1].CostPrice) * 100
-				if direction == SortAsc {
-					shouldSwap = profitRateJ > profitRateJplus1
-				} else {
-					shouldSwap = profitRateJ < profitRateJplus1
-				}
-			case SortByMarketValue:
-				marketValueJ := stocks[j].Price * float64(stocks[j].Quantity)
-				marketValueJplus1 := stocks[j+1].Price * float64(stocks[j+1].Quantity)
-				if direction == SortAsc {
-					shouldSwap = marketValueJ > marketValueJplus1
-				} else {
-					shouldSwap = marketValueJ < marketValueJplus1
-				}
-			}
-
-			if shouldSwap {
-				stocks[j], stocks[j+1] = stocks[j+1], stocks[j]
-			}
-		}
-	}
-}
-
-// 冒泡排序算法 - 自选列表排序（基于实时数据）
-func (m *Model) bubbleSortWatchlist(field SortField, direction SortDirection) {
-	// 获取过滤后的自选列表
-	filteredStocks := m.getFilteredWatchlist()
-	n := len(filteredStocks)
-
-	// 创建带实时数据的结构用于排序
-	type WatchStockWithData struct {
-		Stock WatchlistStock
-		Data  *StockData
-	}
-
-	// 获取所有股票的实时数据
-	stocksWithData := make([]WatchStockWithData, n)
-	for i, stock := range filteredStocks {
-		stockData := getStockPrice(stock.Code)
-		stocksWithData[i] = WatchStockWithData{Stock: stock, Data: stockData}
-	}
-
-	// 冒泡排序
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			shouldSwap := false
-
-			switch field {
-			case SortByCode:
-				if direction == SortAsc {
-					shouldSwap = stocksWithData[j].Stock.Code > stocksWithData[j+1].Stock.Code
-				} else {
-					shouldSwap = stocksWithData[j].Stock.Code < stocksWithData[j+1].Stock.Code
-				}
-			case SortByName:
-				if direction == SortAsc {
-					shouldSwap = stocksWithData[j].Stock.Name > stocksWithData[j+1].Stock.Name
-				} else {
-					shouldSwap = stocksWithData[j].Stock.Name < stocksWithData[j+1].Stock.Name
-				}
-			case SortByTag:
-				if direction == SortAsc {
-					shouldSwap = stocksWithData[j].Stock.getTagsDisplay() > stocksWithData[j+1].Stock.getTagsDisplay()
-				} else {
-					shouldSwap = stocksWithData[j].Stock.getTagsDisplay() < stocksWithData[j+1].Stock.getTagsDisplay()
-				}
-			case SortByPrice:
-				priceJ := float64(0)
-				priceJplus1 := float64(0)
-				if stocksWithData[j].Data != nil {
-					priceJ = stocksWithData[j].Data.Price
-				}
-				if stocksWithData[j+1].Data != nil {
-					priceJplus1 = stocksWithData[j+1].Data.Price
-				}
-				if direction == SortAsc {
-					shouldSwap = priceJ > priceJplus1
-				} else {
-					shouldSwap = priceJ < priceJplus1
-				}
-			case SortByChangePercent:
-				changeJ := float64(0)
-				changeJplus1 := float64(0)
-				if stocksWithData[j].Data != nil {
-					changeJ = stocksWithData[j].Data.ChangePercent
-				}
-				if stocksWithData[j+1].Data != nil {
-					changeJplus1 = stocksWithData[j+1].Data.ChangePercent
-				}
-				if direction == SortAsc {
-					shouldSwap = changeJ > changeJplus1
-				} else {
-					shouldSwap = changeJ < changeJplus1
-				}
-			case SortByTurnoverRate:
-				turnoverJ := float64(0)
-				turnoverJplus1 := float64(0)
-				if stocksWithData[j].Data != nil {
-					turnoverJ = stocksWithData[j].Data.TurnoverRate
-				}
-				if stocksWithData[j+1].Data != nil {
-					turnoverJplus1 = stocksWithData[j+1].Data.TurnoverRate
-				}
-				if direction == SortAsc {
-					shouldSwap = turnoverJ > turnoverJplus1
-				} else {
-					shouldSwap = turnoverJ < turnoverJplus1
-				}
-			case SortByVolume:
-				volumeJ := int64(0)
-				volumeJplus1 := int64(0)
-				if stocksWithData[j].Data != nil {
-					volumeJ = stocksWithData[j].Data.Volume
-				}
-				if stocksWithData[j+1].Data != nil {
-					volumeJplus1 = stocksWithData[j+1].Data.Volume
-				}
-				if direction == SortAsc {
-					shouldSwap = volumeJ > volumeJplus1
-				} else {
-					shouldSwap = volumeJ < volumeJplus1
-				}
-			}
-
-			if shouldSwap {
-				stocksWithData[j], stocksWithData[j+1] = stocksWithData[j+1], stocksWithData[j]
-			}
-		}
-	}
-
-	// 将排序后的结果转换回原格式
-	sortedStocks := make([]WatchlistStock, n)
-	for i, stockWithData := range stocksWithData {
-		sortedStocks[i] = stockWithData.Stock
-	}
-
-	// 更新自选列表的顺序
-	// 由于我们只对过滤后的列表排序，需要重新构建整个watchlist
-	newWatchlist := make([]WatchlistStock, 0, len(m.watchlist.Stocks))
-
-	// 先添加排序后的过滤结果
-	for _, stock := range sortedStocks {
-		newWatchlist = append(newWatchlist, stock)
-	}
-
-	// 再添加不在过滤条件内的股票
-	if m.selectedTag != "" {
-		for _, stock := range m.watchlist.Stocks {
-			if !stock.hasTag(m.selectedTag) {
-				newWatchlist = append(newWatchlist, stock)
-			}
-		}
-	}
-
-	m.watchlist.Stocks = newWatchlist
-}
 
 // 获取排序字段的显示名称
 func (m *Model) getSortFieldName(field SortField) string {
@@ -5639,7 +5423,7 @@ func (m *Model) handlePortfolioSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.portfolioSortDirection = SortAsc
 		}
 		// 执行排序并标记为已排序状态
-		m.bubbleSortPortfolio(m.portfolioSortField, m.portfolioSortDirection)
+		m.optimizedSortPortfolio(m.portfolioSortField, m.portfolioSortDirection)
 		m.portfolioIsSorted = true
 		m.resetPortfolioCursor()
 		// 返回持股列表页面
@@ -5697,13 +5481,13 @@ func (m *Model) handleWatchlistSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.watchlistSortDirection = SortAsc
 		}
 		// 执行排序并标记为已排序状态
-		m.bubbleSortWatchlist(m.watchlistSortField, m.watchlistSortDirection)
+		m.optimizedSortWatchlist(m.watchlistSortField, m.watchlistSortDirection)
 		m.watchlistIsSorted = true
 		m.resetWatchlistCursor()
 		// 返回自选列表页面
 		m.state = WatchlistViewing
 		m.message = ""
-		return m, nil
+		return m, m.tickCmd() // 重启定时器
 	case "c", "C":
 		// 清除当前排序 - 重新加载原始数据顺序
 		m.watchlistIsSorted = false
@@ -5716,12 +5500,12 @@ func (m *Model) handleWatchlistSorting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// 返回自选列表页面
 		m.state = WatchlistViewing
 		m.message = m.getText("sortCleared")
-		return m, nil
+		return m, m.tickCmd() // 重启定时器
 	case "esc", "q":
 		// 返回自选列表页面
 		m.state = WatchlistViewing
 		m.message = ""
-		return m, nil
+		return m, m.tickCmd() // 重启定时器
 	}
 	return m, nil
 }
