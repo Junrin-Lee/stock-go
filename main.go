@@ -1,13 +1,11 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -45,33 +43,13 @@ type StockData struct {
 	StartPrice    float64  `json:"start_price"`
 	MaxPrice      float64  `json:"max_price"`
 	MinPrice      float64  `json:"min_price"`
-	PrevClose     float64  `json:"prev_close"` // 昨日收盘价
-	TurnoverRate  float64  `json:"turnover_rate"`
-	Volume        int64    `json:"volume"`
-	FundFlow      FundFlow `json:"fund_flow"` // 资金流向数据
+	PrevClose    float64 `json:"prev_close"` // 昨日收盘价
+	TurnoverRate float64 `json:"turnover_rate"`
+	Volume       int64   `json:"volume"`
 }
 
 type Portfolio struct {
 	Stocks []Stock `json:"stocks"`
-}
-
-// 资金流向数据结构
-type FundFlow struct {
-	MainNetInflow       float64 `json:"main_net_inflow"`        // 主力净流入净额
-	SuperLargeNetInflow float64 `json:"super_large_net_inflow"` // 超大单净流入
-	LargeNetInflow      float64 `json:"large_net_inflow"`       // 大单净流入
-	MediumNetInflow     float64 `json:"medium_net_inflow"`      // 中单净流入
-	SmallNetInflow      float64 `json:"small_net_inflow"`       // 小单净流入
-	NetInflowRatio      float64 `json:"net_inflow_ratio"`       // 净流入占比
-	ActiveBuyAmount     float64 `json:"active_buy_amount"`      // 主动买入金额
-	ActiveSellAmount    float64 `json:"active_sell_amount"`     // 主动卖出金额
-}
-
-// 资金流向缓存条目
-type FundFlowCacheEntry struct {
-	Data       FundFlow  `json:"data"`        // 资金流向数据
-	UpdateTime time.Time `json:"update_time"` // 数据更新时间
-	IsUpdating bool      `json:"is_updating"` // 是否正在更新中
 }
 
 // 股价缓存条目结构
@@ -83,10 +61,9 @@ type StockPriceCacheEntry struct {
 
 // 自选股票数据结构
 type WatchlistStock struct {
-	Code     string   `json:"code"`
-	Name     string   `json:"name"`
-	Tags     []string `json:"tags"`      // 标签字段，支持多个标签
-	FundFlow FundFlow `json:"fund_flow"` // 资金流向数据
+	Code string   `json:"code"`
+	Name string   `json:"name"`
+	Tags []string `json:"tags"` // 标签字段，支持多个标签
 }
 
 type Watchlist struct {
@@ -236,13 +213,6 @@ type Model struct {
 	watchlistSortCursor    int           // 自选列表排序菜单光标位置
 	watchlistIsSorted      bool          // 自选列表是否已经应用了排序
 
-	// For fund flow async data - 资金流向异步数据
-	fundFlowCache      map[string]*FundFlowCacheEntry // 资金流向数据缓存
-	fundFlowMutex      sync.RWMutex                   // 资金流向数据读写锁
-	fundFlowUpdateTime time.Time                      // 上次更新资金流向数据的时间
-	fundFlowContext    context.Context                // 资金流向异步获取的上下文
-	fundFlowCancel     context.CancelFunc             // 取消资金流向异步获取的函数
-
 	// For stock price async data - 股价异步数据
 	stockPriceCache      map[string]*StockPriceCacheEntry // 股价数据缓存
 	stockPriceMutex      sync.RWMutex                     // 股价数据读写锁
@@ -250,13 +220,6 @@ type Model struct {
 }
 
 type tickMsg struct{}
-
-// 资金流向数据更新消息
-type fundFlowUpdateMsg struct {
-	Symbol string
-	Data   *FundFlow
-	Error  error
-}
 
 // 股价数据更新消息
 type stockPriceUpdateMsg struct {
@@ -336,9 +299,6 @@ func main() {
 		language = Chinese
 	}
 
-	// 创建资金流向异步上下文
-	fundFlowCtx, fundFlowCancel := context.WithCancel(context.Background())
-
 	m := Model{
 		state:              initialState,
 		currentMenuItem:    0,
@@ -356,11 +316,6 @@ func main() {
 		watchlistCursor:    0,     // 自选列表游标
 		portfolioIsSorted:  false, // 持股列表默认未排序状态
 		watchlistIsSorted:  false, // 自选列表默认未排序状态
-		// 资金流向缓存初始化
-		fundFlowCache:      make(map[string]*FundFlowCacheEntry),
-		fundFlowUpdateTime: time.Time{}, // 初始化为零时间
-		fundFlowContext:    fundFlowCtx,
-		fundFlowCancel:     fundFlowCancel,
 		// 股价缓存初始化
 		stockPriceCache:      make(map[string]*StockPriceCacheEntry),
 		stockPriceUpdateTime: time.Time{}, // 初始化为零时间
@@ -485,44 +440,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, stockPriceCmd)
 			}
 
-			if m.state == WatchlistViewing {
-				if fundFlowCmd := m.startFundFlowUpdates(); fundFlowCmd != nil {
-					cmds = append(cmds, fundFlowCmd)
-				}
-			}
-
 			newModel, cmd = m, tea.Batch(cmds...)
 		} else {
 			newModel, cmd = m, nil
 		}
-	case fundFlowUpdateMsg:
-		// 处理资金流向数据更新
-		if msg.Error == nil && msg.Data != nil {
-			// 更新缓存
-			m.fundFlowMutex.Lock()
-			if entry, exists := m.fundFlowCache[msg.Symbol]; exists {
-				entry.Data = *msg.Data
-				entry.UpdateTime = time.Now()
-				entry.IsUpdating = false
-			} else {
-				m.fundFlowCache[msg.Symbol] = &FundFlowCacheEntry{
-					Data:       *msg.Data,
-					UpdateTime: time.Now(),
-					IsUpdating: false,
-				}
-			}
-			m.fundFlowMutex.Unlock()
-			debugPrint("[信息] 资金流向缓存已更新: %s\n", msg.Symbol)
-		} else {
-			// 更新失败，标记为未更新状态
-			m.fundFlowMutex.Lock()
-			if entry, exists := m.fundFlowCache[msg.Symbol]; exists {
-				entry.IsUpdating = false
-			}
-			m.fundFlowMutex.Unlock()
-			debugPrint("[错误] 资金流向数据更新失败: %s, %v\n", msg.Symbol, msg.Error)
-		}
-		newModel, cmd = m, nil
 	case stockPriceUpdateMsg:
 		// 处理股价数据更新
 		if msg.Error == nil && msg.Data != nil {
@@ -655,11 +576,6 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		// 强制启动股价数据更新
 		if stockPriceCmd := m.startStockPriceUpdates(); stockPriceCmd != nil {
 			cmds = append(cmds, stockPriceCmd)
-		}
-
-		// 强制启动资金流向数据更新
-		if fundFlowCmd := m.startFundFlowUpdates(); fundFlowCmd != nil {
-			cmds = append(cmds, fundFlowCmd)
 		}
 
 		return m, tea.Batch(cmds...)
@@ -1346,15 +1262,6 @@ func (m *Model) formatProfitRateWithColorZeroLang(rate float64) string {
 	return m.formatProfitRateWithColorLang(rate)
 }
 
-// 格式化资金流向数据，自动选择万元或亿元单位，支持股票类型检测
-func (m *Model) formatFundFlowWithColorAndUnitForStock(amount float64, symbol string) string {
-	// 对于非A股（如美股），显示 "-" 表示数据不可用
-	if !isChinaStock(symbol) {
-		return "-"
-	}
-	return m.formatFundFlowWithColorAndUnit(amount)
-}
-
 // 格式化盈亏率数据，支持股票类型检测
 func (m *Model) formatProfitRateWithColorZeroLangForStock(rate float64, symbol string) string {
 	// 对于非A股（如美股），显示 "-" 表示数据不可用
@@ -1362,51 +1269,6 @@ func (m *Model) formatProfitRateWithColorZeroLangForStock(rate float64, symbol s
 		return "-"
 	}
 	return m.formatProfitRateWithColorZeroLang(rate)
-}
-
-// 格式化资金流向数据，自动选择万元或亿元单位
-func (m *Model) formatFundFlowWithColorAndUnit(amount float64) string {
-	// 当数值接近0时（考虑浮点数精度），显示白色（无颜色）
-	if abs(amount) < 1000 {
-		return "0"
-	}
-
-	var formattedValue string
-	var unit string
-
-	// 根据金额大小选择单位
-	if abs(amount) >= 100000000 { // 1亿以上显示为亿元
-		value := amount / 100000000
-		if m.language == Chinese {
-			unit = "亿"
-		} else {
-			unit = "B" // Billion
-		}
-		formattedValue = fmt.Sprintf("%.2f%s", value, unit)
-	} else { // 1亿以下显示为万元
-		value := amount / 10000
-		if m.language == Chinese {
-			unit = "万"
-		} else {
-			unit = "W" // 万 (Wan)
-		}
-		formattedValue = fmt.Sprintf("%.1f%s", value, unit)
-	}
-
-	// 应用颜色逻辑
-	if m.language == English {
-		// 英文：绿色盈利，红色亏损
-		if amount >= 0 {
-			return text.FgGreen.Sprintf("+%s", formattedValue)
-		}
-		return text.FgRed.Sprintf("%s", formattedValue)
-	} else {
-		// 中文：红色盈利，绿色亏损
-		if amount >= 0 {
-			return text.FgRed.Sprintf("+%s", formattedValue)
-		}
-		return text.FgGreen.Sprintf("%s", formattedValue)
-	}
 }
 
 func (m *Model) formatPriceWithColorLang(currentPrice, prevClose float64) string {
@@ -1461,14 +1323,6 @@ func getStockInfo(symbol string) *StockData {
 		if stockData == nil || stockData.Price <= 0 {
 			debugPrint("[调试] 直接获取股票价格失败，尝试通过搜索查找: %s\n", symbol)
 			stockData = searchStockBySymbol(symbol)
-		}
-	}
-
-	// 如果获取到股票数据且是中国股票，尝试获取资金流向数据
-	if stockData != nil && stockData.Symbol != "" && isChinaStock(stockData.Symbol) {
-		fundFlow := getFundFlowDataSync(stockData.Symbol)
-		if fundFlow != nil {
-			stockData.FundFlow = *fundFlow
 		}
 	}
 
@@ -2066,23 +1920,6 @@ func generateSearchKeywords(name string) []string {
 	return keywords
 }
 
-// 从缓存获取资金流向数据（非阻塞）
-func (m *Model) getFundFlowDataFromCache(symbol string) *FundFlow {
-	if !isChinaStock(symbol) {
-		return &FundFlow{}
-	}
-
-	m.fundFlowMutex.RLock()
-	defer m.fundFlowMutex.RUnlock()
-
-	if entry, exists := m.fundFlowCache[symbol]; exists {
-		return &entry.Data
-	}
-
-	// 如果缓存中没有数据，返回空数据
-	return &FundFlow{}
-}
-
 // 从缓存获取股价数据（非阻塞）
 func (m *Model) getStockPriceFromCache(symbol string) *StockData {
 	m.stockPriceMutex.RLock()
@@ -2095,100 +1932,6 @@ func (m *Model) getStockPriceFromCache(symbol string) *StockData {
 	}
 	// 如果缓存中没有数据或已过期，返回nil，触发异步更新
 	return nil
-}
-
-// 同步获取资金流向数据（用于搜索结果）
-func getFundFlowDataSync(symbol string) *FundFlow {
-	if !isChinaStock(symbol) {
-		return &FundFlow{}
-	}
-
-	// 调用Python脚本获取AKShare数据
-	cmd := exec.Command("venv/bin/python", "scripts/akshare_fund_flow.py", symbol)
-	output, err := cmd.Output()
-	if err != nil {
-		debugPrint("[错误] 同步获取资金流向失败 %s: %v\n", symbol, err)
-		return &FundFlow{}
-	}
-
-	var fundFlow FundFlow
-	err = json.Unmarshal(output, &fundFlow)
-	if err != nil {
-		debugPrint("[错误] 解析资金流向数据失败 %s: %v\n", symbol, err)
-		return &FundFlow{}
-	}
-
-	debugPrint("[调试] 同步获取资金流向成功 %s: 主力净流入 %.2f\n", symbol, fundFlow.MainNetInflow)
-	return &fundFlow
-}
-
-// 启动异步资金流向数据更新（1分钟间隔）
-func (m *Model) startFundFlowUpdates() tea.Cmd {
-	// 检查是否需要开始新的更新周期
-	if time.Since(m.fundFlowUpdateTime) < time.Minute {
-		return nil // 还未到更新时间
-	}
-
-	// 收集所有需要更新的股票代码
-	stockCodes := make([]string, 0)
-
-	// 添加自选列表中的股票
-	for _, stock := range m.watchlist.Stocks {
-		if isChinaStock(stock.Code) {
-			stockCodes = append(stockCodes, stock.Code)
-		}
-	}
-
-	if len(stockCodes) == 0 {
-		return nil
-	}
-
-	// 更新开始时间
-	m.fundFlowUpdateTime = time.Now()
-
-	// 逐个发起异步获取请求
-	var cmds []tea.Cmd
-	for _, code := range stockCodes {
-		// 标记正在更新
-		m.fundFlowMutex.Lock()
-		if entry, exists := m.fundFlowCache[code]; exists {
-			entry.IsUpdating = true
-		} else {
-			m.fundFlowCache[code] = &FundFlowCacheEntry{
-				Data:       FundFlow{},
-				UpdateTime: time.Time{},
-				IsUpdating: true,
-			}
-		}
-		m.fundFlowMutex.Unlock()
-
-		// 为每个股票添加一个延迟，避免同时请求太多
-		delay := time.Duration(len(cmds)) * 200 * time.Millisecond
-		// 修复闭包问题：将code变量复制到局部变量
-		stockCode := code
-		cmds = append(cmds, tea.Tick(delay, func(t time.Time) tea.Msg {
-			// 直接在这里执行获取操作
-			// 调用Python脚本获取AKShare数据
-			cmd := exec.Command("venv/bin/python", "scripts/akshare_fund_flow.py", stockCode)
-			output, err := cmd.Output()
-			if err != nil {
-				debugPrint("[错误] AKShare资金流向获取失败 %s: %v\n", stockCode, err)
-				return fundFlowUpdateMsg{Symbol: stockCode, Data: nil, Error: err}
-			}
-
-			var fundFlow FundFlow
-			err = json.Unmarshal(output, &fundFlow)
-			if err != nil {
-				debugPrint("[错误] 解析资金流向数据失败 %s: %v\n", stockCode, err)
-				return fundFlowUpdateMsg{Symbol: stockCode, Data: nil, Error: err}
-			}
-
-			debugPrint("[信息] 资金流向数据获取成功: %s\n", stockCode)
-			return fundFlowUpdateMsg{Symbol: stockCode, Data: &fundFlow, Error: nil}
-		}))
-	}
-
-	return tea.Batch(cmds...)
 }
 
 // 启动股价异步更新
@@ -3343,65 +3086,6 @@ func (m *Model) viewSearchResult() string {
 		values = append(values, volumeStr)
 	}
 
-	// 资金流向数据（仅A股显示）
-	if isChinaStock(m.searchResult.Symbol) {
-		fundFlow := &m.searchResult.FundFlow
-
-		// 主力净流入
-		if m.language == Chinese {
-			headers = append(headers, "主力净流入")
-		} else {
-			headers = append(headers, "Main Flow")
-		}
-		mainFlowStr := m.formatFundFlowWithColorAndUnit(fundFlow.MainNetInflow)
-		values = append(values, mainFlowStr)
-
-		// 超大单净流入
-		if m.language == Chinese {
-			headers = append(headers, "超大单")
-		} else {
-			headers = append(headers, "Super Large")
-		}
-		superLargeStr := m.formatFundFlowWithColorAndUnit(fundFlow.SuperLargeNetInflow)
-		values = append(values, superLargeStr)
-
-		// 大单净流入
-		if m.language == Chinese {
-			headers = append(headers, "大单")
-		} else {
-			headers = append(headers, "Large")
-		}
-		largeStr := m.formatFundFlowWithColorAndUnit(fundFlow.LargeNetInflow)
-		values = append(values, largeStr)
-
-		// 中单净流入
-		if m.language == Chinese {
-			headers = append(headers, "中单")
-		} else {
-			headers = append(headers, "Medium")
-		}
-		mediumStr := m.formatFundFlowWithColorAndUnit(fundFlow.MediumNetInflow)
-		values = append(values, mediumStr)
-
-		// 小单净流入
-		if m.language == Chinese {
-			headers = append(headers, "小单")
-		} else {
-			headers = append(headers, "Small")
-		}
-		smallStr := m.formatFundFlowWithColorAndUnit(fundFlow.SmallNetInflow)
-		values = append(values, smallStr)
-
-		// 净流入占比
-		if m.language == Chinese {
-			headers = append(headers, "净流入占比")
-		} else {
-			headers = append(headers, "Net Ratio")
-		}
-		flowRatioStr := m.formatProfitRateWithColorZeroLang(fundFlow.NetInflowRatio)
-		values = append(values, flowRatioStr)
-	}
-
 	// 添加表头和数据行
 	t.AppendHeader(table.Row(headers))
 	t.AppendRow(table.Row(values))
@@ -3520,11 +3204,10 @@ func (m *Model) viewLanguageSelection() string {
 
 // 兼容性结构体 - 用于处理旧格式数据
 type WatchlistStockLegacy struct {
-	Code     string   `json:"code"`
-	Name     string   `json:"name"`
-	Tag      string   `json:"tag,omitempty"`  // 旧格式的单个标签
-	Tags     []string `json:"tags,omitempty"` // 新格式的多个标签
-	FundFlow FundFlow `json:"fund_flow"`      // 资金流向数据
+	Code string   `json:"code"`
+	Name string   `json:"name"`
+	Tag  string   `json:"tag,omitempty"`  // 旧格式的单个标签
+	Tags []string `json:"tags,omitempty"` // 新格式的多个标签
 }
 
 type WatchlistLegacy struct {
@@ -3549,9 +3232,8 @@ func loadWatchlist() Watchlist {
 	var watchlist Watchlist
 	for _, legacyStock := range legacyWatchlist.Stocks {
 		newStock := WatchlistStock{
-			Code:     legacyStock.Code,
-			Name:     legacyStock.Name,
-			FundFlow: legacyStock.FundFlow,
+			Code: legacyStock.Code,
+			Name: legacyStock.Name,
 		}
 
 		// 处理标签字段的兼容性
@@ -4748,65 +4430,6 @@ func (m *Model) viewSearchResultWithActions() string {
 		values = append(values, volumeStr)
 	}
 
-	// 资金流向数据（仅A股显示）
-	if isChinaStock(m.searchResult.Symbol) {
-		fundFlow := &m.searchResult.FundFlow
-
-		// 主力净流入
-		if m.language == Chinese {
-			headers = append(headers, "主力净流入")
-		} else {
-			headers = append(headers, "Main Flow")
-		}
-		mainFlowStr := m.formatFundFlowWithColorAndUnit(fundFlow.MainNetInflow)
-		values = append(values, mainFlowStr)
-
-		// 超大单净流入
-		if m.language == Chinese {
-			headers = append(headers, "超大单")
-		} else {
-			headers = append(headers, "Super Large")
-		}
-		superLargeStr := m.formatFundFlowWithColorAndUnit(fundFlow.SuperLargeNetInflow)
-		values = append(values, superLargeStr)
-
-		// 大单净流入
-		if m.language == Chinese {
-			headers = append(headers, "大单")
-		} else {
-			headers = append(headers, "Large")
-		}
-		largeStr := m.formatFundFlowWithColorAndUnit(fundFlow.LargeNetInflow)
-		values = append(values, largeStr)
-
-		// 中单净流入
-		if m.language == Chinese {
-			headers = append(headers, "中单")
-		} else {
-			headers = append(headers, "Medium")
-		}
-		mediumStr := m.formatFundFlowWithColorAndUnit(fundFlow.MediumNetInflow)
-		values = append(values, mediumStr)
-
-		// 小单净流入
-		if m.language == Chinese {
-			headers = append(headers, "小单")
-		} else {
-			headers = append(headers, "Small")
-		}
-		smallStr := m.formatFundFlowWithColorAndUnit(fundFlow.SmallNetInflow)
-		values = append(values, smallStr)
-
-		// 净流入占比
-		if m.language == Chinese {
-			headers = append(headers, "净流入占比")
-		} else {
-			headers = append(headers, "Net Ratio")
-		}
-		flowRatioStr := m.formatProfitRateWithColorZeroLang(fundFlow.NetInflowRatio)
-		values = append(values, flowRatioStr)
-	}
-
 	// 添加表头和数据行
 	t.AppendHeader(table.Row(headers))
 	t.AppendRow(table.Row(values))
@@ -5020,8 +4643,6 @@ func (m *Model) viewWatchlistViewing() string {
 		watchStock := filteredStocks[i]
 		// 从缓存获取股价数据（非阻塞）
 		stockData := m.getStockPriceFromCache(watchStock.Code)
-		// 从缓存获取资金流向数据（非阻塞）
-		fundFlowData := m.getFundFlowDataFromCache(watchStock.Code)
 
 		if stockData != nil {
 			// 计算今日涨幅：应该基于昨收价，而不是开盘价
@@ -5044,14 +4665,6 @@ func (m *Model) viewWatchlistViewing() string {
 			// 成交量显示
 			volumeStr := formatVolume(stockData.Volume)
 
-			// 格式化资金流向数据，带单位显示，对非A股显示"-"
-			mainFlowStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.MainNetInflow, watchStock.Code)
-			superLargeStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.SuperLargeNetInflow, watchStock.Code)
-			largeStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.LargeNetInflow, watchStock.Code)
-			mediumStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.MediumNetInflow, watchStock.Code)
-			smallStr := m.formatFundFlowWithColorAndUnitForStock(fundFlowData.SmallNetInflow, watchStock.Code)
-			flowRatioStr := m.formatProfitRateWithColorZeroLangForStock(fundFlowData.NetInflowRatio, watchStock.Code)
-
 			// 光标列 - 检查光标是否在当前可见范围内且指向此行
 			cursorCol := ""
 			if m.watchlistCursor >= startIndex && m.watchlistCursor < endIndex && i == m.watchlistCursor {
@@ -5071,12 +4684,6 @@ func (m *Model) viewWatchlistViewing() string {
 				todayChangeStr,
 				turnoverStr,
 				volumeStr,
-				mainFlowStr,   // 主力净流入
-				superLargeStr, // 超大单净流入
-				largeStr,      // 大单净流入
-				mediumStr,     // 中单净流入
-				smallStr,      // 小单净流入
-				flowRatioStr,  // 净流入占比
 			})
 		} else {
 			// 如果无法获取数据，显示基本信息
@@ -5099,12 +4706,6 @@ func (m *Model) viewWatchlistViewing() string {
 				"-",
 				"-",
 				"-",
-				"-", // 主力净流入
-				"-", // 超大单净流入
-				"-", // 大单净流入
-				"-", // 中单净流入
-				"-", // 小单净流入
-				"-", // 净流入占比
 			})
 		}
 
@@ -5405,9 +5006,9 @@ func (m *Model) getPortfolioHeaderWithSortIndicator() table.Row {
 func (m *Model) getWatchlistHeaderWithSortIndicator() table.Row {
 	var baseHeaders table.Row
 	if m.language == Chinese {
-		baseHeaders = table.Row{"", "标签", "代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量", "主力净流入", "超大单", "大单", "中单", "小单", "净流入占比"}
+		baseHeaders = table.Row{"", "标签", "代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"}
 	} else {
-		baseHeaders = table.Row{"", "Tag", "Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume", "MainFlow", "SuperLarge", "Large", "Medium", "Small", "FlowRatio"}
+		baseHeaders = table.Row{"", "Tag", "Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"}
 	}
 
 	// 排序字段到表头列索引的映射（跳过第一列的光标列）
