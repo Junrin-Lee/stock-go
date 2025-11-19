@@ -111,10 +111,11 @@ type SystemConfig struct {
 }
 
 type DisplayConfig struct {
-	ColorScheme   string `yaml:"color_scheme"`   // 颜色方案 "professional", "simple"
-	DecimalPlaces int    `yaml:"decimal_places"` // 价格显示小数位数
-	TableStyle    string `yaml:"table_style"`    // 表格样式 "light", "bold", "simple"
-	MaxLines      int    `yaml:"max_lines"`      // 列表每页最大显示行数
+	ColorScheme        string `yaml:"color_scheme"`        // 颜色方案 "professional", "simple"
+	DecimalPlaces      int    `yaml:"decimal_places"`      // 价格显示小数位数
+	TableStyle         string `yaml:"table_style"`         // 表格样式 "light", "bold", "simple"
+	MaxLines           int    `yaml:"max_lines"`           // 列表每页最大显示行数
+	PortfolioHighlight string `yaml:"portfolio_highlight"` // 自选列表中持仓股票的背景高亮颜色
 }
 
 type UpdateConfig struct {
@@ -1209,10 +1210,11 @@ func getDefaultConfig() Config {
 			DebugMode:     false,       // 调试模式关闭
 		},
 		Display: DisplayConfig{
-			ColorScheme:   "professional", // 专业配色方案
-			DecimalPlaces: 3,              // 3位小数
-			TableStyle:    "light",        // 轻量表格样式
-			MaxLines:      10,             // 默认每页显示10行
+			ColorScheme:        "professional", // 专业配色方案
+			DecimalPlaces:      3,              // 3位小数
+			TableStyle:         "light",        // 轻量表格样式
+			MaxLines:           10,             // 默认每页显示10行
+			PortfolioHighlight: "yellow",       // 默认黄色
 		},
 		Update: UpdateConfig{
 			RefreshInterval: 5,    // 5秒刷新间隔
@@ -1241,6 +1243,14 @@ func loadConfig() Config {
 	// 验证配置的合理性
 	if config.Display.MaxLines <= 0 || config.Display.MaxLines > 50 {
 		config.Display.MaxLines = 10 // 默认值
+	}
+
+	// 验证并设置高亮颜色的默认值
+	if config.Display.PortfolioHighlight == "" {
+		config.Display.PortfolioHighlight = "yellow" // 默认黄色背景
+		debugPrint("[配置] 使用默认高亮颜色: %s\n", config.Display.PortfolioHighlight)
+	} else {
+		debugPrint("[配置] 读取到高亮颜色配置: %s\n", config.Display.PortfolioHighlight)
 	}
 
 	return config
@@ -3867,7 +3877,7 @@ func (m *Model) handleWatchlistGroupSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.state = WatchlistViewing
 		m.message = ""
 		m.resetWatchlistCursor() // 重置游标到第一只股票（考虑过滤）
-		return m, m.tickCmd() // 重启定时器
+		return m, m.tickCmd()    // 重启定时器
 	case "esc", "q":
 		m.selectedTag = ""           // 清除过滤
 		m.invalidateWatchlistCache() // 使缓存失效
@@ -4006,7 +4016,7 @@ func (m *Model) handleWatchlistTagSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = WatchlistViewing
 			m.tagInput = ""
 			m.resetWatchlistCursor() // 重置游标到第一只股票
-			return m, m.tickCmd() // 重启定时器
+			return m, m.tickCmd()    // 重启定时器
 		}
 		return m, nil
 	case "d":
@@ -4049,7 +4059,7 @@ func (m *Model) handleWatchlistTagSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.tagInput = ""
 		m.message = ""
 		m.resetWatchlistCursor() // 重置游标到第一只股票
-		return m, m.tickCmd() // 重启定时器
+		return m, m.tickCmd()    // 重启定时器
 	case "up", "k", "w":
 		if m.tagSelectCursor > 0 {
 			m.tagSelectCursor--
@@ -4524,6 +4534,39 @@ func (m *Model) isStockInWatchlist(code string) bool {
 		}
 	}
 	return false
+}
+
+// 检查股票是否在持仓中
+func (m *Model) isStockInPortfolio(code string) bool {
+	for _, stock := range m.portfolio.Stocks {
+		if stock.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+// 格式化股票名称，如果在持仓中则添加背景高亮
+func (m *Model) formatStockNameWithPortfolioHighlight(name, code string) string {
+	if m.isStockInPortfolio(code) {
+		// 使用颜色工具处理背景高亮
+		colorUtils := NewColorUtils()
+		configColor := m.config.Display.PortfolioHighlight
+
+		debugPrint("[高亮] 股票 %s (%s) 在持仓中，配置颜色: %s\n", name, code, configColor)
+
+		// 获取最终的颜色名称（仅支持go-pretty颜色名称）
+		finalColorName := colorUtils.GetColorFromConfigOrDefault(configColor, "yellow") // 默认黄色背景
+
+		debugPrint("[高亮] 最终使用颜色: %s\n", finalColorName)
+
+		// 应用背景颜色格式化
+		result := colorUtils.FormatTextWithBackground(name, finalColorName)
+		debugPrint("[高亮] 格式化结果: %s (原文本: %s)\n", result, name)
+
+		return result
+	}
+	return name
 }
 
 // 添加股票到自选列表
@@ -5019,7 +5062,7 @@ func (m *Model) viewWatchlistViewing() string {
 				cursorCol,
 				watchStock.getTagsDisplay(), // 显示标签
 				watchStock.Code,
-				watchStock.Name,
+				m.formatStockNameWithPortfolioHighlight(watchStock.Name, watchStock.Code),
 				m.formatPriceWithColorLang(stockData.Price, stockData.PrevClose),
 				fmt.Sprintf("%.3f", stockData.PrevClose),
 				m.formatPriceWithColorLang(stockData.StartPrice, stockData.PrevClose),
@@ -5047,7 +5090,7 @@ func (m *Model) viewWatchlistViewing() string {
 				cursorCol,
 				watchStock.getTagsDisplay(), // 显示标签
 				watchStock.Code,
-				watchStock.Name,
+				m.formatStockNameWithPortfolioHighlight(watchStock.Name, watchStock.Code),
 				"-",
 				"-",
 				"-",
@@ -5242,8 +5285,6 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 
 	return s
 }
-
-
 
 // 获取排序字段的显示名称
 func (m *Model) getSortFieldName(field SortField) string {

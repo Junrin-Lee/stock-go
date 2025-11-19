@@ -47,6 +47,19 @@ display:
     # 建议根据屏幕分辨率调整: 1080p推荐10行, 1440p推荐15行, 4K推荐20行
     # recommended by screen resolution: 1080p=10 lines, 1440p=15 lines, 4K=20 lines
     max_lines: 10
+    
+    # 持仓股票高亮颜色 Portfolio Stock Highlight Color
+    # 自选列表中同时在持仓中的股票名称高亮颜色
+    # highlight color for stocks that are both in watchlist and portfolio
+    # 仅支持go-pretty库提供的颜色名称
+    # only supports color names provided by go-pretty library
+    #
+    # 支持的颜色名称 | Supported color names:
+    # black, red, green, yellow, blue, magenta, cyan, white
+    #
+    # 默认颜色为黄色 (yellow)
+    # default color is yellow
+    portfolio_highlight: "yellow"  # 黄色前景色
 
 # 更新配置 Update Configuration
 update:
