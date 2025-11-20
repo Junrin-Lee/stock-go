@@ -102,5 +102,12 @@
   "sortDesc": "降序",
   "sortHelp": "使用方向键选择排序字段，回车切换升序/降序，C键清除排序，ESC返回列表",
   "sortCleared": "排序已清除",
-  "sortedBy": "排序: %s(%s)"
+  "sortedBy": "排序: %s(%s)",
+  "editTagTitle": "=== 编辑标签 ===",
+  "editingTag": "正在编辑标签: %s",
+  "enterNewTagName": "请输入新的标签名称: ",
+  "tagEditSuccess": "标签已从 \"%s\" 修改为 \"%s\"，共更新 %d 只股票",
+  "tagEditCanceled": "取消编辑标签",
+  "tagNameRequired": "标签名称不能为空",
+  "tagNameUnchanged": "标签名称未改变"
 }

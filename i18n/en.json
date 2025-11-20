@@ -102,5 +102,12 @@
   "sortDesc": "Descending",
   "sortHelp": "Use arrow keys to select sort field, Enter to toggle Asc/Desc, C to clear sort, ESC to return to list",
   "sortCleared": "Sort cleared",
-  "sortedBy": "Sorted by: %s(%s)"
+  "sortedBy": "Sorted by: %s(%s)",
+  "editTagTitle": "=== Edit Tag ===",
+  "editingTag": "Editing tag: %s",
+  "enterNewTagName": "Enter new tag name: ",
+  "tagEditSuccess": "Tag renamed from \"%s\" to \"%s\", updated %d stocks",
+  "tagEditCanceled": "Tag edit canceled",
+  "tagNameRequired": "Tag name cannot be empty",
+  "tagNameUnchanged": "Tag name unchanged"
 }

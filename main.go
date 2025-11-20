@@ -195,6 +195,8 @@ type Model struct {
 	tagManageCursor  int      // 标签管理界面的游标位置
 	tagRemoveCursor  int      // 标签删除选择界面的游标位置
 	isInRemoveMode   bool     // 是否处于删除模式
+	tagToEdit        string   // 要编辑的原标签名称
+	tagEditInput     string   // 标签编辑输入框内容
 
 	// Performance optimization - cached filtered watchlist
 	cachedFilteredWatchlist  []WatchlistStock // 缓存的过滤后自选列表
@@ -418,6 +420,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel, cmd = m.handleWatchlistTagManage(msg)
 		case WatchlistTagRemoveSelect:
 			newModel, cmd = m.handleWatchlistTagRemoveSelect(msg)
+		case WatchlistTagEdit:
+			newModel, cmd = m.handleWatchlistTagEdit(msg)
 		case WatchlistGroupSelect:
 			newModel, cmd = m.handleWatchlistGroupSelect(msg)
 		case PortfolioSorting:
@@ -517,6 +521,8 @@ func (m *Model) View() string {
 		mainContent = m.viewWatchlistTagManage()
 	case WatchlistTagRemoveSelect:
 		mainContent = m.viewWatchlistTagRemoveSelect()
+	case WatchlistTagEdit:
+		mainContent = m.viewWatchlistTagEdit()
 	case WatchlistGroupSelect:
 		mainContent = m.viewWatchlistGroupSelect()
 	case PortfolioSorting:
@@ -3263,6 +3269,31 @@ func (m *Model) saveWatchlist() {
 	os.WriteFile(watchlistFile, data, 0644)
 }
 
+// 批量更新所有使用指定标签的股票，将旧标签替换为新标签
+func (m *Model) renameTagForAllStocks(oldTag, newTag string) int {
+	updatedCount := 0
+
+	for i := range m.watchlist.Stocks {
+		stock := &m.watchlist.Stocks[i]
+		hasOldTag := false
+
+		// 检查股票是否有旧标签
+		for j, tag := range stock.Tags {
+			if tag == oldTag {
+				// 替换为新标签
+				stock.Tags[j] = newTag
+				hasOldTag = true
+			}
+		}
+
+		if hasOldTag {
+			updatedCount++
+		}
+	}
+
+	return updatedCount
+}
+
 // 获取所有可用的标签
 func (m *Model) getAvailableTags() []string {
 	tagMap := make(map[string]bool)
@@ -3939,6 +3970,26 @@ func (m *Model) handleWatchlistTagManage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case "e":
+		// 编辑当前选中的标签
+		if len(m.availableTags) == 0 {
+			if m.language == Chinese {
+				m.message = "没有可编辑的标签"
+			} else {
+				m.message = "No tags to edit"
+			}
+			return m, nil
+		}
+
+		// 获取当前选中的标签
+		selectedTag := m.availableTags[m.tagManageCursor]
+
+		// 进入标签编辑状态
+		m.state = WatchlistTagEdit
+		m.tagToEdit = selectedTag
+		m.tagEditInput = selectedTag // 预填充当前标签名称
+		m.message = ""
+		return m, nil
 	case "up", "k", "w":
 		if len(m.availableTags) > 0 && m.tagManageCursor > 0 {
 			m.tagManageCursor--
@@ -4089,6 +4140,74 @@ func (m *Model) handleWatchlistTagRemoveSelect(msg tea.KeyMsg) (tea.Model, tea.C
 	return m, nil
 }
 
+// 处理标签编辑界面
+func (m *Model) handleWatchlistTagEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q":
+		// 取消编辑，返回标签管理界面
+		m.state = WatchlistTagManage
+		m.message = m.getText("tagEditCanceled")
+		m.tagEditInput = ""
+		m.tagToEdit = ""
+		return m, nil
+	case "enter":
+		// 确认编辑
+		newTagName := strings.TrimSpace(m.tagEditInput)
+
+		// 验证新标签名称
+		if newTagName == "" {
+			m.message = m.getText("tagNameRequired")
+			return m, nil
+		}
+
+		// 检查是否与原标签相同
+		if newTagName == m.tagToEdit {
+			m.message = m.getText("tagNameUnchanged")
+			return m, nil
+		}
+
+		// 批量更新所有使用该标签的股票
+		updatedCount := m.renameTagForAllStocks(m.tagToEdit, newTagName)
+
+		// 保存更新
+		m.invalidateWatchlistCache()
+		m.saveWatchlist()
+
+		// 更新可用标签列表
+		m.availableTags = m.getAvailableTags()
+
+		// 如果当前过滤标签是被修改的标签，更新过滤标签
+		if m.selectedTag == m.tagToEdit {
+			m.selectedTag = newTagName
+		}
+
+		// 显示成功消息
+		m.message = fmt.Sprintf(m.getText("tagEditSuccess"), m.tagToEdit, newTagName, updatedCount)
+
+		// 返回标签管理界面
+		m.state = WatchlistTagManage
+		m.tagEditInput = ""
+		m.tagToEdit = ""
+
+		return m, nil
+	case "backspace":
+		// 删除最后一个字符（正确处理多字节字符如中文）
+		if len(m.tagEditInput) > 0 {
+			runes := []rune(m.tagEditInput)
+			if len(runes) > 0 {
+				m.tagEditInput = string(runes[:len(runes)-1])
+			}
+		}
+		return m, nil
+	default:
+		// 处理文本输入
+		if len(msg.String()) == 1 || len(msg.String()) > 1 && msg.Type == tea.KeyRunes {
+			m.tagEditInput += msg.String()
+		}
+		return m, nil
+	}
+}
+
 // 标签管理界面视图
 func (m *Model) viewWatchlistTagManage() string {
 	var s string
@@ -4152,6 +4271,7 @@ func (m *Model) viewWatchlistTagManage() string {
 			s += "  ↑↓ - 选择标签\n"
 			s += "  Enter - 添加/切换选中标签\n"
 			s += "  D - 删除选中标签(如果当前股票拥有)\n"
+			s += "  E - 编辑选中标签(批量修改所有使用该标签的股票)\n"
 			s += "  N - 创建新标签\n"
 			s += "  ESC/Q - 返回自选列表\n"
 		} else {
@@ -4159,6 +4279,7 @@ func (m *Model) viewWatchlistTagManage() string {
 			s += "  ↑↓ - Select tag\n"
 			s += "  Enter - Add/toggle selected tag\n"
 			s += "  D - Remove selected tag (if owned by current stock)\n"
+			s += "  E - Edit selected tag (batch update all stocks with this tag)\n"
 			s += "  N - Create new tag\n"
 			s += "  ESC/Q - Return to watchlist\n"
 		}
@@ -4203,6 +4324,29 @@ func (m *Model) viewWatchlistTagRemoveSelect() string {
 		} else {
 			s += "Actions: ↑↓ select tag, Enter remove, ESC/Q cancel"
 		}
+	}
+
+	return s
+}
+
+// 标签编辑界面视图
+func (m *Model) viewWatchlistTagEdit() string {
+	var s string
+
+	s += m.getText("editTagTitle") + "\n\n"
+	s += fmt.Sprintf(m.getText("editingTag"), m.tagToEdit) + "\n\n"
+	s += m.getText("enterNewTagName") + m.tagEditInput + "\n\n"
+
+	if m.language == Chinese {
+		s += "提示: 修改后将更新所有使用此标签的股票\n"
+		s += "操作: Enter 确认, ESC/Q 取消"
+	} else {
+		s += "Note: All stocks using this tag will be updated\n"
+		s += "Actions: Enter to confirm, ESC/Q to cancel"
+	}
+
+	if m.message != "" {
+		s += "\n\n" + m.message
 	}
 
 	return s

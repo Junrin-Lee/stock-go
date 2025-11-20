@@ -36,6 +36,7 @@ const (
 	WatchlistTagSelect       // 自选股票标签选择状态
 	WatchlistTagManage       // 自选股票标签管理状态（显示当前股票的所有标签）
 	WatchlistTagRemoveSelect // 自选股票标签删除选择状态
+	WatchlistTagEdit         // 自选股票标签编辑状态（修改标签名称）
 	WatchlistGroupSelect     // 自选股票分组选择状态
 	PortfolioSorting         // 持股列表排序状态
 	WatchlistSorting         // 自选列表排序状态
