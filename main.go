@@ -157,13 +157,16 @@ type Model struct {
 	debugScrollPos  int      // debug日志滚动位置
 
 	// For stock addition
-	addingStep    int
-	tempCode      string
-	tempCost      string
-	tempQuantity  string
-	stockInfo     *StockData
-	fromSearch    bool     // 标记是否从搜索结果添加
-	previousState AppState // 记录进入编辑/删除前的状态
+	addingStep       int
+	tempCode         string
+	tempCodeCursor   int    // 股票代码输入光标位置
+	tempCost         string
+	tempCostCursor   int    // 成本价输入光标位置
+	tempQuantity     string
+	tempQuantityCursor int  // 数量输入光标位置
+	stockInfo        *StockData
+	fromSearch       bool     // 标记是否从搜索结果添加
+	previousState    AppState // 记录进入编辑/删除前的状态
 
 	// For stock editing
 	editingStep        int
@@ -171,6 +174,7 @@ type Model struct {
 
 	// For stock searching
 	searchInput         string
+	searchInputCursor   int  // 搜索输入光标位置
 	searchResult        *StockData
 	searchFromWatchlist bool // 标记是否从自选列表进入搜索
 
@@ -187,16 +191,18 @@ type Model struct {
 	watchlistCursor    int // 自选列表当前选中行
 
 	// For watchlist tagging and grouping
-	selectedTag      string   // 当前选择的标签过滤
-	availableTags    []string // 所有可用的标签列表
-	tagInput         string   // 标签输入框内容
-	tagSelectCursor  int      // 标签选择界面的游标位置
-	currentStockTags []string // 当前选中股票的标签列表（用于删除管理）
-	tagManageCursor  int      // 标签管理界面的游标位置
-	tagRemoveCursor  int      // 标签删除选择界面的游标位置
-	isInRemoveMode   bool     // 是否处于删除模式
-	tagToEdit        string   // 要编辑的原标签名称
-	tagEditInput     string   // 标签编辑输入框内容
+	selectedTag       string   // 当前选择的标签过滤
+	availableTags     []string // 所有可用的标签列表
+	tagInput          string   // 标签输入框内容
+	tagInputCursor    int      // 标签输入光标位置
+	tagSelectCursor   int      // 标签选择界面的游标位置
+	currentStockTags  []string // 当前选中股票的标签列表（用于删除管理）
+	tagManageCursor   int      // 标签管理界面的游标位置
+	tagRemoveCursor   int      // 标签删除选择界面的游标位置
+	isInRemoveMode    bool     // 是否处于删除模式
+	tagToEdit         string   // 要编辑的原标签名称
+	tagEditInput      string   // 标签编辑输入框内容
+	tagEditInputCursor int     // 标签编辑输入光标位置
 
 	// Performance optimization - cached filtered watchlist
 	cachedFilteredWatchlist  []WatchlistStock // 缓存的过滤后自选列表
@@ -2914,11 +2920,15 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = WatchlistViewing
 			m.resetWatchlistCursor() // 重置游标到第一只股票
 			m.searchFromWatchlist = false
+			m.searchInput = ""
+			m.searchInputCursor = 0
 			m.message = ""
 			return m, m.tickCmd() // 重启定时器
 		} else {
 			m.state = MainMenu
 		}
+		m.searchInput = ""
+		m.searchInputCursor = 0
 		m.message = ""
 		return m, nil
 	case "enter":
@@ -2942,21 +2952,37 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.state = SearchResultWithActions
 		}
+		m.searchInput = ""
+		m.searchInputCursor = 0
 		m.message = ""
 		return m, nil
-	case "backspace":
-		if len(m.searchInput) > 0 {
-			// 正确处理多字节字符（如中文）的删除
-			runes := []rune(m.searchInput)
-			if len(runes) > 0 {
-				m.searchInput = string(runes[:len(runes)-1])
-			}
+	case "left", "ctrl+b":
+		if m.searchInputCursor > 0 {
+			m.searchInputCursor--
 		}
+		return m, nil
+	case "right", "ctrl+f":
+		runes := []rune(m.searchInput)
+		if m.searchInputCursor < len(runes) {
+			m.searchInputCursor++
+		}
+		return m, nil
+	case "home", "ctrl+a":
+		m.searchInputCursor = 0
+		return m, nil
+	case "end", "ctrl+e":
+		m.searchInputCursor = len([]rune(m.searchInput))
+		return m, nil
+	case "backspace":
+		m.searchInput, m.searchInputCursor = deleteRuneBeforeCursor(m.searchInput, m.searchInputCursor)
+		return m, nil
+	case "delete", "ctrl+d":
+		m.searchInput, m.searchInputCursor = deleteRuneAtCursor(m.searchInput, m.searchInputCursor)
+		return m, nil
 	default:
-		// 改进的输入处理：支持多字节字符（如中文）
 		str := msg.String()
 		if len(str) > 0 && str != "\n" && str != "\r" && !isControlKey(str) {
-			m.searchInput += str
+			m.searchInput, m.searchInputCursor = insertStringAtCursor(m.searchInput, m.searchInputCursor, str)
 		}
 	}
 	return m, nil
@@ -2979,9 +3005,14 @@ func (m *Model) handleSearchResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) viewSearchingStock() string {
 	s := m.getText("searchTitle") + "\n\n"
-	s += m.getText("enterSearch") + m.searchInput + "_\n\n"
+	s += m.getText("enterSearch") + formatTextWithCursor(m.searchInput, m.searchInputCursor) + "\n\n"
 	s += m.getText("searchFormats") + "\n\n"
-	s += m.getText("searchHelp") + "\n"
+
+	if m.language == Chinese {
+		s += "操作: ←/→移动光标, Enter搜索, ESC返回, Home/End跳转首尾\n"
+	} else {
+		s += "Actions: ←/→ move cursor, Enter search, ESC back, Home/End jump\n"
+	}
 
 	if m.message != "" {
 		s += "\n" + m.message + "\n"
@@ -3551,6 +3582,7 @@ func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = WatchlistTagManage
 		m.tagManageCursor = 0
 		m.tagInput = ""
+		m.tagInputCursor = 0
 		return m, nil
 	case "esc", "q":
 		// 回到标签管理界面
@@ -3558,22 +3590,43 @@ func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = WatchlistTagManage
 		m.tagManageCursor = 0
 		m.tagInput = ""
+		m.tagInputCursor = 0
 		m.message = ""
 		return m, nil
-	case "backspace":
-		if len(m.tagInput) > 0 {
-			// 正确处理UTF-8字符（包括中文）的删除
-			runes := []rune(m.tagInput)
-			if len(runes) > 0 {
-				m.tagInput = string(runes[:len(runes)-1])
-			}
+	case "left", "ctrl+b":
+		// 光标左移
+		if m.tagInputCursor > 0 {
+			m.tagInputCursor--
 		}
 		return m, nil
+	case "right", "ctrl+f":
+		// 光标右移
+		runes := []rune(m.tagInput)
+		if m.tagInputCursor < len(runes) {
+			m.tagInputCursor++
+		}
+		return m, nil
+	case "home", "ctrl+a":
+		// 光标移到开头
+		m.tagInputCursor = 0
+		return m, nil
+	case "end", "ctrl+e":
+		// 光标移到末尾
+		m.tagInputCursor = len([]rune(m.tagInput))
+		return m, nil
+	case "backspace":
+		// 删除光标前的字符
+		m.tagInput, m.tagInputCursor = deleteRuneBeforeCursor(m.tagInput, m.tagInputCursor)
+		return m, nil
+	case "delete", "ctrl+d":
+		// 删除光标处的字符
+		m.tagInput, m.tagInputCursor = deleteRuneAtCursor(m.tagInput, m.tagInputCursor)
+		return m, nil
 	default:
-		// 使用与项目其他输入处理相同的逻辑，支持中文字符
+		// 处理文本输入
 		str := msg.String()
 		if len(str) > 0 && str != "\n" && str != "\r" && !isControlKey(str) {
-			m.tagInput += str
+			m.tagInput, m.tagInputCursor = insertStringAtCursor(m.tagInput, m.tagInputCursor, str)
 		}
 		return m, nil
 	}
@@ -3636,13 +3689,13 @@ func (m *Model) viewWatchlistTagging() string {
 		if m.language == Chinese {
 			s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
 			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay())
-			s += "请输入新标签(多个标签用逗号分隔): " + m.tagInput + "_\n\n"
-			s += "按Enter确认，ESC或Q键取消"
+			s += "请输入新标签(多个标签用逗号分隔): " + formatTextWithCursor(m.tagInput, m.tagInputCursor) + "\n\n"
+			s += "操作: ←/→移动光标, Enter确认, ESC/Q取消, Home/End跳转首尾"
 		} else {
 			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
 			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay())
-			s += "Enter new tags (comma separated): " + m.tagInput + "_\n\n"
-			s += "Press Enter to confirm, ESC or Q to cancel"
+			s += "Enter new tags (comma separated): " + formatTextWithCursor(m.tagInput, m.tagInputCursor) + "\n\n"
+			s += "Actions: ←/→ move cursor, Enter confirm, ESC/Q cancel, Home/End jump"
 		}
 	}
 
@@ -3988,6 +4041,7 @@ func (m *Model) handleWatchlistTagManage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = WatchlistTagEdit
 		m.tagToEdit = selectedTag
 		m.tagEditInput = selectedTag // 预填充当前标签名称
+		m.tagEditInputCursor = len([]rune(selectedTag)) // 光标放在末尾
 		m.message = ""
 		return m, nil
 	case "up", "k", "w":
@@ -4148,6 +4202,7 @@ func (m *Model) handleWatchlistTagEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = WatchlistTagManage
 		m.message = m.getText("tagEditCanceled")
 		m.tagEditInput = ""
+		m.tagEditInputCursor = 0
 		m.tagToEdit = ""
 		return m, nil
 	case "enter":
@@ -4187,22 +4242,43 @@ func (m *Model) handleWatchlistTagEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// 返回标签管理界面
 		m.state = WatchlistTagManage
 		m.tagEditInput = ""
+		m.tagEditInputCursor = 0
 		m.tagToEdit = ""
 
 		return m, nil
-	case "backspace":
-		// 删除最后一个字符（正确处理多字节字符如中文）
-		if len(m.tagEditInput) > 0 {
-			runes := []rune(m.tagEditInput)
-			if len(runes) > 0 {
-				m.tagEditInput = string(runes[:len(runes)-1])
-			}
+	case "left", "ctrl+b":
+		// 光标左移
+		if m.tagEditInputCursor > 0 {
+			m.tagEditInputCursor--
 		}
+		return m, nil
+	case "right", "ctrl+f":
+		// 光标右移
+		runes := []rune(m.tagEditInput)
+		if m.tagEditInputCursor < len(runes) {
+			m.tagEditInputCursor++
+		}
+		return m, nil
+	case "home", "ctrl+a":
+		// 光标移到开头
+		m.tagEditInputCursor = 0
+		return m, nil
+	case "end", "ctrl+e":
+		// 光标移到末尾
+		m.tagEditInputCursor = len([]rune(m.tagEditInput))
+		return m, nil
+	case "backspace":
+		// 删除光标前的字符
+		m.tagEditInput, m.tagEditInputCursor = deleteRuneBeforeCursor(m.tagEditInput, m.tagEditInputCursor)
+		return m, nil
+	case "delete", "ctrl+d":
+		// 删除光标处的字符
+		m.tagEditInput, m.tagEditInputCursor = deleteRuneAtCursor(m.tagEditInput, m.tagEditInputCursor)
 		return m, nil
 	default:
 		// 处理文本输入
-		if len(msg.String()) == 1 || len(msg.String()) > 1 && msg.Type == tea.KeyRunes {
-			m.tagEditInput += msg.String()
+		if len(msg.String()) == 1 || (len(msg.String()) > 1 && msg.Type == tea.KeyRunes) {
+			m.tagEditInput, m.tagEditInputCursor = insertStringAtCursor(m.tagEditInput, m.tagEditInputCursor, msg.String())
 		}
 		return m, nil
 	}
@@ -4335,14 +4411,14 @@ func (m *Model) viewWatchlistTagEdit() string {
 
 	s += m.getText("editTagTitle") + "\n\n"
 	s += fmt.Sprintf(m.getText("editingTag"), m.tagToEdit) + "\n\n"
-	s += m.getText("enterNewTagName") + m.tagEditInput + "\n\n"
+	s += m.getText("enterNewTagName") + formatTextWithCursor(m.tagEditInput, m.tagEditInputCursor) + "\n\n"
 
 	if m.language == Chinese {
 		s += "提示: 修改后将更新所有使用此标签的股票\n"
-		s += "操作: Enter 确认, ESC/Q 取消"
+		s += "操作: ←/→移动光标, Enter确认, ESC/Q取消, Home/End跳转首尾"
 	} else {
 		s += "Note: All stocks using this tag will be updated\n"
-		s += "Actions: Enter to confirm, ESC/Q to cancel"
+		s += "Actions: ←/→ move cursor, Enter confirm, ESC/Q cancel, Home/End jump"
 	}
 
 	if m.message != "" {
@@ -4350,6 +4426,135 @@ func (m *Model) viewWatchlistTagEdit() string {
 	}
 
 	return s
+}
+
+// 文本编辑辅助函数：在光标位置插入字符
+func insertRuneAtCursor(text string, cursor int, r rune) (string, int) {
+	runes := []rune(text)
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor > len(runes) {
+		cursor = len(runes)
+	}
+
+	// 在光标位置插入字符
+	newRunes := make([]rune, len(runes)+1)
+	copy(newRunes[:cursor], runes[:cursor])
+	newRunes[cursor] = r
+	copy(newRunes[cursor+1:], runes[cursor:])
+
+	return string(newRunes), cursor + 1
+}
+
+// 文本编辑辅助函数：在光标位置插入字符串
+func insertStringAtCursor(text string, cursor int, insert string) (string, int) {
+	runes := []rune(text)
+	insertRunes := []rune(insert)
+
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor > len(runes) {
+		cursor = len(runes)
+	}
+
+	// 在光标位置插入字符串
+	newRunes := make([]rune, len(runes)+len(insertRunes))
+	copy(newRunes[:cursor], runes[:cursor])
+	copy(newRunes[cursor:cursor+len(insertRunes)], insertRunes)
+	copy(newRunes[cursor+len(insertRunes):], runes[cursor:])
+
+	return string(newRunes), cursor + len(insertRunes)
+}
+
+// 文本编辑辅助函数：在光标位置删除字符（退格键）
+func deleteRuneBeforeCursor(text string, cursor int) (string, int) {
+	runes := []rune(text)
+	if cursor <= 0 || len(runes) == 0 {
+		return text, cursor
+	}
+	if cursor > len(runes) {
+		cursor = len(runes)
+	}
+
+	// 删除光标前的字符
+	newRunes := make([]rune, len(runes)-1)
+	copy(newRunes[:cursor-1], runes[:cursor-1])
+	copy(newRunes[cursor-1:], runes[cursor:])
+
+	return string(newRunes), cursor - 1
+}
+
+// 文本编辑辅助函数：在光标位置删除字符（Delete键）
+func deleteRuneAtCursor(text string, cursor int) (string, int) {
+	runes := []rune(text)
+	if cursor < 0 || cursor >= len(runes) || len(runes) == 0 {
+		return text, cursor
+	}
+
+	// 删除光标处的字符
+	newRunes := make([]rune, len(runes)-1)
+	copy(newRunes[:cursor], runes[:cursor])
+	copy(newRunes[cursor:], runes[cursor+1:])
+
+	return string(newRunes), cursor
+}
+
+// 文本编辑辅助函数：格式化带光标的文本用于显示
+func formatTextWithCursor(text string, cursor int) string {
+	runes := []rune(text)
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor > len(runes) {
+		cursor = len(runes)
+	}
+
+	// 在光标位置插入光标符号
+	if cursor == len(runes) {
+		return text + "│"
+	}
+
+	before := string(runes[:cursor])
+	after := string(runes[cursor:])
+	return before + "│" + after
+}
+
+// 通用输入处理函数：处理光标移动和文本编辑
+func handleTextInput(msg tea.KeyMsg, text *string, cursor *int) bool {
+	switch msg.String() {
+	case "left", "ctrl+b":
+		if *cursor > 0 {
+			*cursor--
+		}
+		return true
+	case "right", "ctrl+f":
+		runes := []rune(*text)
+		if *cursor < len(runes) {
+			*cursor++
+		}
+		return true
+	case "home", "ctrl+a":
+		*cursor = 0
+		return true
+	case "end", "ctrl+e":
+		*cursor = len([]rune(*text))
+		return true
+	case "backspace":
+		*text, *cursor = deleteRuneBeforeCursor(*text, *cursor)
+		return true
+	case "delete", "ctrl+d":
+		*text, *cursor = deleteRuneAtCursor(*text, *cursor)
+		return true
+	default:
+		str := msg.String()
+		if len(str) > 0 && str != "\n" && str != "\r" && !isControlKey(str) {
+			*text, *cursor = insertStringAtCursor(*text, *cursor, str)
+			return true
+		}
+	}
+	return false
 }
 
 // 检查股票是否已在自选列表中
