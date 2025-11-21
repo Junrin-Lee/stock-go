@@ -171,6 +171,24 @@ func (m *Model) optimizedSortPortfolio(field SortField, direction SortDirection)
 	sorter.SortPortfolio(m.portfolio.Stocks, field, direction)
 }
 
+// updatePortfolioPricesFromCache 从缓存更新持股列表的价格数据
+// 用于排序前确保价格数据是最新的
+func (m *Model) updatePortfolioPricesFromCache() {
+	for i := range m.portfolio.Stocks {
+		stock := &m.portfolio.Stocks[i]
+		stockData := m.getStockPriceFromCache(stock.Code)
+		if stockData != nil {
+			stock.Price = stockData.Price
+			stock.Change = stockData.Change
+			stock.ChangePercent = stockData.ChangePercent
+			stock.StartPrice = stockData.StartPrice
+			stock.MaxPrice = stockData.MaxPrice
+			stock.MinPrice = stockData.MinPrice
+			stock.PrevClose = stockData.PrevClose
+		}
+	}
+}
+
 func (m *Model) optimizedSortWatchlist(field SortField, direction SortDirection) {
 	// 获取过滤后的股票列表
 	filteredStocks := m.getFilteredWatchlist()

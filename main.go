@@ -147,6 +147,7 @@ type Model struct {
 	menuItems       []string
 	cursor          int
 	input           string
+	inputCursor     int    // 通用输入框光标位置
 	message         string
 	portfolio       Portfolio
 	watchlist       Watchlist // 自选股票列表
@@ -472,6 +473,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.stockPriceMutex.Unlock()
 			debugPrint("[信息] 股价缓存已更新: %s\n", msg.Symbol)
+
+			// 如果当前在自选列表且已启用排序，重新应用排序以保持顺序正确
+			if m.state == WatchlistViewing && m.watchlistIsSorted {
+				m.optimizedSortWatchlist(m.watchlistSortField, m.watchlistSortDirection)
+			}
+
+			// 如果当前在持股列表且已启用排序，先更新价格数据再重新排序
+			if m.state == Monitoring && m.portfolioIsSorted {
+				m.updatePortfolioPricesFromCache()
+				m.optimizedSortPortfolio(m.portfolioSortField, m.portfolioSortDirection)
+			}
 		} else {
 			// 更新失败，标记为未更新状态
 			m.stockPriceMutex.Lock()
@@ -688,22 +700,38 @@ func (m *Model) handleAddingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = MainMenu
 		}
 		m.message = ""
+		m.inputCursor = 0
 		return m, nil
 	case "enter":
 		return m.processAddingStep()
-	case "backspace":
-		if len(m.input) > 0 {
-			// 正确处理多字节字符（如中文）的删除
-			runes := []rune(m.input)
-			if len(runes) > 0 {
-				m.input = string(runes[:len(runes)-1])
-			}
+	case "left", "ctrl+b":
+		if m.inputCursor > 0 {
+			m.inputCursor--
 		}
+		return m, nil
+	case "right", "ctrl+f":
+		runes := []rune(m.input)
+		if m.inputCursor < len(runes) {
+			m.inputCursor++
+		}
+		return m, nil
+	case "home", "ctrl+a":
+		m.inputCursor = 0
+		return m, nil
+	case "end", "ctrl+e":
+		m.inputCursor = len([]rune(m.input))
+		return m, nil
+	case "backspace":
+		m.input, m.inputCursor = deleteRuneBeforeCursor(m.input, m.inputCursor)
+		return m, nil
+	case "delete", "ctrl+d":
+		m.input, m.inputCursor = deleteRuneAtCursor(m.input, m.inputCursor)
+		return m, nil
 	default:
 		// 改进的输入处理：支持多字节字符（如中文）
 		str := msg.String()
 		if len(str) > 0 && str != "\n" && str != "\r" && !isControlKey(str) {
-			m.input += str
+			m.input, m.inputCursor = insertStringAtCursor(m.input, m.inputCursor, str)
 		}
 	}
 	return m, nil
@@ -736,6 +764,7 @@ func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 		if stockData == nil || stockData.Name == "" {
 			m.message = fmt.Sprintf(m.getText("searchNotFound"), m.input)
 			m.input = ""
+			m.inputCursor = 0
 			return m, nil
 		}
 
@@ -744,6 +773,7 @@ func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 		m.tempCode = stockData.Symbol
 		m.addingStep = 1
 		m.input = ""
+		m.inputCursor = 0
 		m.message = ""
 	case 1: // 输入成本价
 		if m.input == "" {
@@ -753,11 +783,13 @@ func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 		if _, err := strconv.ParseFloat(m.input, 64); err != nil {
 			m.message = m.getText("invalidPrice")
 			m.input = ""
+			m.inputCursor = 0
 			return m, nil
 		}
 		m.tempCost = m.input
 		m.addingStep = 2
 		m.input = ""
+		m.inputCursor = 0
 		m.message = ""
 	case 2: // 输入数量
 		if m.input == "" {
@@ -767,6 +799,7 @@ func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 		if _, err := strconv.Atoi(m.input); err != nil {
 			m.message = m.getText("invalidQuantity")
 			m.input = ""
+			m.inputCursor = 0
 			return m, nil
 		}
 		m.tempQuantity = m.input
@@ -814,22 +847,27 @@ func (m *Model) viewAddingStock() string {
 
 	switch m.addingStep {
 	case 0:
-		s += m.getText("enterSearch") + m.input + "_\n"
+		s += m.getText("enterSearch") + formatTextWithCursor(m.input, m.inputCursor) + "\n"
 		s += "\n" + m.getText("searchFormats") + "\n"
 	case 1:
 		s += fmt.Sprintf(m.getText("stockCode"), m.tempCode) + "\n"
 		s += fmt.Sprintf(m.getText("stockName"), m.stockInfo.Name) + "\n"
 		s += fmt.Sprintf(m.getText("currentPrice"), m.stockInfo.Price) + "\n\n"
-		s += m.getText("enterCost") + m.input + "_\n"
+		s += m.getText("enterCost") + formatTextWithCursor(m.input, m.inputCursor) + "\n"
 	case 2:
 		s += fmt.Sprintf(m.getText("stockCode"), m.tempCode) + "\n"
 		s += fmt.Sprintf(m.getText("stockName"), m.stockInfo.Name) + "\n"
 		s += fmt.Sprintf(m.getText("currentPrice"), m.stockInfo.Price) + "\n"
 		s += fmt.Sprintf(m.getText("costPrice"), m.tempCost) + "\n\n"
-		s += m.getText("enterQuantity") + m.input + "_\n"
+		s += m.getText("enterQuantity") + formatTextWithCursor(m.input, m.inputCursor) + "\n"
 	}
 
-	s += "\n" + m.getText("returnEscOnly") + "\n"
+	// 添加光标操作提示
+	if m.language == Chinese {
+		s += "\n操作: ←/→移动光标, Enter确认, ESC返回, Home/End跳转首尾\n"
+	} else {
+		s += "\nActions: ←/→ move cursor, Enter confirm, ESC back, Home/End jump\n"
+	}
 
 	if m.message != "" {
 		s += "\n" + m.message + "\n"
@@ -858,7 +896,8 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.tempCode = m.portfolio.Stocks[m.portfolioCursor].Code
 		m.tempCost = ""
 		m.tempQuantity = ""
-		m.input = fmt.Sprintf("%.2f", m.portfolio.Stocks[m.portfolioCursor].CostPrice) // 预填充当前成本价
+		m.input = fmt.Sprintf("%.*f", m.config.Display.DecimalPlaces, m.portfolio.Stocks[m.portfolioCursor].CostPrice) // 预填充当前成本价，使用配置的小数位数
+		m.inputCursor = len([]rune(m.input))                                           // 光标放到末尾
 		m.message = ""
 		return m, nil
 	case "d":
@@ -2801,27 +2840,44 @@ func (m *Model) handleEditingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.resetPortfolioCursor() // 重置游标到第一只股票
 			m.lastUpdate = time.Now()
 			m.message = ""
+			m.inputCursor = 0
 			return m, m.tickCmd()
 		} else {
 			m.state = MainMenu
 			m.message = ""
+			m.inputCursor = 0
 			return m, nil
 		}
 	case "enter", " ":
 		return m.processEditingStep()
-	case "backspace":
-		if len(m.input) > 0 {
-			// 正确处理多字节字符（如中文）的删除
-			runes := []rune(m.input)
-			if len(runes) > 0 {
-				m.input = string(runes[:len(runes)-1])
-			}
+	case "left", "ctrl+b":
+		if m.inputCursor > 0 {
+			m.inputCursor--
 		}
+		return m, nil
+	case "right", "ctrl+f":
+		runes := []rune(m.input)
+		if m.inputCursor < len(runes) {
+			m.inputCursor++
+		}
+		return m, nil
+	case "home", "ctrl+a":
+		m.inputCursor = 0
+		return m, nil
+	case "end", "ctrl+e":
+		m.inputCursor = len([]rune(m.input))
+		return m, nil
+	case "backspace":
+		m.input, m.inputCursor = deleteRuneBeforeCursor(m.input, m.inputCursor)
+		return m, nil
+	case "delete", "ctrl+d":
+		m.input, m.inputCursor = deleteRuneAtCursor(m.input, m.inputCursor)
+		return m, nil
 	default:
 		// 改进的输入处理：支持多字节字符（如中文）
 		str := msg.String()
 		if len(str) > 0 && str != "\n" && str != "\r" && !isControlKey(str) {
-			m.input += str
+			m.input, m.inputCursor = insertStringAtCursor(m.input, m.inputCursor, str)
 		}
 	}
 	return m, nil
@@ -2837,11 +2893,13 @@ func (m *Model) processEditingStep() (tea.Model, tea.Cmd) {
 		if newCost, err := strconv.ParseFloat(m.input, 64); err != nil {
 			m.message = m.getText("invalidPrice")
 			m.input = ""
+			m.inputCursor = 0
 			return m, nil
 		} else {
 			m.portfolio.Stocks[m.selectedStockIndex].CostPrice = newCost
 			m.editingStep = 2
 			m.input = fmt.Sprintf("%d", m.portfolio.Stocks[m.selectedStockIndex].Quantity)
+			m.inputCursor = len([]rune(m.input)) // 光标放到末尾
 			m.message = ""
 		}
 	case 2: // 修改数量
@@ -2852,6 +2910,7 @@ func (m *Model) processEditingStep() (tea.Model, tea.Cmd) {
 		if newQuantity, err := strconv.Atoi(m.input); err != nil {
 			m.message = m.getText("invalidQuantity")
 			m.input = ""
+			m.inputCursor = 0
 			return m, nil
 		} else {
 			m.portfolio.Stocks[m.selectedStockIndex].Quantity = newQuantity
@@ -2867,12 +2926,14 @@ func (m *Model) processEditingStep() (tea.Model, tea.Cmd) {
 				m.message = fmt.Sprintf(m.getText("editSuccess"), stockName)
 				m.editingStep = 0
 				m.input = ""
+				m.inputCursor = 0
 				return m, m.tickCmd()
 			} else {
 				m.state = MainMenu
 				m.message = fmt.Sprintf(m.getText("editSuccess"), stockName)
 				m.editingStep = 0
 				m.input = ""
+				m.inputCursor = 0
 			}
 		}
 	}
@@ -2891,8 +2952,7 @@ func (m *Model) viewEditingStock() string {
 			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
 		}
 		s += fmt.Sprintf(m.getText("currentCost"), stock.CostPrice) + "\n\n"
-		s += m.getText("enterNewCost") + m.input + "_\n"
-		s += "\n" + m.getText("returnToMenuShort") + "\n"
+		s += m.getText("enterNewCost") + formatTextWithCursor(m.input, m.inputCursor) + "\n"
 	case 2:
 		stock := m.portfolio.Stocks[m.selectedStockIndex]
 		if m.language == Chinese {
@@ -2902,8 +2962,14 @@ func (m *Model) viewEditingStock() string {
 		}
 		s += fmt.Sprintf(m.getText("newCost"), stock.CostPrice) + "\n"
 		s += fmt.Sprintf(m.getText("currentQuantity"), stock.Quantity) + "\n\n"
-		s += m.getText("enterNewQuantity") + m.input + "_\n"
-		s += "\n" + m.getText("returnToMenuShort") + "\n"
+		s += m.getText("enterNewQuantity") + formatTextWithCursor(m.input, m.inputCursor) + "\n"
+	}
+
+	// 添加光标操作提示
+	if m.language == Chinese {
+		s += "\n操作: ←/→移动光标, Enter确认, ESC/Q返回, Home/End跳转首尾\n"
+	} else {
+		s += "\nActions: ←/→ move cursor, Enter confirm, ESC/Q back, Home/End jump\n"
 	}
 
 	if m.message != "" {
