@@ -6,16 +6,16 @@
 
 ## 🌟 Project Overview
 
-Stock Monitor is a professional command-line stock monitoring tool that provides real-time stock price tracking, portfolio management, and fund flow analysis for investors.
+Stock Monitor is a professional command-line stock monitoring tool that provides real-time stock price tracking, portfolio management, and watchlist analysis for investors.
 
 ### 🎯 Core Features
 
 - **🔄 Real-time Monitoring** - 5-second interval automatic price refresh, capture every trading moment
-- **📊 Professional Analysis** - 18-column detailed data display including OHLC, today's P&L, position P&L, P&L rate analysis, market value statistics
-- **💰 Fund Flow Data** - Integrated AKShare for main net inflow, super large orders, large orders, medium orders, small orders and other 6-dimensional fund data
+- **📊 Professional Analysis** - Detailed data display including OHLC, today's P&L, position P&L, P&L rate analysis, market value statistics
+- **🏷️ Multi-Tag Management** - Watchlist stocks support multiple tags for flexible grouping
 - **🎨 Smart Display** - Professional stock software color standards: red for gains, green for losses, white for neutral
 - **💼 Portfolio Management** - Complete position management with add, edit, and delete stock operations
-- **⭐ Watchlist Feature** - Independent stock watch list with tag grouping and fund flow analysis
+- **⭐ Watchlist Feature** - Independent stock watch list with multi-tag grouping and portfolio highlighting
 - **🌐 Global Markets** - Support for A-shares, US stocks, Hong Kong stocks and other major market code formats
 - **🌍 Multi-language** - Complete Chinese and English bilingual interface support
 - **💾 Data Persistence** - Local JSON storage, portfolio data never lost
@@ -27,6 +27,7 @@ Stock Monitor is a professional command-line stock monitoring tool that provides
 - Real-time keyboard response without waiting for confirmation
 - Smooth state transitions and menu navigation
 - Support for arrow keys, WASD, and Vim-style shortcuts
+- **Input cursor control**: Support left/right arrow keys to move cursor for editing
 
 ### 📈 Real-time Data Monitoring
 - **Auto Updates**: Refresh stock price data every 5 seconds (portfolio and watchlist)
@@ -39,13 +40,14 @@ Stock Monitor is a professional command-line stock monitoring tool that provides
 - **Position Management**: Add, edit, delete stocks in investment portfolio
 - **Cost Tracking**: Record purchase cost price and share quantity
 - **Auto Calculation**: Real-time calculation of market value, P&L and other key metrics
-- **Sorting Feature**: Support ascending/descending sorting by 11 fields
+- **Sorting Feature**: Support ascending/descending sorting by 11 fields with real-time updates
 
 ### ⭐ Watchlist Feature
 - **Watch List**: Independent stock watch list without investment
 - **Real-time Refresh**: Automatically update watchlist real-time market data every 5 seconds
-- **Tag Management**: Support adding custom tags to stocks and view by tag groups
-- **Fund Flow Data**: Integrated AKShare for A-share real-time fund flow data
+- **Multi-Tag Management**: Support adding multiple custom tags to stocks for flexible grouping
+- **Tag Operations**: Support adding, deleting, and editing tags
+- **Portfolio Highlighting**: Stocks also in portfolio are highlighted, color configurable
 - **Sorting Feature**: Support ascending/descending sorting by 7 fields
 
 ### 🎨 Professional Data Display
@@ -59,7 +61,6 @@ Stock Monitor is a professional command-line stock monitoring tool that provides
 ### 📦 Requirements
 
 - **Go Version**: 1.25.0 or higher
-- **Python Environment**: Python 3.x (for fund flow data acquisition)
 - **Network Connection**: For fetching real-time stock data
 - **System Support**: Windows, macOS, Linux
 - **Terminal**: Color display support (recommended)
@@ -77,27 +78,12 @@ cd stock-go
 go mod download
 ```
 
-#### 3️⃣ Setup Python Environment (Optional, for fund flow feature)
-```bash
-# Create Python virtual environment
-python3 -m venv venv
-
-# Activate virtual environment
-# Linux/macOS:
-source venv/bin/activate
-# Windows:
-venv\Scripts\activate
-
-# Install Python dependencies
-pip install akshare pandas
-```
-
-#### 4️⃣ Build Program
+#### 3️⃣ Build Program
 ```bash
 go build -o cmd/stock-monitor
 ```
 
-#### 5️⃣ Run Program
+#### 4️⃣ Run Program
 ```bash
 ./cmd/stock-monitor
 ```
@@ -112,6 +98,11 @@ go build -o cmd/stock-monitor
 - **Return**: `ESC` or `Q` key
 - **Force Quit**: `Ctrl+C`
 
+**Input Box Editing**:
+- `←→` Arrow keys: Move cursor position
+- `Backspace`: Delete character before cursor
+- `Delete`: Delete character after cursor
+
 **Portfolio Specific**:
 - `E` key: Edit selected stock
 - `D` key: Delete selected stock
@@ -123,7 +114,7 @@ go build -o cmd/stock-monitor
 - `A` key: Add stock to watchlist
 - `D` key: Delete selected stock
 - `S` key: Enter sort settings menu
-- `T` key: Add/modify tag for selected stock
+- `T` key: Enter tag management (add/delete/edit tags)
 - `G` key: Enter group view mode by tags
 - `C` key: Clear tag filter, show all stocks
 - `↑↓` keys: Paginate through watchlist
@@ -168,6 +159,7 @@ The system provides a `cmd/conf/config.yml` configuration file that users can ed
 | `display.decimal_places` | `3` | Price decimal places | `1-4` |
 | `display.table_style` | `"light"` | Table style | `"light"`, `"bold"`, `"simple"` |
 | `display.max_lines` | `10` | Rows displayed per page | Any positive integer (recommended 10-20) |
+| `display.portfolio_highlight` | `"yellow"` | Portfolio stock highlight color | `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white` |
 | `update.refresh_interval` | `5` | Data refresh interval (seconds) | Any positive integer |
 | `update.auto_update` | `true` | Enable auto update | `true`, `false` |
 
@@ -187,9 +179,10 @@ The watchlist module is a stock watch list that allows you to quickly view real-
 #### 🎯 Key Features
 - **Quick Watch**: One-click addition to watchlist after stock search
 - **Real-time Refresh**: Automatically update watchlist real-time market data every 5 seconds
-- **Complete Data**: Display detailed market data for watchlist stocks (including tags, turnover rate, volume, fund flow)
-- **Fund Flow Data**: Integrated AKShare for real-time fund flow data with 6 dimensions
-- **Tag Grouping**: Support adding custom tags to stocks and view by tag groups
+- **Complete Data**: Display detailed market data for watchlist stocks (including tags, turnover rate, volume)
+- **Multi-Tag Management**: Support adding multiple custom tags to stocks and view by tag groups
+- **Tag Operations**: Support adding new tags, selecting from existing tags, editing tag names, deleting tags
+- **Portfolio Highlighting**: Stocks also in portfolio are highlighted for easy identification
 - **Flexible Management**: Support adding, deleting, tagging, and group filtering of watchlist stocks
 - **Independent Storage**: Watchlist and portfolio are managed separately
 
@@ -207,7 +200,11 @@ Stock Search → Enter stock code/name → View details → Press "2" to add to 
 
 **3. Tag Management**
 ```
-Watchlist page → Press "T" key → Add tag to selected stock (supports Chinese) → Press Enter to confirm
+Watchlist page → Press "T" key → Enter tag management interface
+  ├─ Enter new tag name to add
+  ├─ Select from existing tag list
+  ├─ Edit existing tag name
+  └─ Delete unwanted tags
 ```
 
 **4. Group View**
@@ -221,12 +218,12 @@ Once in monitoring mode, the system displays professional stock data tables:
 
 **Portfolio** (14 columns):
 ```
-Code | Name | PrevClose | Price | Cost | Open | High | Low | Quantity | Today% | TodayP&L | PositionP&L | P&LRate | Value
+Code | Name | PrevClose | Price | Cost | Open | High | Low | Quantity | Today% | PositionP&L | P&LRate | Value
 ```
 
-**Watchlist** (18 columns, with fund flow):
+**Watchlist** (10 columns):
 ```
-Tag | Code | Name | Price | Today% | Turnover | Volume | MainFlow | SuperLarge | Large | Medium | Small | FlowRatio | ActiveBuy | ActiveSell | Open | High | Low
+Tag | Code | Name | Price | Today% | Turnover | Volume | Open | High | Low
 ```
 
 **Table Features**:
@@ -234,10 +231,11 @@ Tag | Code | Name | Price | Today% | Turnover | Volume | MainFlow | SuperLarge |
 - **Real-time Updates**: Automatically refresh latest stock data every 5 seconds
 - **Precise Calculations**: All P&L data calculated accurately based on real-time prices
 - **Summary Statistics**: Bottom shows overall portfolio P&L status
+- **Portfolio Highlighting**: Stocks in portfolio are highlighted in watchlist
 
 ### 🔍 Stock Search Function
 
-Support multiple search methods with perfect Chinese stock name search:
+Support multiple search methods with Chinese stock name search:
 
 ```
 === Stock Search ===
@@ -258,23 +256,6 @@ The system uses advanced multi-tier search strategy to ensure accurate real stoc
 ```
 Chinese Input → [Tencent Search API] → [Sina Search API] → [Keyword Variations] → [Not Found Prompt]
 ```
-
-### 💰 Fund Flow Analysis
-
-The system integrates AKShare to get A-share real-time fund flow data with the following 6 dimensions:
-
-1. **Main Net Inflow** - Overall main fund flow direction
-2. **Super Large Order Net Inflow** - Super large order fund flow
-3. **Large Order Net Inflow** - Large order fund flow
-4. **Medium Order Net Inflow** - Medium order fund flow
-5. **Small Order Net Inflow** - Small order fund flow
-6. **Net Inflow Ratio** - Main net inflow ratio
-
-**Data Features**:
-- **Async Acquisition**: Does not affect real-time stock price refresh
-- **Smart Caching**: Avoids frequent API requests
-- **Smart Units**: Automatically selects 10K/100M yuan unit display
-- **Color Indicators**: Positive (inflow/red), negative (outflow/green), zero (balanced/white)
 
 ## 🌐 Supported Stock Markets
 
@@ -321,7 +302,6 @@ Stock Code → [Chinese Stock?] → [Tencent API] → [Success?] → Return Data
 |:--------:|----------|-------------------|-------------------|------------------|
 | 🥇 **1** | **Tencent API** | 🇨🇳 A-Share Markets | Complete (OHLC) | Real-time |
 | 🥈 **2** | **Finnhub API** | 🇺🇸 US / 🇭🇰 HK Markets | Basic Data | Real-time |
-| 🥉 **3** | **AKShare API** | 🇨🇳 A-Share Fund Flow | 6-dimensional Fund Data | Real-time |
 
 ### 🔄 Fault Tolerance
 
@@ -337,6 +317,8 @@ stock-go/
 │
 ├── main.go                      # 🚀 Main program file (core logic)
 ├── consts.go                    # 📋 System constants definition
+├── color.go                     # 🎨 Color utilities
+├── sort.go                      # 🔧 Sorting module
 ├── go.mod                       # 📦 Go module dependencies
 ├── go.sum                       # 🔒 Dependency version lock file
 │
@@ -348,21 +330,14 @@ stock-go/
 │
 ├── data/
 │   ├── portfolio.json          # 📊 Portfolio data (auto-generated)
-│   └── watchlist.json          # ⭐ Watchlist data (auto-generated, with fund flow)
+│   └── watchlist.json          # ⭐ Watchlist data (auto-generated)
 │
 ├── i18n/
 │   ├── zh.json                 # 🇨🇳 Chinese language pack
 │   └── en.json                 # 🇺🇸 English language pack
 │
-├── scripts/
-│   └── akshare_fund_flow.py    # 🐍 AKShare fund flow data acquisition script
-│
-├── venv/                       # 🐍 Python virtual environment (fund flow feature)
-│
 ├── doc/                        # 📖 Documentation directory
-│   ├── FUND_FLOW_FIELDS.md     # Fund flow field descriptions
-│   ├── FUND_FLOW_README.md     # Fund flow feature usage guide
-│   └── test_search_with_fund_flow.md # Search feature test documentation
+│   └── version/                # 📋 Version history documents
 │
 ├── README.md                   # 📝 Chinese documentation
 └── README_EN.md                # 📝 English documentation
@@ -384,6 +359,7 @@ display:
     decimal_places: 3            # Price decimal places (1-4)
     table_style: light           # Table style: "light", "bold", "simple"
     max_lines: 10               # Rows displayed per page
+    portfolio_highlight: yellow  # Portfolio stock highlight color
 
 update:
     refresh_interval: 5          # Refresh interval (seconds)
@@ -411,24 +387,14 @@ update:
 }
 ```
 
-**data/watchlist.json** example (with fund flow):
+**data/watchlist.json** example (multi-tags):
 ```json
 {
   "stocks": [
     {
       "code": "SH600519",
       "name": "Kweichow Moutai",
-      "tag": "Liquor",
-      "fund_flow": {
-        "main_net_inflow": -27600.0,
-        "super_large_net_inflow": -10600.0,
-        "large_net_inflow": -16900.0,
-        "medium_net_inflow": 27600.0,
-        "small_net_inflow": -220.0,
-        "net_inflow_ratio": -6.20,
-        "active_buy_amount": 124580.0,
-        "active_sell_amount": 178940.0
-      }
+      "tags": ["Liquor", "Consumer"]
     }
   ]
 }
@@ -445,10 +411,8 @@ update:
      │
      ├─ 📡 Data Fetching ← HTTP Client + Encoding Conversion
      │              │
-     │              ├─ Tencent/Finnhub API (stock price data)
-     │              └─ AKShare API (fund flow)
-     │
-     ├─ 🐍 Python Integration ← Async AKShare script calls
+     │              ├─ Tencent API (A-share data)
+     │              └─ Finnhub API (US/HK stocks)
      │
      ├─ 🌍 Internationalization ← i18n JSON configuration files
      │
@@ -463,7 +427,6 @@ update:
 | **Go-Pretty** | `v6.6.8` | Table Layout Library | • Chinese character alignment<br>• Rich style support<br>• Out-of-the-box |
 | **Golang Text** | `v0.28.0` | Encoding Conversion | • GBK to UTF-8<br>• Multi-language support<br>• Official library |
 | **YAML v3** | `v3.0.1` | Configuration File Handling | • YAML format support<br>• Structured configuration<br>• User-friendly |
-| **AKShare** | `latest` | Fund Flow Data | • Real-time fund flow<br>• 6-dimensional data<br>• Python ecosystem |
 
 ### ⚙️ Install Dependencies
 
@@ -476,9 +439,6 @@ go get github.com/charmbracelet/bubbletea@v1.3.6
 go get github.com/jedib0t/go-pretty/v6@v6.6.8
 go get golang.org/x/text@v0.28.0
 go get gopkg.in/yaml.v3@v3.0.1
-
-# Python dependencies (for fund flow feature)
-pip install akshare pandas
 ```
 
 ## 🔧 Troubleshooting
@@ -491,7 +451,6 @@ pip install akshare pandas
 | 🎨 Color display issues | • Terminal doesn't support colors<br>• ANSI code issues | • Use color-capable terminal<br>• Check terminal settings |
 | 🔤 Chinese text garbled | • Encoding issues<br>• Font not supported | • System handles automatically<br>• Check terminal font |
 | ⏱️ Response delay | • Slow network connection<br>• Slow API response | • Check network status<br>• Switch network environment |
-| 🐍 Fund flow data shows 0 | • Python environment issues<br>• Missing AKShare library | • Install Python dependencies<br>• Check virtual environment |
 
 ### 🔍 Debug Mode
 
@@ -514,7 +473,6 @@ If you encounter issues you can't solve, please provide:
 
 - ⚙️ Operating system version
 - 🚀 Go language version
-- 🐍 Python version (if using fund flow feature)
 - 📄 Error log screenshots
 - 🌐 Network environment description
 - 💰 Related stock codes
@@ -534,7 +492,7 @@ System adopts professional stock software color standards:
 - **Update Frequency**: Auto refresh every 5 seconds
 - **Smart Caching**: Avoid frequent API requests
 - **Fault Tolerance**: Auto fallback when API fails
-- **Async Processing**: Fund flow data acquired asynchronously, doesn't affect stock price refresh
+- **Real-time Sorting**: Sort results update with real-time stock prices
 
 ### 📊 Precise Calculations
 
@@ -551,27 +509,42 @@ System adopts professional stock software color standards:
 
 ## 📈 Version History
 
-### 🌟 v4.7 - Architecture Optimization & Internationalization Enhancement
+### 🌟 Current Version - v4.8
+**Multi-Tag System & User Experience Optimization** ⭐ Latest Version
 
-**🏗️ Code Architecture Optimization**:
-- ✅ **Constants Modularization**: Migrated system constants to independent `consts.go` file
-- ✅ **Internationalization Refactoring**: Completed i18n migration of text content, supporting bilingual configuration
-- ✅ **Main Program Simplification**: Refactored `main.go`, removed hardcoded text
-- ✅ **Build Configuration Optimization**: Updated Go build configuration, optimized compilation process
+This version focuses on enhancing the tag system and user interaction experience:
+- 🏷️ **Multi-Tag System**: Watchlist stocks support multiple tags with new tag management interface
+- 🎨 **Portfolio Highlighting**: Portfolio stocks highlighted in watchlist, color configurable
+- 🔧 **Sorting Optimization**: Sort results update with real-time stock prices, performance improved
+- ✏️ **Input Enhancement**: Input boxes support cursor control editing
+- 🗑️ **Architecture Simplification**: Pure Go implementation, removed Python dependency
 
-**🎯 User Experience Enhancement**:
-- ✅ **Watchlist Sorting Optimization**: Newly added stocks automatically appear at the top of the table
-- ✅ **Interface Interaction Optimization**: Improved stock addition workflow
-- ✅ **Fund Flow Search Enhancement**: Optimized integration of search functionality with fund flow data
-- ✅ **Cursor Cache Mechanism**: Added cursor position caching
+### 📂 Complete Version History
 
-### 🌟 v4.6 - Fund Flow Data Integration
+> 📝 **Detailed version information has been moved to a dedicated version directory**
 
-**📊 Fund Flow Data Integration**:
-- ✅ **AKShare Integration**: Successfully integrated AKShare library for real-time fund flow data
-- ✅ **6-Dimensional Fund Analysis**: Main net inflow, super large orders, large orders, medium orders, small orders, net inflow ratio
-- ✅ **Smart Unit Display**: Automatically selects 10K/100M yuan units
-- ✅ **Async Optimization**: Fund flow data acquired asynchronously, doesn't affect stock price refresh
+All version update records, feature introductions, and technical improvements are organized in the **[doc/version/](doc/version/)** directory, including:
+
+- **[Current Version v4.8](doc/version/v4.8.md)** - Multi-Tag System & User Experience Optimization ⭐
+- **[v4.7](doc/version/v4.7.md)** - Architecture Optimization & Internationalization Enhancement
+- **[v4.6](doc/version/v4.6.md)** - Fund Flow Data Integration & Async Optimization
+- **[v4.5](doc/version/v4.5.md)** - Advanced Sorting System & Interaction Optimization
+- **[v4.4](doc/version/v4.4.md)** - Watchlist Tag Grouping Feature
+- **[v4.3](doc/version/v4.3.md)** - UI Interaction Enhancement & Pagination Optimization
+- **[v4.2](doc/version/v4.2.md)** - Portfolio Data Optimization & P&L Analysis Enhancement
+- **[v4.1](doc/version/v4.1.md)** - Watchlist Enhancement & User Experience Optimization
+- **[v4.0](doc/version/v4.0.md)** - Chinese Stock Search Core Fix
+- **[v3.1](doc/version/v3.1.md)** - Watchlist Feature Major Update
+- **[v3.0](doc/version/v3.0.md)** - Configuration System & Full Multi-language Support
+- **[Legacy Versions](doc/version/legacy-versions.md)** - Historical versions from v2.5 to v1.0
+
+### 🔄 Version Navigation
+
+Visit **[Version History Directory](doc/version/)** to view:
+- 📊 Version evolution timeline and major milestone comparisons
+- 🌟 Feature comparison tables across versions
+- 📝 Detailed feature introductions and technical improvements for each version
+- 🚀 Upcoming version plans
 
 ## 📝 Usage Notes
 
@@ -582,7 +555,7 @@ System adopts professional stock software color standards:
 - 🌏 **Global Support**: Complete coverage of A-shares, US stocks, Hong Kong stocks
 - 💾 **Data Persistence**: Local JSON storage, never lose data
 - 🌈 **Smart Display**: Professional stock software color scheme
-- 💰 **Fund Analysis**: 6-dimensional fund flow data support
+- 🏷️ **Flexible Grouping**: Multi-tag system for free stock organization
 
 ### 📅 Optimal Usage Times
 
@@ -601,9 +574,9 @@ System adopts professional stock software color standards:
 ### 💡 Usage Tips
 
 - **Batch Management**: Use watchlist to follow multiple stocks, then selectively add to portfolio
-- **Tag Grouping**: Add tags to watchlist stocks (like "Tech", "Healthcare") for categorized viewing
+- **Multi-Tag Grouping**: Add multiple tags to watchlist stocks (like "Tech", "Healthcare") for flexible categorization
 - **Sorting Analysis**: Use sorting function to analyze stock performance by P&L rate, change percentage, etc.
-- **Fund Flow**: Monitor A-share fund flow data to judge main fund movements
+- **Portfolio Recognition**: Notice highlighted portfolio stocks in watchlist
 - **Configuration Optimization**: Adjust rows per page based on screen size to improve browsing experience
 
 ---
