@@ -40,6 +40,7 @@ const (
 	WatchlistGroupSelect     // 自选股票分组选择状态
 	PortfolioSorting         // 持股列表排序状态
 	WatchlistSorting         // 自选列表排序状态
+	IntradayChartViewing     // 分时图表查看状态
 )
 
 // 排序字段枚举
