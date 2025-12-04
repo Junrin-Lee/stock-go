@@ -34,6 +34,7 @@ Stock Monitor is a professional command-line stock monitoring tool that provides
 - **Multi-dimensional Data**: Current price, open price, high price, low price, previous close
 - **Change Analysis**: Precise change percentage based on previous close
 - **P&L Statistics**: Real-time calculation of today's P&L, position P&L, and P&L rate
+- **Intraday Data Collection**: Background automatic collection of intraday data, updated every minute, permanently saved
 
 ### 💼 Portfolio Management
 - **Stock Search**: Support stock code or Chinese name search
@@ -316,6 +317,7 @@ Stock Code → [Chinese Stock?] → [Tencent API] → [Success?] → Return Data
 stock-go/
 │
 ├── main.go                      # 🚀 Main program file (core logic)
+├── intraday.go                 # 📈 Intraday data background collection module
 ├── consts.go                    # 📋 System constants definition
 ├── color.go                     # 🎨 Color utilities
 ├── sort.go                      # 🔧 Sorting module
@@ -330,7 +332,8 @@ stock-go/
 │
 ├── data/
 │   ├── portfolio.json          # 📊 Portfolio data (auto-generated)
-│   └── watchlist.json          # ⭐ Watchlist data (auto-generated)
+│   ├── watchlist.json          # ⭐ Watchlist data (auto-generated)
+│   └── intraday/               # 📈 Intraday data directory (organized by stock code/date)
 │
 ├── i18n/
 │   ├── zh.json                 # 🇨🇳 Chinese language pack
@@ -479,6 +482,49 @@ If you encounter issues you can't solve, please provide:
 
 ## 🌟 Special Features
 
+### 📈 Intraday Data Background Collection
+
+The system provides automated intraday data collection to build a data foundation for future intraday charts and quantitative analysis:
+
+#### 🎯 Core Features
+- **Auto Trigger**: Automatically starts background collection when entering portfolio or watchlist pages
+- **Concurrency Control**: Maximum 10 concurrent goroutines to prevent resource exhaustion
+- **Smart Updates**: Auto-update every minute, only during trading hours (09:30-11:30, 13:00-15:00)
+- **API Fallback**: Sina Finance (primary) → East Money (fallback), auto-switch for high availability
+- **Permanent Storage**: JSON format storage, organized by stock code and date, data permanently retained
+
+#### 📁 Data Storage Structure
+```
+data/intraday/
+├── SH600000/
+│   ├── 20251202.json
+│   └── 20251203.json
+├── SZ000001/
+│   └── 20251202.json
+└── ...
+```
+
+#### 📊 Data Format Example
+```json
+{
+  "code": "SH600000",
+  "name": "Pudong Development Bank",
+  "date": "20251202",
+  "datapoints": [
+    {"time": "09:31", "price": 8.52},
+    {"time": "09:32", "price": 8.53}
+  ],
+  "updated_at": "2025-12-02 15:00:00"
+}
+```
+
+#### 💡 Usage Notes
+- Feature is enabled by default, no configuration needed
+- Press `d` key in debug mode to view collection logs
+- Data files can be used for future intraday chart features or exported for analysis
+
+> 📝 **Detailed Documentation**: See [Intraday Data Collection Feature Documentation](doc/issues/INTRADAY_FEATURE.md) for more technical details
+
 ### 🎨 Smart Color System
 
 System adopts professional stock software color standards:
@@ -509,15 +555,15 @@ System adopts professional stock software color standards:
 
 ## 📈 Version History
 
-### 🌟 Current Version - v4.8
-**Multi-Tag System & User Experience Optimization** ⭐ Latest Version
+### 🌟 Current Version - v4.9
+**Intraday Chart Enhancement & Smart Date Selection** ⭐ Latest Version
 
-This version focuses on enhancing the tag system and user interaction experience:
-- 🏷️ **Multi-Tag System**: Watchlist stocks support multiple tags with new tag management interface
-- 🎨 **Portfolio Highlighting**: Portfolio stocks highlighted in watchlist, color configurable
-- 🔧 **Sorting Optimization**: Sort results update with real-time stock prices, performance improved
-- ✏️ **Input Enhancement**: Input boxes support cursor control editing
-- 🗑️ **Architecture Simplification**: Pure Go implementation, removed Python dependency
+This version focuses on enhancing intraday chart functionality and user experience:
+- 📊 **Intraday Chart Optimization**: New chart rendering engine using Braille characters for smooth curves
+- 🕐 **Smart Date Selection**: Automatically shows previous trading day data before market open, avoiding blank charts
+- 📈 **Adaptive Y-Axis**: Dynamically adjusts chart margin based on price volatility for better visual effect
+- ⏰ **Complete Time Framework**: Fixed 9:30-15:00 timeline, correctly handles lunch break period
+- 🎯 **Trading Session Markers**: Chart interface displays key trading time point markers
 
 ### 📂 Complete Version History
 
@@ -525,7 +571,8 @@ This version focuses on enhancing the tag system and user interaction experience
 
 All version update records, feature introductions, and technical improvements are organized in the **[doc/version/](doc/version/)** directory, including:
 
-- **[Current Version v4.8](doc/version/v4.8.md)** - Multi-Tag System & User Experience Optimization ⭐
+- **[Current Version v4.9](doc/version/v4.9.md)** - Intraday Chart Enhancement & Smart Date Selection ⭐
+- **[v4.8](doc/version/v4.8.md)** - Multi-Tag System & User Experience Optimization
 - **[v4.7](doc/version/v4.7.md)** - Architecture Optimization & Internationalization Enhancement
 - **[v4.6](doc/version/v4.6.md)** - Fund Flow Data Integration & Async Optimization
 - **[v4.5](doc/version/v4.5.md)** - Advanced Sorting System & Interaction Optimization
