@@ -16,6 +16,7 @@
 .vscode
 .idea
 .DS_Store
+.claude
 data
 cmd/stock-monitor
 cmd/conf/config.yml
