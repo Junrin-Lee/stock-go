@@ -3,18 +3,18 @@ module stock-monitor
 go 1.25.0
 
 require (
+	github.com/NimbleMarkets/ntcharts v0.3.1
 	github.com/charmbracelet/bubbletea v1.3.6
+	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/jedib0t/go-pretty/v6 v6.6.8
 	golang.org/x/text v0.28.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	github.com/NimbleMarkets/ntcharts v0.3.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/bubbles v0.20.0 // indirect
 	github.com/charmbracelet/colorprofile v0.3.1 // indirect
-	github.com/charmbracelet/lipgloss v1.1.0 // indirect
 	github.com/charmbracelet/x/ansi v0.9.3 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
