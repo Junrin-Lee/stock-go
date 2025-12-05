@@ -555,15 +555,15 @@ System adopts professional stock software color standards:
 
 ## 📈 Version History
 
-### 🌟 Current Version - v4.9
-**Intraday Chart Enhancement & Smart Date Selection** ⭐ Latest Version
+### 🌟 Current Version - v5.0
+**Architecture Modernization & Core Function Refactoring** ⭐ Latest Version
 
-This version focuses on enhancing intraday chart functionality and user experience:
-- 📊 **Intraday Chart Optimization**: New chart rendering engine using Braille characters for smooth curves
-- 🕐 **Smart Date Selection**: Automatically shows previous trading day data before market open, avoiding blank charts
-- 📈 **Adaptive Y-Axis**: Dynamically adjusts chart margin based on price volatility for better visual effect
-- ⏰ **Complete Time Framework**: Fixed 9:30-15:00 timeline, correctly handles lunch break period
-- 🎯 **Trading Session Markers**: Chart interface displays key trading time point markers
+This version completes the project's architecture modernization, significantly improving code maintainability and extensibility through modular design:
+- 🏗️ **Complete Modular Architecture**: 16 professional modules with clear responsibility division
+- 📊 **main.go Optimization**: Reduced from 6,424 lines to 3,156 lines, 50% complexity reduction
+- ✅ **Full Feature Preservation**: All user features remain unchanged, compatible with all historical data
+- 🎯 **Layered Design**: UI layer, business logic layer, data layer, and utility layer clearly separated
+- 📈 **Maintainability Improvement**: Clear module responsibilities, easy to locate and modify code
 
 ### 📂 Complete Version History
 
@@ -571,7 +571,8 @@ This version focuses on enhancing intraday chart functionality and user experien
 
 All version update records, feature introductions, and technical improvements are organized in the **[doc/version/](doc/version/)** directory, including:
 
-- **[Current Version v4.9](doc/version/v4.9.md)** - Intraday Chart Enhancement & Smart Date Selection ⭐
+- **[Current Version v5.0](doc/version/v5.0.md)** - Architecture Modernization & Core Function Refactoring ⭐
+- **[v4.9](doc/version/v4.9.md)** - Intraday Chart Enhancement & Smart Date Selection
 - **[v4.8](doc/version/v4.8.md)** - Multi-Tag System & User Experience Optimization
 - **[v4.7](doc/version/v4.7.md)** - Architecture Optimization & Internationalization Enhancement
 - **[v4.6](doc/version/v4.6.md)** - Fund Flow Data Integration & Async Optimization
