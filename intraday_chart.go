@@ -43,7 +43,7 @@ func (m *Model) startIntradayDataCollection() {
 		}
 	}
 
-	debugPrint("[分时数据] 开始跟踪 %d 只股票的分时数据\n", len(stocksToTrack))
+	debugPrint("debug.intraday.trackStart", len(stocksToTrack))
 
 	// 为每只股票启动worker
 	for code, name := range stocksToTrack {
@@ -56,7 +56,7 @@ func (m *Model) stopIntradayDataCollection() {
 	if m.intradayManager != nil {
 		close(m.intradayManager.cancelChan)
 		m.intradayManager = nil
-		debugPrint("[分时数据] 已停止所有分时数据跟踪\n")
+		debugPrint("debug.intraday.trackStop")
 	}
 }
 
@@ -299,19 +299,19 @@ func (m *Model) createFixedTimeRange(date string) []TimePoint {
 
 // createIntradayChart 从分时数据创建图表（使用普通 linechart 以精确控制数据点）
 func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model {
-	debugPrint("[图表] 开始创建图表: termWidth=%d, termHeight=%d\n", termWidth, termHeight)
+	debugPrint("debug.chart.creating", termWidth, termHeight)
 
 	if m.chartData == nil {
-		debugPrint("[图表] chartData 为 nil\n")
+		debugPrint("debug.chart.dataNil")
 		return nil
 	}
 
 	if len(m.chartData.Datapoints) == 0 {
-		debugPrint("[图表] chartData.Datapoints 为空\n")
+		debugPrint("debug.chart.dataEmpty")
 		return nil
 	}
 
-	debugPrint("[图表] chartData 包含 %d 个数据点\n", len(m.chartData.Datapoints))
+	debugPrint("debug.chart.dataPoints", len(m.chartData.Datapoints))
 
 	// 最小大小检查
 	minWidth := 40
@@ -370,8 +370,7 @@ func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model 
 
 	minPrice, maxPrice, margin := calculateAdaptiveMargin(actualPrices)
 
-	debugPrint("[图表] 价格范围: %.3f-%.3f, 波动率: %.2f%%, margin: %.3f\n",
-		minPrice, maxPrice, (maxPrice-minPrice)/minPrice*100, margin)
+	debugPrint("debug.chart.priceRange", minPrice, maxPrice, (maxPrice-minPrice)/minPrice*100, margin)
 
 	// 设置样式：A股红涨绿跌，非A股绿涨红跌
 	firstPrice := m.chartData.Datapoints[0].Price
@@ -461,8 +460,7 @@ func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model 
 	}
 
 	// === 创建图表 ===
-	debugPrint("[图表] 创建图表 - 宽度:%d 高度:%d 数据点:%d 价格范围:%.3f-%.3f\n",
-		chartWidth, chartHeight, len(dataPoints), minPrice-margin, maxPrice+margin)
+	debugPrint("debug.chart.dimensions", chartWidth, chartHeight, len(dataPoints), minPrice-margin, maxPrice+margin)
 
 	lc := linechart.New(chartWidth, chartHeight,
 		0, float64(len(dataPoints)-1), // X 轴范围：0 到数据点数量-1
@@ -482,7 +480,7 @@ func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model 
 
 	lc.DrawXYAxisAndLabel()
 
-	debugPrint("[图表] 图表创建并绘制成功\n")
+	debugPrint("debug.chart.success")
 	return &lc
 }
 

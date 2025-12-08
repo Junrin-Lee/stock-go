@@ -240,7 +240,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.stockPriceMutex.Unlock()
-			debugPrint("[信息] 股价缓存已更新: %s\n", msg.Symbol)
+			debugPrint("debug.cache.updated", msg.Symbol)
 
 			// 如果当前在自选列表且已启用排序，重新应用排序以保持顺序正确
 			if m.state == WatchlistViewing && m.watchlistIsSorted {
@@ -259,7 +259,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				entry.IsUpdating = false
 			}
 			m.stockPriceMutex.Unlock()
-			debugPrint("[错误] 股价数据更新失败: %s, %v\n", msg.Symbol, msg.Error)
+			debugPrint("debug.cache.error", msg.Symbol, msg.Error)
 		}
 		newModel, cmd = m, nil
 	case checkDataAvailabilityMsg:
@@ -379,7 +379,7 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 	m.message = "" // 清除之前的消息
 	switch m.currentMenuItem {
 	case 0: // 股票列表
-		m.logUserAction("进入持股监控页面")
+		m.logUserAction("debug.action.enterPortfolio")
 		m.state = Monitoring
 		m.resetPortfolioCursor() // 重置游标到第一只股票
 		m.lastUpdate = time.Now()
@@ -389,7 +389,7 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 
 		return m, m.tickCmd()
 	case 1: // 自选股票
-		m.logUserAction("进入自选股票页面")
+		m.logUserAction("debug.action.enterWatchlist")
 		m.state = WatchlistViewing
 		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.cursor = 0
@@ -410,7 +410,7 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 
 		return m, tea.Batch(cmds...)
 	case 2: // 股票搜索
-		m.logUserAction("进入股票搜索页面")
+		m.logUserAction("debug.action.enterSearch")
 		m.state = SearchingStock
 		m.searchInput = ""
 		m.searchResult = nil
@@ -419,9 +419,9 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		return m, nil
 	case 3: // 调试模式
 		if m.debugMode {
-			m.logUserAction("关闭调试模式")
+			m.logUserAction("debug.action.debugOff")
 		} else {
-			m.logUserAction("开启调试模式")
+			m.logUserAction("debug.action.debugOn")
 		}
 		m.debugMode = !m.debugMode
 		m.config.System.DebugMode = m.debugMode
@@ -431,7 +431,7 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case 4: // 语言选择页面
-		m.logUserAction("进入语言选择页面")
+		m.logUserAction("debug.action.enterLanguage")
 		m.state = LanguageSelection
 		m.languageCursor = 0
 		if m.language == English {
@@ -439,7 +439,7 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case 5: // 退出
-		m.logUserAction("用户退出程序")
+		m.logUserAction("debug.action.exit")
 		m.savePortfolio()
 		m.saveWatchlist()
 		return m, tea.Quit
@@ -562,7 +562,7 @@ func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 
 			// 如果直接获取失败，尝试作为搜索关键词搜索
 			if stockData == nil || stockData.Price <= 0 {
-				debugPrint("[调试] 添加股票时直接获取价格失败，尝试通过搜索查找: %s\n", m.input)
+				debugPrint("debug.api.addStockFail", m.input)
 				stockData = searchStockBySymbol(m.input)
 			}
 		}
@@ -695,7 +695,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = m.getText("emptyPortfolio")
 			return m, nil
 		}
-		m.logUserAction("从持股列表进入编辑股票页面")
+		m.logUserAction("debug.action.enterEdit")
 		m.previousState = m.state // 记录当前状态
 		m.state = EditingStock
 		m.editingStep = 1 // 开始编辑成本价
@@ -726,7 +726,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "a":
 		// 跳转到添加股票页面
-		m.logUserAction("从持股列表跳转到添加股票页面")
+		m.logUserAction("debug.action.enterAdd")
 		m.previousState = m.state // 记录当前状态
 		m.state = AddingStock
 		m.addingStep = 0
@@ -750,8 +750,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.chartViewDate = getSmartChartDate() // 智能选择日期
 		m.previousState = Monitoring
 
-		debugPrint("[图表] 按下V键 - 股票:%s(%s) 日期:%s (智能选择)\n",
-			selectedStock.Code, selectedStock.Name, m.chartViewDate)
+		debugPrint("debug.chart.keyV", selectedStock.Code, selectedStock.Name, m.chartViewDate)
 
 		// 尝试加载数据
 		data, err := m.loadIntradayDataForDate(
@@ -762,7 +761,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		if err != nil {
 			// 无数据 - 触发采集
-			debugPrint("[图表] 数据不存在,触发采集: %v\n", err)
+			debugPrint("debug.chart.noData", err)
 			m.chartData = nil
 			m.chartLoadError = nil
 			m.state = IntradayChartViewing
@@ -774,7 +773,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		// 数据存在 - 创建图表
-		debugPrint("[图表] 数据已加载,包含 %d 个数据点\n", len(data.Datapoints))
+		debugPrint("debug.chart.dataLoaded", len(data.Datapoints))
 		m.chartData = data
 		m.chartLoadError = nil
 		m.chartIsCollecting = false
@@ -782,7 +781,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "s":
 		// 进入排序菜单
-		m.logUserAction("从持股列表进入排序菜单")
+		m.logUserAction("debug.action.enterSort")
 		m.state = PortfolioSorting
 		// 智能定位光标到当前排序字段
 		m.portfolioSortCursor = m.findSortFieldIndex(m.portfolioSortField, true)
@@ -1032,7 +1031,6 @@ func (s *Stock) CalculateTotalQuantity() int {
 
 // API 相关函数 (getStockInfo, getStockPrice, searchStock*, tryXXXAPI 等) 已移动到 api.go
 // 缓存相关函数 (getStockPriceFromCache, startStockPriceUpdates) 已移动到 cache.go
-
 
 // debug 相关函数 (debugPrint, addDebugLog, renderDebugPanel, logUserAction) 已移动到 debug.go
 // scroll 相关函数 (scrollPortfolioUp/Down, scrollWatchlistUp/Down) 已移动到 scroll.go
@@ -1486,7 +1484,6 @@ func (m *Model) resetPortfolioCursor() {
 		}
 	}
 }
-
 
 // 处理自选股票标签选择
 func (m *Model) handleWatchlistTagSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -2437,7 +2434,7 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "a":
 		// 跳转到股票搜索页面
-		m.logUserAction("从自选列表跳转到股票搜索页面")
+		m.logUserAction("debug.action.watchlistSearch")
 		m.state = SearchingStock
 		m.searchInput = ""
 		m.searchResult = nil
@@ -2446,7 +2443,7 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "s":
 		// 进入排序菜单
-		m.logUserAction("从自选列表进入排序菜单")
+		m.logUserAction("debug.action.watchlistSort")
 		m.state = WatchlistSorting
 		// 智能定位光标到当前排序字段
 		m.watchlistSortCursor = m.findSortFieldIndex(m.watchlistSortField, false)

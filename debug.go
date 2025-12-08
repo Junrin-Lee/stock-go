@@ -13,10 +13,13 @@ import (
 // globalModel 全局模型引用，用于调试日志记录
 var globalModel *Model
 
-// debugPrint 调试输出函数
-func debugPrint(format string, args ...any) {
+// debugPrint 调试输出函数 - 支持 i18n key
+// key 参数是 i18n 键名，如 "debug.api.directFail"
+// args 是格式化参数，将替换翻译文本中的 %s, %d 等占位符
+func debugPrint(key string, args ...any) {
 	if globalModel != nil && globalModel.debugMode {
 		timestamp := time.Now().Format("15:04:05")
+		format := getDebugText(key)
 		logMsg := fmt.Sprintf("[%s] %s", timestamp, fmt.Sprintf(format, args...))
 		globalModel.addDebugLog(logMsg)
 	}
@@ -36,11 +39,15 @@ func (m *Model) addDebugLog(msg string) {
 	// 如果 debugScrollPos == 0，用户在底部，自动跟随最新日志（无需调整）
 }
 
-// logUserAction 记录用户操作
-func (m *Model) logUserAction(action string) {
+// logUserAction 记录用户操作 - 支持 i18n key
+// actionKey 参数是 i18n 键名，如 "debug.action.enterPortfolio"
+// args 是格式化参数，将替换翻译文本中的占位符
+func (m *Model) logUserAction(actionKey string, args ...any) {
 	if m.debugMode {
 		timestamp := time.Now().Format("15:04:05")
-		logMsg := fmt.Sprintf("[%s] 用户操作: %s", timestamp, action)
+		prefix := m.getText("debug.action.prefix")
+		action := fmt.Sprintf(m.getText(actionKey), args...)
+		logMsg := fmt.Sprintf("[%s] %s %s", timestamp, prefix, action)
 		m.addDebugLog(logMsg)
 	}
 }

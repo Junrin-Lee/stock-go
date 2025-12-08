@@ -127,16 +127,16 @@ func (m *Model) formatStockNameWithPortfolioHighlight(name, code string) string 
 		colorUtils := NewColorUtils()
 		configColor := m.config.Display.PortfolioHighlight
 
-		debugPrint("[高亮] 股票 %s (%s) 在持仓中，配置颜色: %s\n", name, code, configColor)
+		debugPrint("debug.highlight.found", name, code, configColor)
 
 		// 获取最终的颜色名称（仅支持go-pretty颜色名称）
 		finalColorName := colorUtils.GetColorFromConfigOrDefault(configColor, "yellow") // 默认黄色背景
 
-		debugPrint("[高亮] 最终使用颜色: %s\n", finalColorName)
+		debugPrint("debug.highlight.finalColor", finalColorName)
 
 		// 应用背景颜色格式化
 		result := colorUtils.FormatTextWithBackground(name, finalColorName)
-		debugPrint("[高亮] 格式化结果: %s (原文本: %s)\n", result, name)
+		debugPrint("debug.highlight.result", result, name)
 
 		return result
 	}

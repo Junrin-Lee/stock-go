@@ -153,9 +153,9 @@ func loadConfig() Config {
 	// 验证并设置高亮颜色的默认值
 	if config.Display.PortfolioHighlight == "" {
 		config.Display.PortfolioHighlight = "yellow" // 默认黄色背景
-		debugPrint("[配置] 使用默认高亮颜色: %s\n", config.Display.PortfolioHighlight)
+		debugPrint("debug.config.defaultHighlight", config.Display.PortfolioHighlight)
 	} else {
-		debugPrint("[配置] 读取到高亮颜色配置: %s\n", config.Display.PortfolioHighlight)
+		debugPrint("debug.config.loadedHighlight", config.Display.PortfolioHighlight)
 	}
 
 	return config

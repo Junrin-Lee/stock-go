@@ -70,10 +70,10 @@ func (im *IntradayManager) startWorker(stockCode, stockName string, m *Model) {
 			im.mu.Lock()
 			delete(im.activeStocks, stockCode)
 			im.mu.Unlock()
-			debugPrint("[分时数据] Worker停止: %s\n", stockCode)
+			debugPrint("debug.intraday.workerStop", stockCode)
 		}()
 
-		debugPrint("[分时数据] Worker启动: %s (%s)\n", stockCode, stockName)
+		debugPrint("debug.intraday.workerStart", stockCode, stockName)
 
 		// Create ticker
 		ticker := time.NewTicker(im.fetchInterval)
@@ -119,12 +119,12 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 	// Fetch from API
 	datapoints, err := fetchIntradayDataFromAPI(stockCode)
 	if err != nil {
-		debugPrint("[分时数据] 获取失败 %s: %v\n", stockCode, err)
+		debugPrint("debug.intraday.fetchFail", stockCode, err)
 		return
 	}
 
 	if len(datapoints) == 0 {
-		debugPrint("[分时数据] 无数据返回 %s\n", stockCode)
+		debugPrint("debug.intraday.noData", stockCode)
 		return
 	}
 
@@ -134,7 +134,7 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 
 	// Ensure directory exists
 	if err := ensureIntradayDirectory(stockCode); err != nil {
-		debugPrint("[分时数据] 创建目录失败 %s: %v\n", stockCode, err)
+		debugPrint("debug.intraday.mkdirFail", stockCode, err)
 		return
 	}
 
@@ -159,11 +159,11 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 
 	// Write back to file
 	if err := saveIntradayData(filePath, existingData); err != nil {
-		debugPrint("[分时数据] 保存失败 %s: %v\n", stockCode, err)
+		debugPrint("debug.intraday.saveFail", stockCode, err)
 		return
 	}
 
-	debugPrint("[分时数据] 更新成功 %s: %d 个数据点\n", stockCode, len(existingData.Datapoints))
+	debugPrint("debug.intraday.saveSuccess", stockCode, len(existingData.Datapoints))
 }
 
 // fetchIntradayDataFromAPI tries all APIs in fallback order
@@ -173,40 +173,40 @@ func fetchIntradayDataFromAPI(stockCode string) ([]IntradayDataPoint, error) {
 	// Try Tencent API (primary - most reliable for intraday data)
 	data, err := tryGetIntradayFromTencent(stockCode)
 	if err == nil && len(data) > 0 {
-		debugPrint("[分时数据] Tencent API 成功: %s (%d points)\n", stockCode, len(data))
+		debugPrint("debug.intraday.tencentSuccess", stockCode, len(data))
 		return data, nil
 	}
 	if err != nil {
 		lastErr = err
-		debugPrint("[分时数据] Tencent API 失败: %s - %v\n", stockCode, err)
+		debugPrint("debug.intraday.tencentFail", stockCode, err)
 	} else {
-		debugPrint("[分时数据] Tencent API 无数据: %s\n", stockCode)
+		debugPrint("debug.intraday.tencentNoData", stockCode)
 	}
 
 	// Try EastMoney API (secondary)
 	data, err = tryGetIntradayFromEastMoney(stockCode)
 	if err == nil && len(data) > 0 {
-		debugPrint("[分时数据] EastMoney API 成功: %s (%d points)\n", stockCode, len(data))
+		debugPrint("debug.intraday.eastMoneySuccess", stockCode, len(data))
 		return data, nil
 	}
 	if err != nil {
 		lastErr = err
-		debugPrint("[分时数据] EastMoney API 失败: %s - %v\n", stockCode, err)
+		debugPrint("debug.intraday.eastMoneyFail", stockCode, err)
 	} else {
-		debugPrint("[分时数据] EastMoney API 无数据: %s\n", stockCode)
+		debugPrint("debug.intraday.eastMoneyNoData", stockCode)
 	}
 
 	// Try Sina Finance API (last fallback - K-line data, may not have today's data)
 	data, err = tryGetIntradayFromSina(stockCode)
 	if err == nil && len(data) > 0 {
-		debugPrint("[分时数据] Sina API 成功: %s (%d points)\n", stockCode, len(data))
+		debugPrint("debug.intraday.sinaSuccess", stockCode, len(data))
 		return data, nil
 	}
 	if err != nil {
 		lastErr = err
-		debugPrint("[分时数据] Sina API 失败: %s - %v\n", stockCode, err)
+		debugPrint("debug.intraday.sinaFail", stockCode, err)
 	} else {
-		debugPrint("[分时数据] Sina API 无数据: %s\n", stockCode)
+		debugPrint("debug.intraday.sinaNoData", stockCode)
 	}
 
 	return nil, fmt.Errorf("所有API失败, 最后错误: %w", lastErr)

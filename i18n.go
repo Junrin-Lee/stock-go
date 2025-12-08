@@ -55,3 +55,16 @@ func (m *Model) getText(key string) string {
 	}
 	return key // 最后备用返回key本身
 }
+
+// getDebugText 全局调试文本获取函数（供 debugPrint 使用）
+// 通过 globalModel 获取当前语言设置，如果 globalModel 未初始化则默认返回英文
+func getDebugText(key string) string {
+	if globalModel == nil {
+		// globalModel 未初始化时，默认返回英文
+		if text, exists := texts[English][key]; exists {
+			return text
+		}
+		return key
+	}
+	return globalModel.getText(key)
+}
