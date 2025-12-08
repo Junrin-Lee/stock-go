@@ -52,6 +52,12 @@ func isChinaStock(symbol string) bool {
 		(len(symbol) == 6 && (strings.HasPrefix(symbol, "0") || strings.HasPrefix(symbol, "3") || strings.HasPrefix(symbol, "6")))
 }
 
+// isHKStock 判断是否为香港股票
+func isHKStock(symbol string) bool {
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	return strings.HasPrefix(symbol, "HK") || strings.HasSuffix(symbol, ".HK")
+}
+
 // ============================================================================
 // 股票搜索函数
 // ============================================================================
@@ -303,8 +309,8 @@ func tryTwelveDataAPI(symbol string) *StockData {
 func searchStockByTencentAPI(keyword string) *StockData {
 	debugPrint("debug.api.tencentSearchStart", keyword)
 
-	// 腾讯股票搜索API URL - 使用更完整的搜索接口
-	url := fmt.Sprintf("https://smartbox.gtimg.cn/s3/?q=%s&t=gp", keyword)
+	// 腾讯股票搜索API URL - 使用t=all支持A股、港股、美股搜索
+	url := fmt.Sprintf("https://smartbox.gtimg.cn/s3/?q=%s&t=all", keyword)
 	debugPrint("debug.api.tencentSearchUrl", url)
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -464,6 +470,15 @@ func convertStockSymbolForTencent(symbol string) string {
 		return "sh" + strings.TrimPrefix(symbol, "SH")
 	} else if strings.HasPrefix(symbol, "SZ") {
 		return "sz" + strings.TrimPrefix(symbol, "SZ")
+	} else if strings.HasPrefix(symbol, "HK") {
+		// 港股格式: HK00700 -> hk00700, HK2020 -> hk02020
+		// 港股代码需要补齐5位数字
+		code := strings.TrimPrefix(symbol, "HK")
+		return "hk" + padHKStockCode(code)
+	} else if strings.HasSuffix(symbol, ".HK") {
+		// 港股格式: 0700.HK -> hk00700, 2020.HK -> hk02020
+		code := strings.TrimSuffix(symbol, ".HK")
+		return "hk" + padHKStockCode(code)
 	}
 
 	if len(symbol) == 6 && strings.HasPrefix(symbol, "6") {
@@ -473,6 +488,18 @@ func convertStockSymbolForTencent(symbol string) string {
 	}
 
 	return symbol
+}
+
+// padHKStockCode 将港股代码补齐为5位数字
+// 例如: "700" -> "00700", "2020" -> "02020", "00700" -> "00700"
+func padHKStockCode(code string) string {
+	// 移除可能的前导零后的纯数字部分
+	code = strings.TrimSpace(code)
+	if len(code) >= 5 {
+		return code
+	}
+	// 补齐到5位
+	return fmt.Sprintf("%05s", code)
 }
 
 // ============================================================================
@@ -1169,7 +1196,8 @@ func tryYahooFinanceAPI(symbol string) *StockData {
 
 // getStockPrice 获取股票价格（带多API降级策略）
 func getStockPrice(symbol string) *StockData {
-	if isChinaStock(symbol) {
+	// A股和港股都优先使用腾讯API
+	if isChinaStock(symbol) || isHKStock(symbol) {
 		data := tryTencentAPI(symbol)
 		if data.Price > 0 {
 			return data
