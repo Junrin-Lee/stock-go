@@ -71,22 +71,22 @@ This is a **state machine-based TUI application** with clear separation of conce
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| **main.go** | 3,156 | Core application: state machine, TUI event handling, orchestration |
-| **api.go** | 1,226 | External API integration: Tencent, Sina, Finnhub, TwelveData with fallback logic |
-| **intraday_chart.go** | 754 | Intraday chart visualization: smart date selection, adaptive Y-axis, Braille rendering |
-| **intraday.go** | 616 | Background intraday data collection with worker pool (max 10 concurrent) |
-| **watchlist.go** | 508 | Watchlist management: tag operations, filtering, search, group selection |
-| **sort.go** | 238 | Sorting engine for 11 portfolio fields and 7 watchlist fields |
-| **types.go** | 215 | Data structure definitions: Stock, StockData, WatchlistStock, Config, etc. |
-| **ui_utils.go** | 194 | UI rendering utilities: table formatting, pagination, Chinese character width handling |
-| **persistence.go** | 171 | Data persistence layer: JSON/YAML read/write, file operations, backup/restore |
-| **format.go** | 156 | Formatting utilities: number formatting, price display, percentage calculations |
-| **debug.go** | 153 | Debug logging: 1000-entry buffer, scrollable viewer, conditional logging |
-| **cache.go** | 129 | Stock price caching: 30-second TTL, RWMutex protection, cache invalidation |
-| **scroll.go** | 77 | Scroll handling: cursor management, pagination logic |
-| **consts.go** | 71 | Application constants (states, sort fields, file paths, enums) |
-| **i18n.go** | 57 | Internationalization: translation loading, language switching, fallback logic |
-| **color.go** | 55 | Color utilities using go-pretty (red/green/white for gains/losses/neutral) |
+| **main.go** | ~3,150 | Core application: state machine, TUI event handling, orchestration |
+| **api.go** | ~1,250 | External API integration: Tencent, Sina, Finnhub, TwelveData with fallback logic |
+| **intraday_chart.go** | ~750 | Intraday chart visualization: smart date selection, adaptive Y-axis, Braille rendering |
+| **intraday.go** | ~616 | Background intraday data collection with worker pool (max 10 concurrent) |
+| **watchlist.go** | ~508 | Watchlist management: tag operations, filtering, search, group selection |
+| **sort.go** | ~238 | Sorting engine for 11 portfolio fields and 7 watchlist fields |
+| **types.go** | ~215 | Data structure definitions: Stock, StockData, WatchlistStock, Config, etc. |
+| **ui_utils.go** | ~194 | UI rendering utilities: table formatting, pagination, Chinese character width handling |
+| **persistence.go** | ~171 | Data persistence layer: JSON/YAML read/write, file operations, backup/restore |
+| **debug.go** | ~160 | Debug logging: 1000-entry buffer, scrollable viewer, conditional logging |
+| **format.go** | ~156 | Formatting utilities: number formatting, price display, percentage calculations |
+| **cache.go** | ~129 | Stock price caching: 30-second TTL, RWMutex protection, cache invalidation |
+| **scroll.go** | ~77 | Scroll handling: cursor management, pagination logic |
+| **consts.go** | ~71 | Application constants (states, sort fields, file paths, enums) |
+| **i18n.go** | ~70 | Internationalization: translation loading, language switching, fallback logic |
+| **color.go** | ~55 | Color utilities using go-pretty (red/green/white for gains/losses/neutral) |
 
 ### State Machine (19 States)
 The application flows through these states:
@@ -149,7 +149,7 @@ The codebase has undergone significant architectural evolution culminating in v5
 - **Early versions**: Monolithic single main.go (~6,400+ lines) with all logic intertwined
 - **v4.x (initial refactoring)**: Started extracting functionality into separate modules
 - **v5.0 (current)**: Complete modular architecture - 16 focused, independently maintainable modules
-  - **Result**: 50% reduction in main.go size (6,424 → 3,156 lines), zero functional loss, backward-compatible upgrade
+  - **Result**: 50% reduction in main.go size (~6,400 → ~3,150 lines), zero functional loss, backward-compatible upgrade
   - **Benefit**: Clearer code organization, easier to locate features, simpler to add new functionality
 
 **Modular Architecture Benefits:**
@@ -244,22 +244,22 @@ Stock data fetching has automatic fallback:
 
 ```
 stock-go/
-├── main.go                  # Core application: state machine, event handling (3,156 lines)
-├── api.go                   # External API integration with fallback logic (1,226 lines)
-├── intraday_chart.go       # Intraday chart visualization (754 lines)
-├── intraday.go             # Background intraday data collection (616 lines)
-├── watchlist.go            # Watchlist management and tag operations (508 lines)
-├── sort.go                 # Sorting engine (238 lines)
-├── types.go                # Data structure definitions (215 lines)
-├── ui_utils.go             # UI rendering utilities (194 lines)
-├── persistence.go          # Data persistence layer (171 lines)
-├── format.go               # Formatting utilities (156 lines)
-├── debug.go                # Debug logging system (153 lines)
-├── cache.go                # Stock price caching (129 lines)
-├── scroll.go               # Scroll handling (77 lines)
-├── consts.go               # Application constants (71 lines)
-├── i18n.go                 # Internationalization (57 lines)
-├── color.go                # Color utilities (55 lines)
+├── main.go                  # Core application: state machine, event handling (~3,150 lines)
+├── api.go                   # External API integration with fallback logic (~1,250 lines)
+├── intraday_chart.go       # Intraday chart visualization (~750 lines)
+├── intraday.go             # Background intraday data collection (~616 lines)
+├── watchlist.go            # Watchlist management and tag operations (~508 lines)
+├── sort.go                 # Sorting engine (~238 lines)
+├── types.go                # Data structure definitions (~215 lines)
+├── ui_utils.go             # UI rendering utilities (~194 lines)
+├── persistence.go          # Data persistence layer (~171 lines)
+├── format.go               # Formatting utilities (~156 lines)
+├── debug.go                # Debug logging system (~160 lines)
+├── cache.go                # Stock price caching (~129 lines)
+├── scroll.go               # Scroll handling (~77 lines)
+├── consts.go               # Application constants (~71 lines)
+├── i18n.go                 # Internationalization (~70 lines)
+├── color.go                # Color utilities (~55 lines)
 ├── go.mod / go.sum         # Go module dependencies
 │
 ├── cmd/
@@ -514,7 +514,7 @@ The `doc/issues/plans/` directory should be created if it doesn't exist when the
 ## Version History
 
 **Recent Major Versions:**
-- **v5.0** (Current): 🏗️ Architecture modernization - Complete modular design (16 modules), main.go 50% smaller (6,424 → 3,156 lines), three-tier architecture
+- **v5.0** (Current): 🏗️ Architecture modernization - Complete modular design (16 modules), main.go 50% smaller (~6,400 → ~3,150 lines), three-tier architecture
 - **v4.9**: Enhanced intraday charts with smart date selection, adaptive Y-axis margin, fixed time framework, Braille rendering
 - **v4.8**: Multi-tag system, portfolio highlighting in watchlist, cursor editing, sorting optimizations
 - **v4.7**: Architecture optimization, internationalization enhancements
@@ -545,7 +545,7 @@ When modifying the codebase, use this guide to quickly locate what you need:
 
 ## Important Notes for Future Development
 
-1. **v5.0 Modular architecture** - 16 focused modules with clear responsibilities. Main.go (3,156 lines) is now purely an orchestration layer. Further modularization possible but current design is near-optimal for project size.
+1. **v5.0 Modular architecture** - 16 focused modules with clear responsibilities. Main.go (~3,150 lines) is now purely an orchestration layer. Further modularization possible but current design is near-optimal for project size.
 
 2. **Data Storage** - Uses JSON files (portfolio.json, watchlist.json). For >1000 stocks or complex queries, consider migrating to SQLite in v6.0.
 
