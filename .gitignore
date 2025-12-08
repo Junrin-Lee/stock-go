@@ -1,11 +1,5 @@
 # Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-*.test
+cmd/stock-monitor
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
@@ -13,10 +7,16 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
+# IDE setttings
 .vscode
 .idea
-.DS_Store
+
+# AI settings
 .claude
+
+# macOS system files
+.DS_Store
+
+# Application data and configuration files
 data
-cmd/stock-monitor
 cmd/conf/config.yml
