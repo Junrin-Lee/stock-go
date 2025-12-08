@@ -1,6 +1,6 @@
 # Stock Monitor - Stock Monitoring System
 
-[![Version](https://img.shields.io/badge/version-v5.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.1-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -412,19 +412,20 @@ If you encounter issues, please provide:
 
 ## Version History
 
-### Current Version - v5.0
+### Current Version - v5.1
 
-**Architecture Modernization & Core Refactoring**
+**Internationalization Enhancement & Hong Kong Stock Search Fix**
 
-- **Complete Modular Architecture**: 16 professional modules with clear responsibilities
-- **main.go Optimization**: Reduced from 6,424 to 3,156 lines, 50% complexity reduction
-- **Full Feature Preservation**: All user features unchanged, compatible with historical data
-- **Layered Design**: UI layer, business logic layer, data layer, utility layer clearly separated
+- **Hong Kong Stock Search Fix**: Fixed empty search results for Hong Kong stocks (e.g., HK00700)
+- **Debug Log Internationalization**: All debug logs and internal messages support Chinese/English switching
+- **Intraday Chart Internationalization**: Intraday chart interface fully supports multi-language display
+- **Code Quality Improvement**: Optimized dependency management, cleaned up redundant modules
 
 ### Version History
 
 | Version | Major Updates |
 |---------|---------------|
+| [v5.1](doc/version/v5.1.md) | Internationalization enhancement, HK stock search fix |
 | [v5.0](doc/version/v5.0.md) | Architecture modernization, 16-module design |
 | [v4.9](doc/version/v4.9.md) | Intraday chart enhancement, smart date selection |
 | [v4.8](doc/version/v4.8.md) | Multi-tag system, UX optimization |

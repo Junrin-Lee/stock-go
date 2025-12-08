@@ -1,6 +1,6 @@
 # Stock Monitor - 股票监控系统
 
-[![Version](https://img.shields.io/badge/version-v5.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.1-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -412,19 +412,20 @@ A股实时数据:  腾讯 API → 新浪 API → 显示 "-"
 
 ## 版本历史
 
-### 当前版本 - v5.0
+### 当前版本 - v5.1
 
-**架构现代化与核心功能重构**
+**国际化完善与港股搜索修复**
 
-- **完整模块化架构**: 16 个专业模块，清晰的职责分工
-- **main.go 优化**: 从 6,424 行降至 3,156 行，减少 50% 复杂度
-- **功能完全保留**: 所有用户功能保持不变，兼容历史数据
-- **分层设计**: UI层、业务逻辑层、数据层、工具层清晰分离
+- **港股搜索修复**: 修复了港股（如 HK00700）搜索返回空结果的问题
+- **调试日志国际化**: 所有调试日志和内部消息支持中英文切换
+- **分时图表国际化**: 分时图表界面完整支持多语言显示
+- **代码质量提升**: 优化依赖管理，清理冗余模块
 
 ### 版本历史
 
 | 版本 | 主要更新 |
 |------|----------|
+| [v5.1](doc/version/v5.1.md) | 国际化完善，港股搜索修复 |
 | [v5.0](doc/version/v5.0.md) | 架构现代化，16模块设计 |
 | [v4.9](doc/version/v4.9.md) | 分时图表增强，智能日期选择 |
 | [v4.8](doc/version/v4.8.md) | 多标签系统，用户体验优化 |
