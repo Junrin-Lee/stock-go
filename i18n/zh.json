@@ -124,6 +124,7 @@
   "back": "返回",
   "terminalTooSmall": "终端窗口太小",
   "pleaseResize": "请调整窗口大小至至少 80x25",
+  "tradingSession": "⏰ 交易时段: 9:30开盘 | 11:30午休 | 13:00午盘 | 15:00收盘",
 
   "debug.action.prefix": "用户操作:",
   "debug.action.enterPortfolio": "进入持股监控页面",

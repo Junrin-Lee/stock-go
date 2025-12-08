@@ -124,6 +124,7 @@
   "back": "Back",
   "terminalTooSmall": "Terminal window too small",
   "pleaseResize": "Please resize to at least 80x25",
+  "tradingSession": "⏰ Trading Session: 9:30 Open | 11:30 Lunch | 13:00 Afternoon | 15:00 Close",
 
   "debug.action.prefix": "User Action:",
   "debug.action.enterPortfolio": "Entered portfolio view",

@@ -628,7 +628,7 @@ func (m *Model) viewIntradayChart(termWidth, termHeight int) string {
 	// === 新增：关键时间点说明 ===
 	timeMarkers := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
-		Render("⏰ 交易时段: 9:30开盘 | 11:30午休 | 13:00午盘 | 15:00收盘")
+		Render(m.getText("tradingSession"))
 	b.WriteString(timeMarkers)
 	b.WriteString("\n\n")
 
