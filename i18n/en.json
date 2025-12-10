@@ -162,6 +162,13 @@
   "debug.chart.priceRange": "[Chart] Price range: %.3f-%.3f, volatility: %.2f%%, margin: %.3f",
   "debug.chart.dimensions": "[Chart] Creating chart - width:%d height:%d points:%d range:%.3f-%.3f",
   "debug.chart.success": "[Chart] Chart created and drawn successfully",
+  "debug.chart.prevCloseFromCache": "[Chart] PrevClose from cache: %s = %.2f",
+  "debug.chart.prevCloseFromAPI": "[Chart] PrevClose from API: %s = %.2f",
+  "debug.chart.prevCloseUnavailable": "[Chart] PrevClose unavailable: %s",
+  "debug.chart.prevCloseMissing": "[Chart] PrevClose missing in file: %s",
+  "debug.chart.prevCloseExists": "[Chart] PrevClose exists: %s = %.2f",
+  "debug.chart.colorFallback": "[Chart] PrevClose missing, fallback to open: %s",
+  "debug.chart.statsFallback": "[Chart] PrevClose missing (stats), fallback to open: %s",
 
   "debug.config.defaultHighlight": "[Config] Using default highlight color: %s",
   "debug.config.loadedHighlight": "[Config] Loaded highlight color config: %s",
@@ -188,6 +195,7 @@
   "debug.intraday.sinaNoData": "[Intraday] Sina API no data: %s",
   "debug.intraday.trackStart": "[Intraday] Start tracking %d stocks",
   "debug.intraday.trackStop": "[Intraday] Stopped all intraday tracking",
+  "debug.intraday.prevCloseSet": "[Intraday] PrevClose set: %s = %.2f",
 
   "debug.api.directFail": "[Debug] Direct price fetch failed, trying search: %s",
   "debug.api.symbolSearch": "[Debug] Starting symbol search: %s",

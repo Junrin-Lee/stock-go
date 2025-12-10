@@ -162,6 +162,13 @@
   "debug.chart.priceRange": "[图表] 价格范围: %.3f-%.3f, 波动率: %.2f%%, margin: %.3f",
   "debug.chart.dimensions": "[图表] 创建图表 - 宽度:%d 高度:%d 数据点:%d 价格范围:%.3f-%.3f",
   "debug.chart.success": "[图表] 图表创建并绘制成功",
+  "debug.chart.prevCloseFromCache": "[图表] 从缓存获取昨收: %s = %.2f",
+  "debug.chart.prevCloseFromAPI": "[图表] 从API获取昨收: %s = %.2f",
+  "debug.chart.prevCloseUnavailable": "[图表] 无法获取昨收: %s",
+  "debug.chart.prevCloseMissing": "[图表] 文件缺失昨收字段: %s",
+  "debug.chart.prevCloseExists": "[图表] 文件已有昨收: %s = %.2f",
+  "debug.chart.colorFallback": "[图表] 昨收缺失，降级到开盘价: %s",
+  "debug.chart.statsFallback": "[图表] 昨收缺失(统计)，降级到开盘价: %s",
 
   "debug.config.defaultHighlight": "[配置] 使用默认高亮颜色: %s",
   "debug.config.loadedHighlight": "[配置] 读取到高亮颜色配置: %s",
@@ -188,6 +195,7 @@
   "debug.intraday.sinaNoData": "[分时数据] Sina API 无数据: %s",
   "debug.intraday.trackStart": "[分时数据] 开始跟踪 %d 只股票的分时数据",
   "debug.intraday.trackStop": "[分时数据] 已停止所有分时数据跟踪",
+  "debug.intraday.prevCloseSet": "[分时] 设置昨收: %s = %.2f",
 
   "debug.api.directFail": "[调试] 直接获取股票价格失败，尝试通过搜索查找: %s",
   "debug.api.symbolSearch": "[调试] 开始通过符号搜索股票: %s",

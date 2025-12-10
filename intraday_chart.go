@@ -64,6 +64,34 @@ func (m *Model) stopIntradayDataCollection() {
 // 分时数据加载和解析
 // ============================================================================
 
+// fetchPrevCloseForStock 获取股票的昨日收盘价
+// 优先级：1) 缓存 2) API调用 3) 降级到 0.0
+func (m *Model) fetchPrevCloseForStock(code string) float64 {
+	// 尝试从缓存获取
+	m.stockPriceMutex.RLock()
+	if entry, exists := m.stockPriceCache[code]; exists && entry.Data != nil {
+		prevClose := entry.Data.PrevClose
+		m.stockPriceMutex.RUnlock()
+		if prevClose > 0 {
+			debugPrint("debug.chart.prevCloseFromCache", code, prevClose)
+			return prevClose
+		}
+	} else {
+		m.stockPriceMutex.RUnlock()
+	}
+
+	// 缓存未命中 - 从API获取
+	debugPrint("debug.chart.fetchingPrevClose", code)
+	stockData := getStockPrice(code)
+	if stockData != nil && stockData.PrevClose > 0 {
+		debugPrint("debug.chart.prevCloseFromAPI", code, stockData.PrevClose)
+		return stockData.PrevClose
+	}
+
+	debugPrint("debug.chart.prevCloseUnavailable", code)
+	return 0.0 // 降级方案
+}
+
 // loadIntradayDataForDate 从磁盘加载特定股票和日期的分时数据
 func (m *Model) loadIntradayDataForDate(code, name, date string) (*IntradayData, error) {
 	filePath := filepath.Join("data", "intraday", code, date+".json")
@@ -88,6 +116,19 @@ func (m *Model) loadIntradayDataForDate(code, name, date string) (*IntradayData,
 		if dp.Time == "" || dp.Price == 0 {
 			return nil, fmt.Errorf("invalid datapoint at index %d", i)
 		}
+	}
+
+	// NEW: 如果文件缺失 PrevClose，从缓存/API获取
+	if data.PrevClose == 0 {
+		debugPrint("debug.chart.prevCloseMissing", code)
+		data.PrevClose = m.fetchPrevCloseForStock(code)
+
+		// 可选：异步保存更新后的数据（非阻塞，忽略错误）
+		if data.PrevClose > 0 {
+			go saveIntradayData(filePath, &data)
+		}
+	} else {
+		debugPrint("debug.chart.prevCloseExists", code, data.PrevClose)
 	}
 
 	return &data, nil
@@ -373,21 +414,28 @@ func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model 
 	debugPrint("debug.chart.priceRange", minPrice, maxPrice, (maxPrice-minPrice)/minPrice*100, margin)
 
 	// 设置样式：A股红涨绿跌，非A股绿涨红跌
-	firstPrice := m.chartData.Datapoints[0].Price
 	lastPrice := m.chartData.Datapoints[len(m.chartData.Datapoints)-1].Price
+	prevClose := m.chartData.PrevClose // 使用昨日收盘价
+
+	// 降级方案：如果 prevClose 不可用，回退到开盘价（保持现有行为）
+	comparisonBase := prevClose
+	if comparisonBase == 0 {
+		comparisonBase = m.chartData.Datapoints[0].Price // 降级到开盘价
+		debugPrint("debug.chart.colorFallback", m.chartData.Code)
+	}
 
 	// 判断是否为A股（SH/SZ开头）
 	isAShare := strings.HasPrefix(m.chartData.Code, "SH") || strings.HasPrefix(m.chartData.Code, "SZ")
 
 	var chartStyle lipgloss.Style
-	if lastPrice > firstPrice {
+	if lastPrice > comparisonBase {
 		// 上涨：A股红色，非A股绿色
 		if isAShare {
 			chartStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9")) // 红色
 		} else {
 			chartStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // 绿色
 		}
-	} else if lastPrice < firstPrice {
+	} else if lastPrice < comparisonBase {
 		// 下跌：A股绿色，非A股红色
 		if isAShare {
 			chartStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // 绿色
@@ -700,10 +748,18 @@ func (m *Model) viewIntradayChart(termWidth, termHeight int) string {
 		}
 	}
 
-	openPrice := prices[0]
 	closePrice := prices[len(prices)-1]
-	change := closePrice - openPrice
-	changePercent := (change / openPrice) * 100
+	prevClose := m.chartData.PrevClose
+
+	// 降级方案：如果 prevClose 不可用，回退到开盘价（保持现有行为）
+	comparisonBase := prevClose
+	if comparisonBase == 0 {
+		comparisonBase = prices[0] // 降级到开盘价
+		debugPrint("debug.chart.statsFallback", m.chartData.Code)
+	}
+
+	change := closePrice - comparisonBase
+	changePercent := (change / comparisonBase) * 100
 
 	// 统计信息行：A股红涨绿跌，非A股绿涨红跌
 	isAShare := strings.HasPrefix(m.chartData.Code, "SH") || strings.HasPrefix(m.chartData.Code, "SZ")
@@ -725,8 +781,9 @@ func (m *Model) viewIntradayChart(termWidth, termHeight int) string {
 	}
 
 	b.WriteString(statsStyle.Render(fmt.Sprintf(
-		"%s: %.2f  %s: %.2f  %s: %.2f  %s: %.2f  %s: %+.2f (%.2f%%)",
-		m.getText("open"), openPrice,
+		"%s: %.2f  %s: %.2f  %s: %.2f  %s: %.2f  %s: %.2f  %s: %+.2f (%.2f%%)",
+		m.getText("prevClose"), prevClose,
+		m.getText("open"), prices[0],
 		m.getText("close"), closePrice,
 		m.getText("high"), maxPrice,
 		m.getText("low"), minPrice,

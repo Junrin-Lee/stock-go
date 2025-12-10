@@ -22,11 +22,12 @@ type IntradayDataPoint struct {
 
 // IntradayData represents the complete intraday data for a stock on a given day
 type IntradayData struct {
-	Code       string              `json:"code"`       // e.g., "SH600000"
-	Name       string              `json:"name"`       // e.g., "浦发银行"
-	Date       string              `json:"date"`       // Format: "20251126"
-	Datapoints []IntradayDataPoint `json:"datapoints"` // Minute-by-minute data
-	UpdatedAt  string              `json:"updated_at"` // Format: "2025-11-26 15:00:00"
+	Code       string              `json:"code"`                 // e.g., "SH600000"
+	Name       string              `json:"name"`                 // e.g., "浦发银行"
+	Date       string              `json:"date"`                 // Format: "20251126"
+	Datapoints []IntradayDataPoint `json:"datapoints"`           // Minute-by-minute data
+	UpdatedAt  string              `json:"updated_at"`           // Format: "2025-11-26 15:00:00"
+	PrevClose  float64             `json:"prev_close,omitempty"` // 昨日收盘价（向后兼容）
 }
 
 // IntradayManager manages background fetching of intraday data
@@ -156,6 +157,19 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 	// Merge datapoints (deduplicate by time)
 	existingData.Datapoints = mergeDatapoints(existingData.Datapoints, datapoints)
 	existingData.UpdatedAt = time.Now().Format("2006-01-02 15:04:05")
+
+	// NEW: 如果 existingData.PrevClose 为空，从缓存获取
+	if existingData.PrevClose == 0 {
+		m.stockPriceMutex.RLock()
+		if entry, exists := m.stockPriceCache[stockCode]; exists && entry.Data != nil {
+			existingData.PrevClose = entry.Data.PrevClose
+		}
+		m.stockPriceMutex.RUnlock()
+
+		if existingData.PrevClose > 0 {
+			debugPrint("debug.intraday.prevCloseSet", stockCode, existingData.PrevClose)
+		}
+	}
 
 	// Write back to file
 	if err := saveIntradayData(filePath, existingData); err != nil {
