@@ -59,11 +59,41 @@ type Watchlist struct {
 	Stocks []WatchlistStock `json:"stocks"`
 }
 
+// MarketType 市场类型枚举
+type MarketType string
+
+const (
+	MarketChina    MarketType = "china"
+	MarketUS       MarketType = "us"
+	MarketHongKong MarketType = "hongkong"
+)
+
+// TradingSession 交易时段
+type TradingSession struct {
+	StartTime string `yaml:"start_time"` // "09:30"
+	EndTime   string `yaml:"end_time"`   // "11:30"
+}
+
+// MarketConfig 市场配置
+type MarketConfig struct {
+	Timezone        string           `yaml:"timezone"`         // "Asia/Shanghai"
+	TradingSessions []TradingSession `yaml:"trading_sessions"` // 交易时段列表
+	Weekdays        []int            `yaml:"weekdays"`         // [1,2,3,4,5] (周一到周五)
+}
+
+// MarketsConfig 所有市场配置
+type MarketsConfig struct {
+	China    MarketConfig `yaml:"china"`
+	US       MarketConfig `yaml:"us"`
+	HongKong MarketConfig `yaml:"hongkong"`
+}
+
 // Config 系统配置结构
 type Config struct {
 	System  SystemConfig  `yaml:"system"`  // 系统设置
 	Display DisplayConfig `yaml:"display"` // 显示设置
 	Update  UpdateConfig  `yaml:"update"`  // 更新设置
+	Markets MarketsConfig `yaml:"markets"` // 市场配置
 }
 
 // SystemConfig 系统设置

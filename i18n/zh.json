@@ -124,7 +124,7 @@
   "back": "返回",
   "terminalTooSmall": "终端窗口太小",
   "pleaseResize": "请调整窗口大小至至少 80x25",
-  "tradingSession": "⏰ 交易时段: 9:30开盘 | 11:30午休 | 13:00午盘 | 15:00收盘",
+  "tradingSession": "交易时段",
 
   "debug.action.prefix": "用户操作:",
   "debug.action.enterPortfolio": "进入持股监控页面",
@@ -195,6 +195,12 @@
   "debug.intraday.sinaNoData": "[分时数据] Sina API 无数据: %s",
   "debug.intraday.trackStart": "[分时数据] 开始跟踪 %d 只股票的分时数据",
   "debug.intraday.trackStop": "[分时数据] 已停止所有分时数据跟踪",
+  "debug.intraday.marketTypeUS": "[分时数据] 检测到美股市场: %s",
+  "debug.intraday.marketTypeHK": "[分时数据] 检测到港股市场: %s",
+  "debug.intraday.marketTypeChina": "[分时数据] 检测到A股市场: %s",
+  "debug.intraday.yahooSuccess": "[分时数据] Yahoo Finance API 成功: %s (%d points)",
+  "debug.intraday.yahooFail": "[分时数据] Yahoo Finance API 失败: %s - %v",
+  "debug.intraday.yahooNoData": "[分时数据] Yahoo Finance API 无数据: %s",
   "debug.intraday.prevCloseSet": "[分时] 设置昨收: %s = %.2f",
 
   "debug.api.directFail": "[调试] 直接获取股票价格失败，尝试通过搜索查找: %s",
@@ -293,5 +299,14 @@
   "debug.api.yahooGetSuccess": "[调试] Yahoo获取成功 - 名称: %s, 价格: %.2f, 涨跌: %.2f (%.2f%%), 开: %.2f, 高: %.2f, 低: %.2f, 量: %d",
   "debug.api.tencentApiFailed": "[调试] 腾讯API失败，尝试其他API",
   "debug.api.allApiFailed": "[调试] 所有API都失败，未找到股票数据",
-  "debug.api.allUsApiFailed": "[调试] 所有美股API都失败，建议配置有效的API key"
+  "debug.api.allUsApiFailed": "[调试] 所有美股API都失败，建议配置有效的API key",
+  "market": "市场",
+  "marketChina": "A股",
+  "marketUS": "美股",
+  "marketHongKong": "港股",
+  "open": "开盘",
+  "close": "收盘",
+  "lunch": "午休",
+  "afternoon": "午盘",
+  "marketNotSupported": "该市场暂不支持分时数据"
 }

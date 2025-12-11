@@ -124,7 +124,7 @@
   "back": "Back",
   "terminalTooSmall": "Terminal window too small",
   "pleaseResize": "Please resize to at least 80x25",
-  "tradingSession": "⏰ Trading Session: 9:30 Open | 11:30 Lunch | 13:00 Afternoon | 15:00 Close",
+  "tradingSession": "Trading Session",
 
   "debug.action.prefix": "User Action:",
   "debug.action.enterPortfolio": "Entered portfolio view",
@@ -195,6 +195,12 @@
   "debug.intraday.sinaNoData": "[Intraday] Sina API no data: %s",
   "debug.intraday.trackStart": "[Intraday] Start tracking %d stocks",
   "debug.intraday.trackStop": "[Intraday] Stopped all intraday tracking",
+  "debug.intraday.marketTypeUS": "[Intraday] Detected US market: %s",
+  "debug.intraday.marketTypeHK": "[Intraday] Detected HK market: %s",
+  "debug.intraday.marketTypeChina": "[Intraday] Detected China market: %s",
+  "debug.intraday.yahooSuccess": "[Intraday] Yahoo Finance API success: %s (%d points)",
+  "debug.intraday.yahooFail": "[Intraday] Yahoo Finance API failed: %s - %v",
+  "debug.intraday.yahooNoData": "[Intraday] Yahoo Finance API no data: %s",
   "debug.intraday.prevCloseSet": "[Intraday] PrevClose set: %s = %.2f",
 
   "debug.api.directFail": "[Debug] Direct price fetch failed, trying search: %s",
@@ -293,5 +299,14 @@
   "debug.api.yahooGetSuccess": "[Debug] Yahoo success - Name: %s, Price: %.2f, Change: %.2f (%.2f%%), Open: %.2f, High: %.2f, Low: %.2f, Vol: %d",
   "debug.api.tencentApiFailed": "[Debug] Tencent API failed, trying other APIs",
   "debug.api.allApiFailed": "[Debug] All APIs failed, no stock data found",
-  "debug.api.allUsApiFailed": "[Debug] All US stock APIs failed, recommend configuring valid API key"
+  "debug.api.allUsApiFailed": "[Debug] All US stock APIs failed, recommend configuring valid API key",
+  "market": "Market",
+  "marketChina": "A-Share",
+  "marketUS": "US Stock",
+  "marketHongKong": "HK Stock",
+  "open": "Open",
+  "close": "Close",
+  "lunch": "Lunch",
+  "afternoon": "Afternoon",
+  "marketNotSupported": "Intraday data not supported for this market"
 }

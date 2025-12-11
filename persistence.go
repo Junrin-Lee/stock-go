@@ -105,6 +105,35 @@ func (m *Model) saveWatchlist() {
 // Config 配置文件持久化
 // ============================================================================
 
+// defaultMarketsConfig 获取默认的市场配置
+func defaultMarketsConfig() MarketsConfig {
+	return MarketsConfig{
+		China: MarketConfig{
+			Timezone: "Asia/Shanghai",
+			TradingSessions: []TradingSession{
+				{StartTime: "09:30", EndTime: "11:30"},
+				{StartTime: "13:00", EndTime: "15:00"},
+			},
+			Weekdays: []int{1, 2, 3, 4, 5},
+		},
+		US: MarketConfig{
+			Timezone: "America/New_York",
+			TradingSessions: []TradingSession{
+				{StartTime: "09:30", EndTime: "16:00"},
+			},
+			Weekdays: []int{1, 2, 3, 4, 5},
+		},
+		HongKong: MarketConfig{
+			Timezone: "Asia/Hong_Kong",
+			TradingSessions: []TradingSession{
+				{StartTime: "09:30", EndTime: "12:00"},
+				{StartTime: "13:00", EndTime: "16:00"},
+			},
+			Weekdays: []int{1, 2, 3, 4, 5},
+		},
+	}
+}
+
 // getDefaultConfig 获取默认配置
 func getDefaultConfig() Config {
 	return Config{
@@ -125,6 +154,7 @@ func getDefaultConfig() Config {
 			RefreshInterval: 5,    // 5秒刷新间隔
 			AutoUpdate:      true, // 自动更新开启
 		},
+		Markets: defaultMarketsConfig(), // 市场配置
 	}
 }
 
@@ -156,6 +186,12 @@ func loadConfig() Config {
 		debugPrint("debug.config.defaultHighlight", config.Display.PortfolioHighlight)
 	} else {
 		debugPrint("debug.config.loadedHighlight", config.Display.PortfolioHighlight)
+	}
+
+	// 如果 Markets 为空，填充默认值（向后兼容）
+	if config.Markets.China.Timezone == "" {
+		config.Markets = defaultMarketsConfig()
+		debugPrint("debug.config.defaultMarkets", "填充默认市场配置")
 	}
 
 	return config

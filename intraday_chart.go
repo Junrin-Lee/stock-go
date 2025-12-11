@@ -26,20 +26,16 @@ func (m *Model) startIntradayDataCollection() {
 		m.intradayManager = newIntradayManager()
 	}
 
-	// 收集当前页面的股票
+	// 收集当前页面的股票（支持所有市场）
 	stocksToTrack := make(map[string]string) // code -> name
 
 	if m.state == Monitoring {
 		for _, stock := range m.portfolio.Stocks {
-			if isChinaStock(stock.Code) {
-				stocksToTrack[stock.Code] = stock.Name
-			}
+			stocksToTrack[stock.Code] = stock.Name
 		}
 	} else if m.state == WatchlistViewing {
 		for _, stock := range m.watchlist.Stocks {
-			if isChinaStock(stock.Code) {
-				stocksToTrack[stock.Code] = stock.Name
-			}
+			stocksToTrack[stock.Code] = stock.Name
 		}
 	}
 
@@ -104,6 +100,12 @@ func (m *Model) loadIntradayDataForDate(code, name, date string) (*IntradayData,
 	var data IntradayData
 	if err := json.Unmarshal(fileData, &data); err != nil {
 		return nil, fmt.Errorf("parse error: %w", err)
+	}
+
+	// 向后兼容：如果 Market 为空，自动识别
+	if data.Market == "" {
+		data.Market = getMarketType(code)
+		debugPrint("debug.chart.marketAutoDetect", code, data.Market)
 	}
 
 	// 验证数据
@@ -314,21 +316,47 @@ func formatDate(dateStr string) string {
 
 // createFixedTimeRange 创建固定的时间范围框架（9:30-15:00，共331个分钟点，包含午休）
 // 创建完整连续的时间轴，午休时段（11:30-13:00）也包含在内，用于正确的时间映射
-func (m *Model) createFixedTimeRange(date string) []TimePoint {
-	baseDate := parseIntradayTime(date, "09:30")
-	endDate := parseIntradayTime(date, "15:00")
+func (m *Model) createFixedTimeRange(date string, market MarketType) []TimePoint {
+	var marketConfig MarketConfig
+	switch market {
+	case MarketChina:
+		marketConfig = m.config.Markets.China
+	case MarketUS:
+		marketConfig = m.config.Markets.US
+	case MarketHongKong:
+		marketConfig = m.config.Markets.HongKong
+	default:
+		debugPrint("debug.chart.unknownMarket", market)
+		return nil
+	}
 
-	// 计算总分钟数：9:30 到 15:00 = 5.5小时 = 330分钟 + 1（包含起点）= 331个点
-	totalMinutes := int(endDate.Sub(baseDate).Minutes()) + 1
-	points := make([]TimePoint, 0, totalMinutes)
+	points := make([]TimePoint, 0)
 
-	// 创建连续的时间点（包含午休时段）
-	for i := 0; i < totalMinutes; i++ {
-		t := baseDate.Add(time.Duration(i) * time.Minute)
-		points = append(points, TimePoint{
-			Time:  t,
-			Value: 0, // 占位，后续填充实际价格
-		})
+	// 遍历所有交易时段
+	for _, session := range marketConfig.TradingSessions {
+		startTime, err := parseTimeInMarket(date, session.StartTime, marketConfig)
+		if err != nil {
+			debugPrint("debug.chart.parseStartFail", session.StartTime, err)
+			continue
+		}
+
+		endTime, err := parseTimeInMarket(date, session.EndTime, marketConfig)
+		if err != nil {
+			debugPrint("debug.chart.parseEndFail", session.EndTime, err)
+			continue
+		}
+
+		// 生成该时段的所有分钟点
+		totalMinutes := int(endTime.Sub(startTime).Minutes()) + 1
+		for i := 0; i < totalMinutes; i++ {
+			t := startTime.Add(time.Duration(i) * time.Minute)
+			// 转换到本地时区显示
+			localTime := t.Local()
+			points = append(points, TimePoint{
+				Time:  localTime,
+				Value: 0,
+			})
+		}
 	}
 
 	return points
@@ -372,8 +400,8 @@ func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model 
 		chartHeight = minHeight
 	}
 
-	// === 创建完整时间框架（9:30-15:00，每分钟一个点） ===
-	timeFramework := m.createFixedTimeRange(m.chartData.Date)
+	// === 创建完整时间框架（根据市场配置动态生成） ===
+	timeFramework := m.createFixedTimeRange(m.chartData.Date, m.chartData.Market)
 
 	// === 将实际数据填充到时间框架中 ===
 	dataMap := make(map[string]float64)
@@ -658,26 +686,86 @@ func (m *Model) handleIntradayChartViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 // 分时图表视图渲染
 // ============================================================================
 
+// getMarketTradingSessionText 获取市场交易时段文本
+func (m *Model) getMarketTradingSessionText(market MarketType) string {
+	var marketConfig MarketConfig
+	switch market {
+	case MarketChina:
+		marketConfig = m.config.Markets.China
+	case MarketUS:
+		marketConfig = m.config.Markets.US
+	case MarketHongKong:
+		marketConfig = m.config.Markets.HongKong
+	default:
+		return m.getText("tradingSession")
+	}
+
+	if len(marketConfig.TradingSessions) == 0 {
+		return m.getText("tradingSession")
+	}
+
+	var sessions []string
+	for i, session := range marketConfig.TradingSessions {
+		if i == 0 {
+			// 第一个时段：开盘
+			sessions = append(sessions, fmt.Sprintf("%s %s", session.StartTime, m.getText("open")))
+		} else {
+			// 后续时段：午盘
+			sessions = append(sessions, fmt.Sprintf("%s %s", session.StartTime, m.getText("afternoon")))
+		}
+
+		if i < len(marketConfig.TradingSessions)-1 {
+			// 非最后一个时段：午休
+			sessions = append(sessions, fmt.Sprintf("%s %s", session.EndTime, m.getText("lunch")))
+		} else {
+			// 最后一个时段：收盘
+			sessions = append(sessions, fmt.Sprintf("%s %s", session.EndTime, m.getText("close")))
+		}
+	}
+
+	return "⏰ " + m.getText("tradingSession") + ": " + strings.Join(sessions, " | ")
+}
+
 // viewIntradayChart 渲染分时图表视图
 func (m *Model) viewIntradayChart(termWidth, termHeight int) string {
 	var b strings.Builder
 
-	// 股票信息头部
+	// 股票信息头部（带市场标签）
+	marketLabel := ""
+	if m.chartData != nil {
+		switch m.chartData.Market {
+		case MarketChina:
+			marketLabel = m.getText("marketChina")
+		case MarketUS:
+			marketLabel = m.getText("marketUS")
+		case MarketHongKong:
+			marketLabel = m.getText("marketHongKong")
+		default:
+			marketLabel = m.getText("market")
+		}
+	}
+
 	b.WriteString(lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("14")). // 青色
-		Render(fmt.Sprintf("📈 %s - %s (%s) - %s",
+		Render(fmt.Sprintf("📈 %s [%s] - %s (%s) - %s",
 			m.getText("intradayChart"),
+			marketLabel,
 			m.chartViewStock,
 			m.chartViewStockName,
 			formatDate(m.chartViewDate))))
 	b.WriteString("\n\n")
 
-	// === 新增：关键时间点说明 ===
-	timeMarkers := lipgloss.NewStyle().
+	// === 动态交易时段说明 ===
+	timeMarkers := ""
+	if m.chartData != nil {
+		timeMarkers = m.getMarketTradingSessionText(m.chartData.Market)
+	} else {
+		timeMarkers = m.getText("tradingSession")
+	}
+	b.WriteString(lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
-		Render(m.getText("tradingSession"))
-	b.WriteString(timeMarkers)
+		Render(timeMarkers))
 	b.WriteString("\n\n")
 
 	// 处理不同状态

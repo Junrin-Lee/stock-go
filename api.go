@@ -58,6 +58,27 @@ func isHKStock(symbol string) bool {
 	return strings.HasPrefix(symbol, "HK") || strings.HasSuffix(symbol, ".HK")
 }
 
+// getMarketType 根据股票代码识别市场类型
+func getMarketType(symbol string) MarketType {
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+
+	// A股识别 (上海、深圳)
+	if strings.HasPrefix(symbol, "SH") || strings.HasPrefix(symbol, "SZ") ||
+		(len(symbol) == 6 && (strings.HasPrefix(symbol, "0") ||
+			strings.HasPrefix(symbol, "3") ||
+			strings.HasPrefix(symbol, "6"))) {
+		return MarketChina
+	}
+
+	// 港股识别
+	if strings.HasPrefix(symbol, "HK") || strings.HasSuffix(symbol, ".HK") {
+		return MarketHongKong
+	}
+
+	// 默认为美股
+	return MarketUS
+}
+
 // ============================================================================
 // 股票搜索函数
 // ============================================================================
