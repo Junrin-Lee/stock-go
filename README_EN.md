@@ -412,26 +412,29 @@ If you encounter issues, please provide:
 
 ## Version History
 
-### Current Version - v5.1
+### Current Version - v5.1 (December 2025)
 
-**Internationalization Enhancement & Hong Kong Stock Search Fix**
+**🌍 Multi-Market Support & Critical Fixes**
 
-- **Hong Kong Stock Search Fix**: Fixed empty search results for Hong Kong stocks (e.g., HK00700)
-- **Debug Log Internationalization**: All debug logs and internal messages support Chinese/English switching
-- **Intraday Chart Internationalization**: Intraday chart interface fully supports multi-language display
-- **Code Quality Improvement**: Optimized dependency management, cleaned up redundant modules
+- **Multi-Market Intraday Data**: New support for US stocks and Hong Kong stocks real-time intraday data
+- **Timezone-Aware Module**: New `timezone.go` module for market-specific timezone handling
+- **Yahoo Finance API**: US stock data fetched from Yahoo Finance (free, no API key required)
+- **Critical Bug Fixes**: Fixed HK stock code padding (HK9626 → HK09626) and US intraday data collection failure
+- **Smart API Routing**: Automatic selection of optimal API sources per market type, 3-tier fallback mechanism
+- **First Unit Tests**: 4 test functions with 100% pass rate, marking the beginning of TDD
+- **Data Migration Tool**: Safe migration of intraday data to new market-classified directory structure
 
 ### Version History
 
-| Version | Major Updates |
-|---------|---------------|
-| [v5.1](doc/version/v5.1.md) | Internationalization enhancement, HK stock search fix |
-| [v5.0](doc/version/v5.0.md) | Architecture modernization, 16-module design |
-| [v4.9](doc/version/v4.9.md) | Intraday chart enhancement, smart date selection |
-| [v4.8](doc/version/v4.8.md) | Multi-tag system, UX optimization |
-| [v4.7](doc/version/v4.7.md) | Architecture optimization, i18n enhancement |
-| [v4.6](doc/version/v4.6.md) | Intraday data collection, async optimization |
-| [v4.5](doc/version/v4.5.md) | Advanced sorting system |
+| Version | Release Date | Major Updates | Documentation |
+|---------|--------------|-----------------|----------------|
+| **v5.1** | Dec 2025 | 🌍 Multi-market support, US/HK intraday data, Yahoo API, unit tests | [Details](doc/version/v5.1.md) |
+| v5.0 | Dec 2025 | 🏗️ Architecture modernization, complete modular design | [Details](doc/version/v5.0.md) |
+| v4.9 | Nov 2025 | Intraday chart enhancement, smart date selection | [Details](doc/version/v4.9.md) |
+| v4.8 | Nov 2025 | Multi-tag system, UX optimization | [Details](doc/version/v4.8.md) |
+| v4.7 | Oct 2025 | Architecture optimization, i18n enhancement | [Details](doc/version/v4.7.md) |
+| v4.6 | Oct 2025 | Intraday data collection, async optimization | [Details](doc/version/v4.6.md) |
+| v4.5 | Sep 2025 | Advanced sorting system | [Details](doc/version/v4.5.md) |
 
 View complete version history: [doc/version/](doc/version/)
 
