@@ -67,8 +67,83 @@ update:
     # 股票数据自动刷新间隔时间 (1-60秒)
     # auto refresh interval for stock data in seconds (1-60)
     refresh_interval: 5
-    
+
     # 自动更新 Auto Update
     # true: 自动刷新股票数据 | false: 手动刷新
     # true: enable auto refresh of stock data | false: manual refresh
     auto_update: true
+
+# 市场配置 Markets Configuration
+# 配置各个市场的交易时间、时区和工作日
+# Configure trading hours, timezone and weekdays for each market
+markets:
+    # 中国市场 (A股) China Market (A-shares)
+    china:
+        # 时区 Timezone
+        # 中国A股使用东八区时间 (UTC+8)
+        # China A-shares use Asia/Shanghai timezone (UTC+8)
+        timezone: "Asia/Shanghai"
+
+        # 交易时段 Trading Sessions
+        # A股有两个交易时段: 上午盘和下午盘
+        # A-shares have two trading sessions: morning and afternoon
+        trading_sessions:
+            # 上午盘 Morning Session
+            - start_time: "09:30"  # 开盘时间 Market open
+              end_time: "11:30"    # 收盘时间 Market close
+
+            # 下午盘 Afternoon Session
+            - start_time: "13:00"  # 开盘时间 Market open
+              end_time: "15:00"    # 收盘时间 Market close
+
+        # 交易日 Trading Weekdays
+        # 1=周一 Monday, 2=周二 Tuesday, ..., 5=周五 Friday
+        # A股交易日为周一至周五 (不包括节假日)
+        # A-shares trade Monday to Friday (excluding holidays)
+        weekdays: [1, 2, 3, 4, 5]
+
+    # 美国市场 US Market
+    us:
+        # 时区 Timezone
+        # 美股使用美国东部时间 (纽约时区)
+        # US stocks use America/New_York timezone (Eastern Time)
+        timezone: "America/New_York"
+
+        # 交易时段 Trading Sessions
+        # 美股只有一个连续交易时段
+        # US market has one continuous trading session
+        trading_sessions:
+            # 常规交易时间 Regular Trading Hours
+            - start_time: "09:30"  # 开盘时间 Market open (9:30 AM ET)
+              end_time: "16:00"    # 收盘时间 Market close (4:00 PM ET)
+
+        # 交易日 Trading Weekdays
+        # 1=周一 Monday, 2=周二 Tuesday, ..., 5=周五 Friday
+        # US stocks trade Monday to Friday (excluding holidays)
+        # 美股交易日为周一至周五 (不包括节假日)
+        weekdays: [1, 2, 3, 4, 5]
+
+    # 香港市场 Hong Kong Market
+    hongkong:
+        # 时区 Timezone
+        # 港股使用香港时间 (UTC+8, 与中国大陆相同)
+        # Hong Kong stocks use Asia/Hong_Kong timezone (UTC+8, same as mainland China)
+        timezone: "Asia/Hong_Kong"
+
+        # 交易时段 Trading Sessions
+        # 港股有两个交易时段: 上午盘和下午盘
+        # Hong Kong stocks have two trading sessions: morning and afternoon
+        trading_sessions:
+            # 上午盘 Morning Session
+            - start_time: "09:30"  # 开盘时间 Market open
+              end_time: "12:00"    # 收盘时间 Market close (中午休市 Lunch break)
+
+            # 下午盘 Afternoon Session
+            - start_time: "13:00"  # 开盘时间 Market open
+              end_time: "16:00"    # 收盘时间 Market close
+
+        # 交易日 Trading Weekdays
+        # 1=周一 Monday, 2=周二 Tuesday, ..., 5=周五 Friday
+        # 港股交易日为周一至周五 (不包括节假日)
+        # Hong Kong stocks trade Monday to Friday (excluding holidays)
+        weekdays: [1, 2, 3, 4, 5]
