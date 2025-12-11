@@ -2,11 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Note**: This is an AI-generated repository. The entire project was created by AI, including code architecture, implementation, and documentation.
+
 ## Project Overview
 
 **Stock Monitor** is a professional command-line TUI (Terminal User Interface) application for real-time stock price tracking, portfolio management, and watchlist analysis. Built with Go using the Bubble Tea framework, it supports A-shares (Shanghai/Shenzhen), US stocks, and Hong Kong stocks with bilingual support (Chinese/English).
 
-**Current Version**: v5.0 - Architecture modernization with complete modular design (16 professional modules), 50% complexity reduction in main.go, zero-risk upgrade with full backward compatibility
+**Current Version**: v5.1 - Multi-market support with timezone-aware data collection, fixes for US/HK intraday data, and improved chart color logic
 
 ## Essential Commands
 
@@ -72,19 +74,20 @@ This is a **state machine-based TUI application** with clear separation of conce
 | File | Lines | Purpose |
 |------|-------|---------|
 | **main.go** | ~3,150 | Core application: state machine, TUI event handling, orchestration |
-| **api.go** | ~1,250 | External API integration: Tencent, Sina, Finnhub, TwelveData with fallback logic |
-| **intraday_chart.go** | ~750 | Intraday chart visualization: smart date selection, adaptive Y-axis, Braille rendering |
-| **intraday.go** | ~616 | Background intraday data collection with worker pool (max 10 concurrent) |
-| **watchlist.go** | ~508 | Watchlist management: tag operations, filtering, search, group selection |
-| **sort.go** | ~238 | Sorting engine for 11 portfolio fields and 7 watchlist fields |
-| **types.go** | ~215 | Data structure definitions: Stock, StockData, WatchlistStock, Config, etc. |
-| **ui_utils.go** | ~194 | UI rendering utilities: table formatting, pagination, Chinese character width handling |
-| **persistence.go** | ~171 | Data persistence layer: JSON/YAML read/write, file operations, backup/restore |
-| **debug.go** | ~160 | Debug logging: 1000-entry buffer, scrollable viewer, conditional logging |
-| **format.go** | ~156 | Formatting utilities: number formatting, price display, percentage calculations |
-| **cache.go** | ~129 | Stock price caching: 30-second TTL, RWMutex protection, cache invalidation |
-| **scroll.go** | ~77 | Scroll handling: cursor management, pagination logic |
-| **consts.go** | ~71 | Application constants (states, sort fields, file paths, enums) |
+| **api.go** | ~1,270 | External API integration: Tencent, Sina, Finnhub, TwelveData with fallback logic |
+| **intraday.go** | ~1,000 | Background intraday data collection with worker pool, multi-market support (max 10 concurrent) |
+| **intraday_chart.go** | ~900 | Intraday chart visualization: smart date selection, adaptive Y-axis, Braille rendering, timezone support |
+| **watchlist.go** | ~510 | Watchlist management: tag operations, filtering, search, group selection |
+| **types.go** | ~245 | Data structure definitions: Stock, StockData, WatchlistStock, Config, etc. |
+| **sort.go** | ~240 | Sorting engine for 11 portfolio fields and 7 watchlist fields |
+| **persistence.go** | ~210 | Data persistence layer: JSON/YAML read/write, file operations, backup/restore, legacy migration |
+| **ui_utils.go** | ~195 | UI rendering utilities: table formatting, pagination, Chinese character width handling |
+| **debug.go** | ~160 | Debug logging: 1000-entry buffer, scrollable viewer, conditional i18n logging |
+| **format.go** | ~155 | Formatting utilities: number formatting, price display, percentage calculations |
+| **cache.go** | ~130 | Stock price caching: 30-second TTL, RWMutex protection, cache invalidation |
+| **timezone.go** | ~100 | Timezone handling: market-specific timezone conversions, trading hours detection (v5.1) |
+| **scroll.go** | ~75 | Scroll handling: cursor management, pagination logic |
+| **consts.go** | ~70 | Application constants (states, sort fields, file paths, enums) |
 | **i18n.go** | ~70 | Internationalization: translation loading, language switching, fallback logic |
 | **color.go** | ~55 | Color utilities using go-pretty (red/green/white for gains/losses/neutral) |
 
@@ -141,16 +144,19 @@ Timer Tick (5s)
     → View() renders fresh data
 ```
 
-## Architectural Evolution to v5.0 Modular Design
+## Architectural Evolution to v5.0+ Modular Design
 
-The codebase has undergone significant architectural evolution culminating in v5.0's complete modularization:
+The codebase has undergone significant architectural evolution culminating in v5.0's complete modularization and v5.1's multi-market enhancements:
 
 **Evolution Path:**
 - **Early versions**: Monolithic single main.go (~6,400+ lines) with all logic intertwined
 - **v4.x (initial refactoring)**: Started extracting functionality into separate modules
-- **v5.0 (current)**: Complete modular architecture - 16 focused, independently maintainable modules
+- **v5.0**: Complete modular architecture - 16 focused, independently maintainable modules
   - **Result**: 50% reduction in main.go size (~6,400 → ~3,150 lines), zero functional loss, backward-compatible upgrade
   - **Benefit**: Clearer code organization, easier to locate features, simpler to add new functionality
+- **v5.1 (current)**: Extended architecture with timezone-aware multi-market support - added timezone.go (17 modules total)
+  - **Result**: Fixed US/HK stock intraday data collection, implemented market-specific timezone handling
+  - **New Pattern**: Smart API routing based on market type with 3-layer fallback strategy
 
 **Modular Architecture Benefits:**
 
@@ -200,6 +206,7 @@ The codebase has undergone significant architectural evolution culminating in v5
 │   - intraday.go (background collector) │
 ├─────────────────────────────────────────┤
 │   Cross-Cutting Concerns               │
+│   - timezone.go (market-specific TZ)   │
 │   - i18n.go (internationalization)     │
 │   - debug.go (logging)                 │
 │   - color.go (theming)                 │
@@ -326,7 +333,7 @@ type WatchlistStock struct {
 ```go
 type Model struct {
     // State machine
-    state AppState  // One of 13 states
+    state AppState  // One of 19 states
 
     // Data
     portfolio Portfolio
@@ -361,17 +368,22 @@ The application auto-converts between different formats:
 
 - **Trigger**: Automatically starts when entering Monitoring or WatchlistViewing states
 - **Worker Pool**: Max 10 concurrent goroutines with buffered channel semaphore
-- **Update Frequency**: Every 1 minute during trading hours (09:30-11:30, 13:00-15:00)
+- **Multi-Market Support** (v5.1):
+  - **A-shares**: Tencent Finance (primary) → East Money (fallback) → Sina Finance
+  - **US stocks**: Yahoo Finance (primary) → fallbacks
+  - **HK stocks**: Tencent Finance (primary) → Yahoo Finance → East Money
+  - **Market Detection**: Automatic based on stock code format (SH/SZ, AAPL, HK prefix)
+  - **Timezone Handling**: timezone.go module converts UTC to market-specific timezones
+- **Update Frequency**: Every 1 minute during market-specific trading hours
 - **Data Storage**: `data/intraday/{CODE}/YYYYMMDD.json` with minute-by-minute prices
-- **APIs**: Sina Finance (primary) → East Money (fallback)
 - **Data Format**: JSON with code, name, date, datapoints array (time + price), and update timestamp
 - **Persistence**: Data is permanently retained, organized by stock code and date directories
 - **Thread Safety**: File-level locks via sync.Map, atomic writes using temp files + rename
 - See `doc/issues/INTRADAY_FEATURE.md` for detailed documentation
 
-## Intraday Chart Visualization (v4.9)
+## Intraday Chart Visualization (v5.1)
 
-The application provides terminal-based intraday charts using the `ntcharts` library (Braille characters for smooth rendering).
+The application provides terminal-based intraday charts using the `ntcharts` library (Braille characters for smooth rendering). v5.1 adds timezone-aware display for multi-market support.
 
 ### Key Features
 
@@ -514,14 +526,15 @@ The `doc/issues/plans/` directory should be created if it doesn't exist when the
 ## Version History
 
 **Recent Major Versions:**
-- **v5.0** (Current): 🏗️ Architecture modernization - Complete modular design (16 modules), main.go 50% smaller (~6,400 → ~3,150 lines), three-tier architecture
+- **v5.1** (Current): 🌍 Multi-market support with timezone-aware data collection, fixes for US/HK intraday data acquisition, improved chart color logic, new timezone.go module for market-specific handling
+- **v5.0**: 🏗️ Architecture modernization - Complete modular design (16 modules), main.go 50% smaller (~6,400 → ~3,150 lines), three-tier architecture
 - **v4.9**: Enhanced intraday charts with smart date selection, adaptive Y-axis margin, fixed time framework, Braille rendering
 - **v4.8**: Multi-tag system, portfolio highlighting in watchlist, cursor editing, sorting optimizations
 - **v4.7**: Architecture optimization, internationalization enhancements
 - **v4.6**: Intraday data collection, async optimizations
 - **v4.5**: Advanced sorting system (11 portfolio fields, 7 watchlist fields)
 
-See `doc/version/README.md` for complete version history and `doc/version/v5.0.md` for v5.0 detailed documentation
+See `doc/version/README.md` for complete version history and `doc/version/v5.1.md` for v5.1 detailed documentation
 
 ## Quick Reference: Where to Find Things
 
@@ -536,7 +549,8 @@ When modifying the codebase, use this guide to quickly locate what you need:
 | **Save/load user data** | `persistence.go` | JSON for portfolio/watchlist, YAML for config |
 | **Add UI colors/themes** | `color.go` | Color utilities using go-pretty library |
 | **Add translations** | `i18n/zh.json`, `i18n/en.json` | Keep both files in sync |
-| **Background tasks** | `intraday.go` | Worker pool pattern with max 10 concurrent goroutines |
+| **Market-specific timezone/hours** | `timezone.go` | Market detection, trading hours, timezone conversions (v5.1) |
+| **Background tasks** | `intraday.go` | Worker pool pattern with max 10 concurrent goroutines, multi-market support |
 | **Stock data structures** | `types.go` | Central location for Stock, StockData, Config types |
 | **Debug/logging** | `debug.go` | Accessible via debug mode, press 'd' in app |
 | **Sorting logic** | `sort.go` | Implements DefaultSorter interface for portfolio/watchlist |
@@ -545,7 +559,7 @@ When modifying the codebase, use this guide to quickly locate what you need:
 
 ## Important Notes for Future Development
 
-1. **v5.0 Modular architecture** - 16 focused modules with clear responsibilities. Main.go (~3,150 lines) is now purely an orchestration layer. Further modularization possible but current design is near-optimal for project size.
+1. **v5.1 Modular architecture** - 17 focused modules with clear responsibilities. Main.go (~3,150 lines) is now purely an orchestration layer. New timezone.go module handles market-specific timezone conversions and trading hours detection. Current design is near-optimal for project size.
 
 2. **Data Storage** - Uses JSON files (portfolio.json, watchlist.json). For >1000 stocks or complex queries, consider migrating to SQLite in v6.0.
 
