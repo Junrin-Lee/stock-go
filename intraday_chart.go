@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -90,7 +89,8 @@ func (m *Model) fetchPrevCloseForStock(code string) float64 {
 
 // loadIntradayDataForDate 从磁盘加载特定股票和日期的分时数据
 func (m *Model) loadIntradayDataForDate(code, name, date string) (*IntradayData, error) {
-	filePath := filepath.Join("data", "intraday", code, date+".json")
+	// Use getIntradayFilePath for backward compatibility (tries new structure, falls back to old)
+	filePath := getIntradayFilePath(code, date)
 
 	fileData, err := os.ReadFile(filePath)
 	if err != nil {

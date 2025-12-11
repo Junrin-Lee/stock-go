@@ -130,18 +130,20 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 		return
 	}
 
-	// Prepare file path
-	today := getCurrentDate()
-	filePath := filepath.Join("data", "intraday", stockCode, today+".json")
+	// Prepare file path (使用市场时区的日期)
+	market := getMarketType(stockCode)
+	today := getCurrentDateForMarket(market, m)
+	marketDir := getMarketDirectory(stockCode)
+	filePath := filepath.Join("data", "intraday", marketDir, stockCode, today+".json")
 
-	// Ensure directory exists
-	if err := ensureIntradayDirectory(stockCode); err != nil {
+	// Ensure directory exists (using new market-based structure)
+	if err := ensureIntradayDirectoryWithMarket(stockCode); err != nil {
 		debugPrint("debug.intraday.mkdirFail", stockCode, err)
 		return
 	}
 
-	// 获取市场类型
-	market := getMarketType(stockCode)
+	// 获取市场类型（已在上面获取）
+	// market := getMarketType(stockCode)
 
 	// Read existing data (if any)
 	existingData := &IntradayData{
@@ -474,6 +476,45 @@ func ensureIntradayDirectory(stockCode string) error {
 	return os.MkdirAll(dirPath, 0755)
 }
 
+// getMarketDirectory returns market subdirectory (CN/HK/US) based on stock code
+func getMarketDirectory(code string) string {
+	market := getMarketType(code)
+	switch market {
+	case MarketChina:
+		return "CN"
+	case MarketHongKong:
+		return "HK"
+	case MarketUS:
+		return "US"
+	default:
+		return "US"
+	}
+}
+
+// getIntradayFilePath returns file path with backward compatibility fallback
+// Priority: new market-based structure (data/intraday/CN/SH600058/20251211.json)
+//
+//	→ old flat structure (data/intraday/SH600058/20251211.json)
+func getIntradayFilePath(stockCode, date string) string {
+	// Try new market-based structure first
+	marketDir := getMarketDirectory(stockCode)
+	newPath := filepath.Join("data", "intraday", marketDir, stockCode, date+".json")
+	if fileExists(newPath) {
+		return newPath
+	}
+
+	// Fallback to old flat structure for backward compatibility
+	return filepath.Join("data", "intraday", stockCode, date+".json")
+}
+
+// ensureIntradayDirectoryWithMarket creates market-based directory structure
+// New implementation that organizes stocks by market (CN/HK/US)
+func ensureIntradayDirectoryWithMarket(stockCode string) error {
+	marketDir := getMarketDirectory(stockCode)
+	dirPath := filepath.Join("data", "intraday", marketDir, stockCode)
+	return os.MkdirAll(dirPath, 0755)
+}
+
 // saveIntradayData writes IntradayData to JSON file with thread-safe locking
 func saveIntradayData(filePath string, data *IntradayData) error {
 	lock := getFileLock(filePath)
@@ -574,11 +615,6 @@ func formatIntradayTime(fullTime string) string {
 
 	// Return "HH:MM"
 	return timeComponents[0] + ":" + timeComponents[1]
-}
-
-// getCurrentDate returns today's date in YYYYMMDD format
-func getCurrentDate() string {
-	return time.Now().Format("20060102")
 }
 
 // fileExists checks if a file path exists
