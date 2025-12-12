@@ -1,6 +1,6 @@
 # Stock Monitor - Stock Monitoring System
 
-[![Version](https://img.shields.io/badge/version-v5.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.2-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -346,6 +346,126 @@ update:
     auto_update: true
 ```
 
+### v5.2 New Feature: Configurable Table Columns
+
+v5.2 introduces a flexible table column configuration system, allowing users to customize displayed columns and their order.
+
+#### Portfolio Configurable Columns (14 Columns)
+
+**Required Columns** (cannot be removed):
+- `cursor` - Selection cursor indicator
+- `code` - Stock code
+- `name` - Stock name
+- `price` - Current price
+
+**Optional Columns** (can be enabled/disabled):
+- `prev_close` - Previous close
+- `open` - Open price
+- `high` - High price
+- `low` - Low price
+- `cost` - Cost price
+- `quantity` - Quantity held
+- `today_change` - Today's change %
+- `position_profit` - Position P&L
+- `profit_rate` - P&L rate
+- `market_value` - Market value
+
+#### Watchlist Configurable Columns (12 Columns)
+
+**Required Columns** (cannot be removed):
+- `cursor` - Selection cursor indicator
+- `tag` - Tag
+- `code` - Stock code
+- `name` - Stock name
+- `price` - Current price
+
+**Optional Columns** (can be enabled/disabled):
+- `prev_close` - Previous close
+- `open` - Open price
+- `high` - High price
+- `low` - Low price
+- `today_change` - Today's change %
+- `turnover` - Turnover rate
+- `volume` - Volume
+
+#### Configuration Examples
+
+**Minimal Mode** (essential info only):
+```yaml
+display:
+  portfolio_columns:
+    - cursor
+    - code
+    - name
+    - price
+    - position_profit
+    - profit_rate
+
+  watchlist_columns:
+    - cursor
+    - tag
+    - code
+    - name
+    - price
+    - today_change
+```
+
+**Custom Priority Mode** (P&L first):
+```yaml
+display:
+  portfolio_columns:
+    - cursor
+    - code
+    - name
+    - price
+    - position_profit     # Prioritize P&L
+    - profit_rate         # Prioritize P&L rate
+    - cost
+    - quantity
+    - today_change
+    - market_value
+```
+
+**Detailed Mode** (all columns, default):
+```yaml
+display:
+  portfolio_columns:
+    - cursor
+    - code
+    - name
+    - prev_close
+    - open
+    - high
+    - low
+    - price
+    - cost
+    - quantity
+    - today_change
+    - position_profit
+    - profit_rate
+    - market_value
+
+  watchlist_columns:
+    - cursor
+    - tag
+    - code
+    - name
+    - price
+    - prev_close
+    - open
+    - high
+    - low
+    - today_change
+    - turnover
+    - volume
+```
+
+**Usage Tips**:
+- Columns display left-to-right in configured order
+- Comment out a line to hide that column (except required columns)
+- Required columns are automatically added if missing
+- Restart application after config changes to take effect
+
 ---
 
 ## Supported Markets & APIs
@@ -412,22 +532,23 @@ If you encounter issues, please provide:
 
 ## Version History
 
-### Current Version - v5.1 (December 2025)
+### Current Version - v5.2 (December 2025)
 
-**🌍 Multi-Market Support & Critical Fixes**
+**📊 Configurable Table Columns & UX Enhancements**
 
-- **Multi-Market Intraday Data**: New support for US stocks and Hong Kong stocks real-time intraday data
-- **Timezone-Aware Module**: New `timezone.go` module for market-specific timezone handling
-- **Yahoo Finance API**: US stock data fetched from Yahoo Finance (free, no API key required)
-- **Critical Bug Fixes**: Fixed HK stock code padding (HK9626 → HK09626) and US intraday data collection failure
-- **Smart API Routing**: Automatic selection of optimal API sources per market type, 3-tier fallback mechanism
-- **First Unit Tests**: 4 test functions with 100% pass rate, marking the beginning of TDD
-- **Data Migration Tool**: Safe migration of intraday data to new market-classified directory structure
+- **Flexible Column Configuration**: Customize which columns display in Portfolio and Watchlist via config file
+- **Portfolio**: 14 configurable columns (4 required + 10 optional)
+- **Watchlist**: 12 configurable columns (5 required + 7 optional)
+- **Minimal Mode Support**: Show only essential info for small screens or focused analysis
+- **Detailed Mode Support**: Display all available data for comprehensive stock analysis
+- **Custom Column Order**: Arrange columns according to personal preferences
+- **Backward Compatible**: Uses default columns when not configured, seamless upgrade experience
 
 ### Version History
 
 | Version | Release Date | Major Updates | Documentation |
 |---------|--------------|-----------------|----------------|
+| **v5.2** | Dec 2025 | 📊 Configurable table columns, flexible config, UX upgrades | [Details](doc/version/v5.2.md) |
 | **v5.1** | Dec 2025 | 🌍 Multi-market support, US/HK intraday data, Yahoo API, unit tests | [Details](doc/version/v5.1.md) |
 | v5.0 | Dec 2025 | 🏗️ Architecture modernization, complete modular design | [Details](doc/version/v5.0.md) |
 | v4.9 | Nov 2025 | Intraday chart enhancement, smart date selection | [Details](doc/version/v4.9.md) |

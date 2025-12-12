@@ -1,6 +1,6 @@
 # Stock Monitor - 股票监控系统
 
-[![Version](https://img.shields.io/badge/version-v5.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.2-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -346,6 +346,126 @@ update:
     auto_update: true
 ```
 
+### v5.2 新增：可定制表格列
+
+v5.2 引入了灵活的表格列配置系统，允许用户自定义显示的列和顺序。
+
+#### 持股列表可配置列（14列）
+
+**必需列**（无法移除）:
+- `cursor` - 光标选中指示器
+- `code` - 股票代码
+- `name` - 股票名称
+- `price` - 现价
+
+**可选列**（可根据需要启用/禁用）:
+- `prev_close` - 昨收价
+- `open` - 开盘价
+- `high` - 最高价
+- `low` - 最低价
+- `cost` - 成本价
+- `quantity` - 持股数
+- `today_change` - 今日涨幅
+- `position_profit` - 持仓盈亏
+- `profit_rate` - 盈亏率
+- `market_value` - 市值
+
+#### 自选列表可配置列（12列）
+
+**必需列**（无法移除）:
+- `cursor` - 光标选中指示器
+- `tag` - 标签
+- `code` - 股票代码
+- `name` - 股票名称
+- `price` - 现价
+
+**可选列**（可根据需要启用/禁用）:
+- `prev_close` - 昨收价
+- `open` - 开盘价
+- `high` - 最高价
+- `low` - 最低价
+- `today_change` - 今日涨幅
+- `turnover` - 换手率
+- `volume` - 成交量
+
+#### 配置示例
+
+**简洁模式**（只显示核心信息）:
+```yaml
+display:
+  portfolio_columns:
+    - cursor
+    - code
+    - name
+    - price
+    - position_profit
+    - profit_rate
+
+  watchlist_columns:
+    - cursor
+    - tag
+    - code
+    - name
+    - price
+    - today_change
+```
+
+**自定义优先级模式**（盈亏信息优先）:
+```yaml
+display:
+  portfolio_columns:
+    - cursor
+    - code
+    - name
+    - price
+    - position_profit     # 优先显示盈亏
+    - profit_rate         # 优先显示盈亏率
+    - cost
+    - quantity
+    - today_change
+    - market_value
+```
+
+**详细模式**（显示所有列，默认配置）:
+```yaml
+display:
+  portfolio_columns:
+    - cursor
+    - code
+    - name
+    - prev_close
+    - open
+    - high
+    - low
+    - price
+    - cost
+    - quantity
+    - today_change
+    - position_profit
+    - profit_rate
+    - market_value
+
+  watchlist_columns:
+    - cursor
+    - tag
+    - code
+    - name
+    - price
+    - prev_close
+    - open
+    - high
+    - low
+    - today_change
+    - turnover
+    - volume
+```
+
+**使用提示**:
+- 列按配置文件中的顺序从左到右显示
+- 注释掉某一行即可隐藏该列（必需列除外）
+- 必需列缺失时会自动补全，确保界面正常工作
+- 修改配置后重启应用生效
+
 ---
 
 ## 支持的市场与API
@@ -412,22 +532,23 @@ A股实时数据:  腾讯 API → 新浪 API → 显示 "-"
 
 ## 版本历史
 
-### 当前版本 - v5.1 (2025年12月)
+### 当前版本 - v5.2 (2025年12月)
 
-**🌍 多市场支持与关键修复**
+**📊 可定制表格列与用户体验升级**
 
-- **多市场盘中数据**: 新增美国股票和香港股票的实时盘中数据采集
-- **时区感知模块**: 新增 `timezone.go`，支持市场特定的时区处理
-- **Yahoo Finance API**: 美股数据通过 Yahoo Finance 免费获取（无需密钥）
-- **关键Bug修复**: 修复港股代码填充错误 (HK9626 → HK09626) 和美股数据采集失败
-- **智能API路由**: 根据市场类型自动选择最优API源，3层容错机制
-- **首个单元测试**: 4个测试函数，100% 通过率，标志着TDD的开始
-- **数据迁移工具**: 安全迁移盘中数据到新的市场分类目录结构
+- **灵活的列配置**: 用户可通过配置文件自定义持股列表和自选列表显示的列
+- **持股列表**: 14个可配置列（4个必需列 + 10个可选列）
+- **自选列表**: 12个可配置列（5个必需列 + 7个可选列）
+- **简洁模式支持**: 只显示核心信息，适应小屏幕或专注需求
+- **详细模式支持**: 显示所有可用信息，全面分析股票数据
+- **自定义列顺序**: 按个人偏好调整列的显示顺序
+- **向后兼容**: 无配置时使用默认列设置，平滑升级体验
 
 ### 版本历史
 
 | 版本 | 发布时间 | 主要更新 | 文档 |
 |------|----------|----------|------|
+| **v5.2** | 2025年12月 | 📊 可定制表格列、灵活配置、用户体验升级 | [查看详情](doc/version/v5.2.md) |
 | **v5.1** | 2025年12月 | 🌍 多市场支持、美股港股盘中数据、Yahoo API、单元测试 | [查看详情](doc/version/v5.1.md) |
 | v5.0 | 2025年12月 | 🏗️ 架构现代化，完整模块化设计 | [查看详情](doc/version/v5.0.md) |
 | v4.9 | 2025年11月 | 分时图表增强，智能日期选择 | [查看详情](doc/version/v4.9.md) |
