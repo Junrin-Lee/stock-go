@@ -308,5 +308,22 @@
   "close": "Close",
   "lunch": "Lunch",
   "afternoon": "Afternoon",
-  "marketNotSupported": "Intraday data not supported for this market"
+  "marketNotSupported": "Intraday data not supported for this market",
+  "col.cursor": "",
+  "col.code": "Code",
+  "col.name": "Name",
+  "col.prev_close": "PrevClose",
+  "col.open": "Open",
+  "col.high": "High",
+  "col.low": "Low",
+  "col.price": "Price",
+  "col.cost": "Cost",
+  "col.quantity": "Quantity",
+  "col.today_change": "Today%",
+  "col.position_profit": "PositionP&L",
+  "col.profit_rate": "P&LRate",
+  "col.market_value": "Value",
+  "col.tag": "Tag",
+  "col.turnover": "Turnover",
+  "col.volume": "Volume"
 }

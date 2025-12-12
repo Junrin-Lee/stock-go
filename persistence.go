@@ -149,6 +149,17 @@ func getDefaultConfig() Config {
 			TableStyle:         "light",        // 轻量表格样式
 			MaxLines:           10,             // 默认每页显示10行
 			PortfolioHighlight: "yellow",       // 默认黄色
+			// 持股列表默认显示所有列（按当前顺序）
+			PortfolioColumns: []string{
+				"cursor", "code", "name", "prev_close", "open", "high",
+				"low", "price", "cost", "quantity", "today_change",
+				"position_profit", "profit_rate", "market_value",
+			},
+			// 自选列表默认显示所有列（按当前顺序）
+			WatchlistColumns: []string{
+				"cursor", "tag", "code", "name", "price", "prev_close",
+				"open", "high", "low", "today_change", "turnover", "volume",
+			},
 		},
 		Update: UpdateConfig{
 			RefreshInterval: 5,    // 5秒刷新间隔
@@ -194,6 +205,20 @@ func loadConfig() Config {
 		debugPrint("debug.config.defaultMarkets", "填充默认市场配置")
 	}
 
+	// 向后兼容：如果列配置为空，使用默认值
+	if len(config.Display.PortfolioColumns) == 0 {
+		config.Display.PortfolioColumns = getDefaultConfig().Display.PortfolioColumns
+		debugPrint("debug.config.defaultPortfolioColumns", "使用默认持股列表列配置")
+	}
+	if len(config.Display.WatchlistColumns) == 0 {
+		config.Display.WatchlistColumns = getDefaultConfig().Display.WatchlistColumns
+		debugPrint("debug.config.defaultWatchlistColumns", "使用默认自选列表列配置")
+	}
+
+	// 验证列配置
+	config.Display.PortfolioColumns = validatePortfolioColumns(config.Display.PortfolioColumns)
+	config.Display.WatchlistColumns = validateWatchlistColumns(config.Display.WatchlistColumns)
+
 	return config
 }
 
@@ -204,4 +229,100 @@ func saveConfig(config Config) error {
 		return err
 	}
 	return os.WriteFile(configFile, data, 0644)
+}
+
+// validatePortfolioColumns - 验证Portfolio列配置
+func validatePortfolioColumns(configured []string) []string {
+	required := []string{"cursor", "code", "name", "price"}
+	valid := map[string]bool{
+		"cursor": true, "code": true, "name": true, "prev_close": true,
+		"open": true, "high": true, "low": true, "price": true,
+		"cost": true, "quantity": true, "today_change": true,
+		"position_profit": true, "profit_rate": true, "market_value": true,
+	}
+
+	return smartMergeRequiredColumns(configured, required, valid)
+}
+
+// validateWatchlistColumns - 验证Watchlist列配置
+func validateWatchlistColumns(configured []string) []string {
+	required := []string{"cursor", "tag", "code", "name", "price"}
+	valid := map[string]bool{
+		"cursor": true, "tag": true, "code": true, "name": true,
+		"price": true, "prev_close": true, "open": true, "high": true,
+		"low": true, "today_change": true, "turnover": true, "volume": true,
+	}
+
+	return smartMergeRequiredColumns(configured, required, valid)
+}
+
+// smartMergeRequiredColumns - 智能合并必须列
+// 算法：在保留用户配置顺序的同时，智能插入缺失的必须列
+func smartMergeRequiredColumns(userConfig []string, required []string, valid map[string]bool) []string {
+	result := []string{}
+	inserted := make(map[string]bool)
+
+	// 第一步：添加用户配置的有效列
+	for _, col := range userConfig {
+		if valid[col] {
+			result = append(result, col)
+			inserted[col] = true
+		} else {
+			// 静默忽略无效列ID，在debug模式下记录
+			debugPrint("debug.config.invalidColumn", col)
+		}
+	}
+
+	// 第二步：收集缺失的必须列
+	missingRequired := []string{}
+	for _, req := range required {
+		if !inserted[req] {
+			missingRequired = append(missingRequired, req)
+		}
+	}
+
+	// 第三步：智能插入缺失的必须列
+	// 策略：在第一个用户配置列之后插入，如果用户配置为空则放在最前面
+	if len(missingRequired) > 0 {
+		insertPosition := 0
+		if len(result) > 0 {
+			insertPosition = 1 // 在第一列之后插入
+		}
+		result = insertAt(result, insertPosition, missingRequired...)
+	}
+
+	// 如果结果为空（用户配置为空且无必须列），返回必须列
+	if len(result) == 0 {
+		return required
+	}
+
+	return result
+}
+
+// insertAt - 在指定位置插入元素
+func insertAt(slice []string, index int, values ...string) []string {
+	// 确保index在有效范围内
+	if index < 0 {
+		index = 0
+	}
+	if index > len(slice) {
+		index = len(slice)
+	}
+
+	// 创建新切片
+	result := make([]string, 0, len(slice)+len(values))
+	result = append(result, slice[:index]...)
+	result = append(result, values...)
+	result = append(result, slice[index:]...)
+	return result
+}
+
+// contains - 检查字符串切片是否包含指定字符串
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }

@@ -61,6 +61,99 @@ display:
     # default color is yellow
     portfolio_highlight: "yellow"  # 黄色前景色
 
+    # === 可配置表格列 Configurable Table Columns ===
+    # v5.2+ 新特性: 自定义持股列表和自选列表显示的列
+    # v5.2+ New Feature: Customize columns displayed in portfolio and watchlist
+
+    # 持股列表显示的列 Portfolio Columns
+    # 按配置顺序显示，可以注释掉不需要的列
+    # Displayed in configured order, comment out unwanted columns
+    #
+    # 必须列 (Required Columns) - 无法移除，如果缺失会自动添加:
+    #   - cursor: 光标列 (选中指示器 ►)
+    #   - code: 股票代码
+    #   - name: 股票名称
+    #   - price: 现价
+    #
+    # 可选列 (Optional Columns) - 可以根据需要启用/禁用:
+    #   - prev_close: 昨收价
+    #   - open: 开盘价
+    #   - high: 最高价
+    #   - low: 最低价
+    #   - cost: 成本价
+    #   - quantity: 持股数
+    #   - today_change: 今日涨幅
+    #   - position_profit: 持仓盈亏
+    #   - profit_rate: 盈亏率
+    #   - market_value: 市值
+    portfolio_columns:
+        - cursor         # 光标 (必须) | Cursor (required)
+        - code           # 股票代码 (必须) | Stock Code (required)
+        - name           # 股票名称 (必须) | Stock Name (required)
+        - prev_close     # 昨收价 | Previous Close
+        - open           # 开盘价 | Open Price
+        - high           # 最高价 | High Price
+        - low            # 最低价 | Low Price
+        - price          # 现价 (必须) | Current Price (required)
+        - cost           # 成本价 | Cost Price
+        - quantity       # 持股数 | Quantity
+        - today_change   # 今日涨幅 | Today's Change %
+        - position_profit # 持仓盈亏 | Position P&L
+        - profit_rate    # 盈亏率 | P&L Rate
+        - market_value   # 市值 | Market Value
+
+    # 自选列表显示的列 Watchlist Columns
+    # 按配置顺序显示，可以注释掉不需要的列
+    # Displayed in configured order, comment out unwanted columns
+    #
+    # 必须列 (Required Columns) - 无法移除，如果缺失会自动添加:
+    #   - cursor: 光标列 (选中指示器 ►)
+    #   - tag: 标签
+    #   - code: 股票代码
+    #   - name: 股票名称
+    #   - price: 现价
+    #
+    # 可选列 (Optional Columns) - 可以根据需要启用/禁用:
+    #   - prev_close: 昨收价
+    #   - open: 开盘价
+    #   - high: 最高价
+    #   - low: 最低价
+    #   - today_change: 今日涨幅
+    #   - turnover: 换手率
+    #   - volume: 成交量
+    watchlist_columns:
+        - cursor         # 光标 (必须) | Cursor (required)
+        - tag            # 标签 (必须) | Tag (required)
+        - code           # 股票代码 (必须) | Stock Code (required)
+        - name           # 股票名称 (必须) | Stock Name (required)
+        - price          # 现价 (必须) | Current Price (required)
+        - prev_close     # 昨收价 | Previous Close
+        - open           # 开盘价 | Open Price
+        - high           # 最高价 | High Price
+        - low            # 最低价 | Low Price
+        - today_change   # 今日涨幅 | Today's Change %
+        - turnover       # 换手率 | Turnover Rate
+        - volume         # 成交量 | Volume
+
+    # 使用提示 Usage Tips:
+    # 1. 列顺序：列按照配置文件中的顺序从左到右显示
+    #    Column Order: Columns are displayed left-to-right as configured
+    #
+    # 2. 隐藏列：注释掉某一行即可隐藏该列（必须列除外）
+    #    Hide Columns: Comment out a line to hide that column (except required columns)
+    #
+    # 3. 简洁模式示例：只显示核心信息
+    #    Minimal Mode Example: Show only essential info
+    #    portfolio_columns: [cursor, code, name, price, position_profit, profit_rate]
+    #    watchlist_columns: [cursor, tag, code, name, price, today_change]
+    #
+    # 4. 详细模式：显示所有列（默认配置）
+    #    Detailed Mode: Show all columns (default configuration)
+    #
+    # 5. 自定义顺序示例：优先显示盈亏信息
+    #    Custom Order Example: Prioritize P&L info
+    #    portfolio_columns: [cursor, code, name, price, position_profit, profit_rate, cost, quantity, ...]
+
 # 更新配置 Update Configuration
 update:
     # 刷新间隔 Refresh Interval (秒)

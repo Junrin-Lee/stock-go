@@ -36,6 +36,9 @@ func main() {
 	// 加载 i18n 文件
 	loadI18nFiles()
 
+	// 初始化列注册表
+	initColumnRegistry()
+
 	// 加载配置文件
 	config := loadConfig()
 	portfolio := loadPortfolio()
@@ -817,7 +820,7 @@ func (m *Model) viewMonitoring() string {
 	t.SetStyle(table.StyleLight)
 
 	// 获取带排序指示器的表头
-	t.AppendHeader(m.getPortfolioHeaderWithSortIndicator())
+	t.AppendHeader(m.GeneratePortfolioHeader())
 
 	var totalMarketValue float64
 	var totalCost float64
@@ -874,80 +877,13 @@ func (m *Model) viewMonitoring() string {
 	for i := startIndex; i < endIndex; i++ {
 		stock := &m.portfolio.Stocks[i]
 
-		if stock.Price > 0 {
-			positionProfit := stock.CalculatePositionProfit()
-			profitRate := ((stock.Price - stock.CostPrice) / stock.CostPrice) * 100
-			marketValue := stock.Price * float64(stock.Quantity)
+		// 使用动态列渲染器生成行
+		row := m.GeneratePortfolioRow(stock, i, startIndex, endIndex)
+		t.AppendRow(row)
 
-			// 计算今日涨幅：应该基于昨收价，而不是开盘价
-			var todayChangeStr string
-			// 使用change_percent字段，这是基于昨收价计算的涨跌幅
-			// 当数据有效时显示百分比（包括0.00%），只有无法获取数据时才显示"-"
-			if stock.PrevClose > 0 && stock.Price > 0 {
-				todayChangeStr = m.formatProfitRateWithColorZeroLang(stock.ChangePercent)
-			} else {
-				todayChangeStr = "-"
-			}
-
-			// 使用多语言颜色显示函数
-			positionProfitStr := m.formatProfitWithColorZeroLang(positionProfit)
-			profitRateStr := m.formatProfitRateWithColorZeroLang(profitRate)
-
-			// 光标列 - 检查光标是否在当前可见范围内且指向此行
-			cursorCol := ""
-			if m.portfolioCursor >= startIndex && m.portfolioCursor < endIndex && i == m.portfolioCursor {
-				cursorCol = "►"
-			}
-
-			t.AppendRow(table.Row{
-				cursorCol,
-				stock.Code,                           // 代码
-				stock.Name,                           // 名称
-				fmt.Sprintf("%.3f", stock.PrevClose), // 昨收价（无颜色）
-				m.formatPriceWithColorLang(stock.StartPrice, stock.PrevClose), // 开盘
-				m.formatPriceWithColorLang(stock.MaxPrice, stock.PrevClose),   // 最高
-				m.formatPriceWithColorLang(stock.MinPrice, stock.PrevClose),   // 最低
-				m.formatPriceWithColorLang(stock.Price, stock.PrevClose),      // 现价（有颜色）
-				fmt.Sprintf("%.3f", stock.CostPrice),                          // 成本价（无颜色）
-				stock.Quantity,                                                // 持股数
-				todayChangeStr,                                                // 今日涨幅
-				positionProfitStr,                                             // 持仓盈亏（基于成本价）
-				profitRateStr,                                                 // 盈亏率
-				fmt.Sprintf("%.2f", marketValue),                              // 市值
-			})
-
-			// 在每个股票后添加分隔线（除了显示范围内的最后一个）
-			if i < endIndex-1 {
-				t.AppendSeparator()
-			}
-		} else {
-			// 如果无法获取数据，显示基本信息但标记数据不可用
-			// 光标列 - 检查光标是否在当前可见范围内且指向此行
-			cursorCol := ""
-			if m.portfolioCursor >= startIndex && m.portfolioCursor < endIndex && i == m.portfolioCursor {
-				cursorCol = "►"
-			}
-
-			t.AppendRow(table.Row{
-				cursorCol,
-				stock.Code,                           // 代码
-				stock.Name,                           // 名称
-				"-",                                  // 昨收价
-				"-",                                  // 开盘
-				"-",                                  // 最高
-				"-",                                  // 最低
-				"-",                                  // 现价
-				fmt.Sprintf("%.3f", stock.CostPrice), // 成本价
-				stock.Quantity,                       // 持股数
-				"-",                                  // 今日涨幅
-				"-",                                  // 持仓盈亏
-				"-",                                  // 盈亏率
-				"-",                                  // 市值
-			})
-			// 在每个股票后添加分隔线（除了显示范围内的最后一个）
-			if i < endIndex-1 {
-				t.AppendSeparator()
-			}
+		// 在每个股票后添加分隔线（除了显示范围内的最后一个）
+		if i < endIndex-1 {
+			t.AppendSeparator()
 		}
 	}
 
@@ -958,22 +894,9 @@ func (m *Model) viewMonitoring() string {
 	}
 
 	t.AppendSeparator()
-	t.AppendRow(table.Row{
-		"",                 // 光标列
-		"",                 // 代码
-		m.getText("total"), // 名称 -> 总计
-		"",                 // 昨收价
-		"",                 // 现价
-		"",                 // 成本价
-		"",                 // 开盘
-		"",                 // 最高
-		"",                 // 最低
-		"",                 // 持股数
-		"",                 // 今日涨幅
-		m.formatProfitWithColorLang(totalPortfolioProfit), // 持仓盈亏（总持仓盈亏）
-		m.formatProfitRateWithColorLang(totalProfitRate),  // 盈亏率（总盈亏率）
-		fmt.Sprintf("%.2f", totalMarketValue),             // 市值（总市值）
-	})
+	// 使用动态列渲染器生成总计行
+	totalRow := m.GeneratePortfolioTotalRow(totalPortfolioProfit, totalProfitRate, totalMarketValue)
+	t.AppendRow(totalRow)
 
 	s += t.Render() + "\n"
 
@@ -2576,7 +2499,7 @@ func (m *Model) viewWatchlistViewing() string {
 	t.SetStyle(table.StyleLight)
 
 	// 获取带排序指示器的表头
-	t.AppendHeader(m.getWatchlistHeaderWithSortIndicator())
+	t.AppendHeader(m.GenerateWatchlistHeader())
 
 	// 计算要显示的股票范围
 	endIndex := len(filteredStocks) - m.watchlistScrollPos
@@ -2593,70 +2516,9 @@ func (m *Model) viewWatchlistViewing() string {
 		// 从缓存获取股价数据（非阻塞）
 		stockData := m.getStockPriceFromCache(watchStock.Code)
 
-		if stockData != nil {
-			// 计算今日涨幅：应该基于昨收价，而不是开盘价
-			var todayChangeStr string
-			// 使用change_percent字段，这是基于昨收价计算的涨跌幅
-			if stockData.ChangePercent != 0 {
-				todayChangeStr = m.formatProfitRateWithColorZeroLang(stockData.ChangePercent)
-			} else {
-				todayChangeStr = "-"
-			}
-
-			// 换手率显示
-			var turnoverStr string
-			if stockData.TurnoverRate > 0 {
-				turnoverStr = fmt.Sprintf("%.2f%%", stockData.TurnoverRate)
-			} else {
-				turnoverStr = "-"
-			}
-
-			// 成交量显示
-			volumeStr := formatVolume(stockData.Volume)
-
-			// 光标列 - 检查光标是否在当前可见范围内且指向此行
-			cursorCol := ""
-			if m.watchlistCursor >= startIndex && m.watchlistCursor < endIndex && i == m.watchlistCursor {
-				cursorCol = "►"
-			}
-
-			t.AppendRow(table.Row{
-				cursorCol,
-				watchStock.getTagsDisplay(), // 显示标签
-				watchStock.Code,
-				m.formatStockNameWithPortfolioHighlight(watchStock.Name, watchStock.Code),
-				m.formatPriceWithColorLang(stockData.Price, stockData.PrevClose),
-				fmt.Sprintf("%.3f", stockData.PrevClose),
-				m.formatPriceWithColorLang(stockData.StartPrice, stockData.PrevClose),
-				m.formatPriceWithColorLang(stockData.MaxPrice, stockData.PrevClose),
-				m.formatPriceWithColorLang(stockData.MinPrice, stockData.PrevClose),
-				todayChangeStr,
-				turnoverStr,
-				volumeStr,
-			})
-		} else {
-			// 如果无法获取数据，显示基本信息
-			// 光标列 - 检查光标是否在当前可见范围内且指向此行
-			cursorCol := ""
-			if m.watchlistCursor >= startIndex && m.watchlistCursor < endIndex && i == m.watchlistCursor {
-				cursorCol = "►"
-			}
-
-			t.AppendRow(table.Row{
-				cursorCol,
-				watchStock.getTagsDisplay(), // 显示标签
-				watchStock.Code,
-				m.formatStockNameWithPortfolioHighlight(watchStock.Name, watchStock.Code),
-				"-",
-				"-",
-				"-",
-				"-",
-				"-",
-				"-",
-				"-",
-				"-",
-			})
-		}
+		// 使用动态列渲染器生成行
+		row := m.GenerateWatchlistRow(&watchStock, stockData, i, startIndex, endIndex)
+		t.AppendRow(row)
 
 		// 在每个股票后添加分隔线（除了显示范围内的最后一个）
 		if i < endIndex-1 {
@@ -2905,77 +2767,6 @@ func (m *Model) findSortFieldIndex(field SortField, isPortfolio bool) int {
 
 	// 如果没找到当前排序字段，返回0（第一个字段）
 	return 0
-}
-
-// 生成带排序指示器的持股列表表头
-func (m *Model) getPortfolioHeaderWithSortIndicator() table.Row {
-	var baseHeaders table.Row
-	if m.language == Chinese {
-		baseHeaders = table.Row{"", "代码", "名称", "昨收价", "开盘", "最高", "最低", "现价", "成本价", "持股数", "今日涨幅", "持仓盈亏", "盈亏率", "市值"}
-	} else {
-		baseHeaders = table.Row{"", "Code", "Name", "PrevClose", "Open", "High", "Low", "Price", "Cost", "Quantity", "Today%", "PositionP&L", "P&LRate", "Value"}
-	}
-
-	// 排序字段到表头列索引的映射（跳过第一列的光标列）
-	// 新顺序：代码，名称，昨收价，开盘，最高，最低，现价，成本价，持股数，今日涨幅，持仓盈亏，盈亏率，市值
-	sortFieldToColumnIndex := map[SortField]int{
-		SortByCode:          1,  // 代码
-		SortByName:          2,  // 名称
-		SortByPrice:         7,  // 现价
-		SortByCostPrice:     8,  // 成本价
-		SortByQuantity:      9,  // 持股数
-		SortByChangePercent: 10, // 今日涨幅
-		SortByTotalProfit:   11, // 持仓盈亏
-		SortByProfitRate:    12, // 盈亏率
-		SortByMarketValue:   13, // 市值
-	}
-
-	// 添加排序指示器（只有在已排序状态下才显示）
-	if m.portfolioIsSorted {
-		if columnIndex, exists := sortFieldToColumnIndex[m.portfolioSortField]; exists {
-			sortIndicator := "↑"
-			if m.portfolioSortDirection == SortDesc {
-				sortIndicator = "↓"
-			}
-			baseHeaders[columnIndex] = fmt.Sprintf("%s %s", baseHeaders[columnIndex], sortIndicator)
-		}
-	}
-
-	return baseHeaders
-}
-
-// 生成带排序指示器的自选列表表头
-func (m *Model) getWatchlistHeaderWithSortIndicator() table.Row {
-	var baseHeaders table.Row
-	if m.language == Chinese {
-		baseHeaders = table.Row{"", "标签", "代码", "名称", "现价", "昨收价", "开盘", "最高", "最低", "今日涨幅", "换手率", "成交量"}
-	} else {
-		baseHeaders = table.Row{"", "Tag", "Code", "Name", "Price", "PrevClose", "Open", "High", "Low", "Today%", "Turnover", "Volume"}
-	}
-
-	// 排序字段到表头列索引的映射（跳过第一列的光标列）
-	sortFieldToColumnIndex := map[SortField]int{
-		SortByTag:           1,  // 标签
-		SortByCode:          2,  // 代码
-		SortByName:          3,  // 名称
-		SortByPrice:         4,  // 现价
-		SortByChangePercent: 9,  // 今日涨幅
-		SortByTurnoverRate:  10, // 换手率
-		SortByVolume:        11, // 成交量
-	}
-
-	// 添加排序指示器（只有在已排序状态下才显示）
-	if m.watchlistIsSorted {
-		if columnIndex, exists := sortFieldToColumnIndex[m.watchlistSortField]; exists {
-			sortIndicator := "↑"
-			if m.watchlistSortDirection == SortDesc {
-				sortIndicator = "↓"
-			}
-			baseHeaders[columnIndex] = fmt.Sprintf("%s %s", baseHeaders[columnIndex], sortIndicator)
-		}
-	}
-
-	return baseHeaders
 }
 
 // 处理持股列表排序

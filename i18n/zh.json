@@ -308,5 +308,22 @@
   "close": "收盘",
   "lunch": "午休",
   "afternoon": "午盘",
-  "marketNotSupported": "该市场暂不支持分时数据"
+  "marketNotSupported": "该市场暂不支持分时数据",
+  "col.cursor": "",
+  "col.code": "代码",
+  "col.name": "名称",
+  "col.prev_close": "昨收价",
+  "col.open": "开盘",
+  "col.high": "最高",
+  "col.low": "最低",
+  "col.price": "现价",
+  "col.cost": "成本价",
+  "col.quantity": "持股数",
+  "col.today_change": "今日涨幅",
+  "col.position_profit": "持仓盈亏",
+  "col.profit_rate": "盈亏率",
+  "col.market_value": "市值",
+  "col.tag": "标签",
+  "col.turnover": "换手率",
+  "col.volume": "成交量"
 }

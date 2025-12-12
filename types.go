@@ -106,11 +106,13 @@ type SystemConfig struct {
 
 // DisplayConfig 显示设置
 type DisplayConfig struct {
-	ColorScheme        string `yaml:"color_scheme"`        // 颜色方案 "professional", "simple"
-	DecimalPlaces      int    `yaml:"decimal_places"`      // 价格显示小数位数
-	TableStyle         string `yaml:"table_style"`         // 表格样式 "light", "bold", "simple"
-	MaxLines           int    `yaml:"max_lines"`           // 列表每页最大显示行数
-	PortfolioHighlight string `yaml:"portfolio_highlight"` // 自选列表中持仓股票的背景高亮颜色
+	ColorScheme        string   `yaml:"color_scheme"`        // 颜色方案 "professional", "simple"
+	DecimalPlaces      int      `yaml:"decimal_places"`      // 价格显示小数位数
+	TableStyle         string   `yaml:"table_style"`         // 表格样式 "light", "bold", "simple"
+	MaxLines           int      `yaml:"max_lines"`           // 列表每页最大显示行数
+	PortfolioHighlight string   `yaml:"portfolio_highlight"` // 自选列表中持仓股票的背景高亮颜色
+	PortfolioColumns   []string `yaml:"portfolio_columns"`   // 持股列表显示的列（按顺序）
+	WatchlistColumns   []string `yaml:"watchlist_columns"`   // 自选列表显示的列（按顺序）
 }
 
 // UpdateConfig 更新设置
