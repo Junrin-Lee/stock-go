@@ -22,7 +22,7 @@ import (
 // startIntradayDataCollection 开始采集分时数据
 func (m *Model) startIntradayDataCollection() {
 	if m.intradayManager == nil {
-		m.intradayManager = newIntradayManager()
+		m.intradayManager = newIntradayManager(m)
 	}
 
 	// 收集当前页面的股票（支持所有市场）
@@ -40,9 +40,11 @@ func (m *Model) startIntradayDataCollection() {
 
 	debugPrint("debug.intraday.trackStart", len(stocksToTrack))
 
-	// 为每只股票启动worker
+	// 为每只股票启动智能 worker
 	for code, name := range stocksToTrack {
-		m.intradayManager.startWorker(code, name, m)
+		if err := m.intradayManager.StartCollection(code, name); err != nil {
+			m.addDebugLog(fmt.Sprintf("Failed to start collection for %s: %v", code, err))
+		}
 	}
 }
 
@@ -137,7 +139,8 @@ func (m *Model) loadIntradayDataForDate(code, name, date string) (*IntradayData,
 }
 
 // parseIntradayTime 解析分时时间字符串 ("09:31") + 日期 ("20251130") → time.Time
-func parseIntradayTime(date string, timeStr string) time.Time {
+// location: 市场时区（用于正确解析时间）
+func parseIntradayTime(date string, timeStr string, location *time.Location) time.Time {
 	// date = "20251130", timeStr = "09:31"
 	year, _ := strconv.Atoi(date[:4])
 	month, _ := strconv.Atoi(date[4:6])
@@ -147,7 +150,11 @@ func parseIntradayTime(date string, timeStr string) time.Time {
 	hour, _ := strconv.Atoi(parts[0])
 	minute, _ := strconv.Atoi(parts[1])
 
-	return time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.Local)
+	if location == nil {
+		location = time.Local // 降级为本地时区
+	}
+
+	return time.Date(year, time.Month(month), day, hour, minute, 0, 0, location)
 }
 
 // ============================================================================
@@ -255,25 +262,7 @@ func isWeekend(t time.Time) bool {
 	return weekday == time.Saturday || weekday == time.Sunday
 }
 
-// findPreviousTradingDay 查找前一个交易日（跳过周末）
-// 最多往前查找7天，避免无限循环
-func findPreviousTradingDay(currentDateStr string) (string, error) {
-	currentDate, err := time.Parse("20060102", currentDateStr)
-	if err != nil {
-		return "", err
-	}
-
-	// 最多往前查找7天
-	for i := 1; i <= 7; i++ {
-		previousDate := currentDate.AddDate(0, 0, -i)
-		if !isWeekend(previousDate) {
-			return previousDate.Format("20060102"), nil
-		}
-	}
-
-	// 如果7天内都是周末（理论上不可能），返回错误
-	return "", fmt.Errorf("无法找到前一个交易日")
-}
+// Note: findPreviousTradingDay 已移至 intraday.go 并增强为支持多市场
 
 // findNextTradingDay 查找下一个交易日（跳过周末）
 // 最多往后查找7天，避免无限循环
@@ -350,10 +339,9 @@ func (m *Model) createFixedTimeRange(date string, market MarketType) []TimePoint
 		totalMinutes := int(endTime.Sub(startTime).Minutes()) + 1
 		for i := 0; i < totalMinutes; i++ {
 			t := startTime.Add(time.Duration(i) * time.Minute)
-			// 转换到本地时区显示
-			localTime := t.Local()
+			// 保持市场时区（不转换为本地时区，确保与存储数据的时区一致）
 			points = append(points, TimePoint{
-				Time:  localTime,
+				Time:  t,
 				Value: 0,
 			})
 		}
@@ -571,11 +559,13 @@ func (m *Model) triggerIntradayDataCollection(code, name, date string) tea.Cmd {
 
 	// 确保 intradayManager 存在
 	if m.intradayManager == nil {
-		m.intradayManager = newIntradayManager()
+		m.intradayManager = newIntradayManager(m)
 	}
 
-	// 为此特定股票启动 worker
-	m.intradayManager.startWorker(code, name, m)
+	// 为此特定股票启动智能 worker
+	if err := m.intradayManager.StartCollection(code, name); err != nil {
+		m.addDebugLog(fmt.Sprintf("Failed to trigger collection for %s: %v", code, err))
+	}
 
 	// 返回命令每 2 秒检查数据可用性
 	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
@@ -594,16 +584,26 @@ func (m *Model) handleIntradayChartViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		// 返回上一个状态
 		m.state = m.previousState
 		m.chartData = nil
+
+		// 如果返回到 Monitoring 或 WatchlistViewing，需要重启定时器和数据更新
+		if m.previousState == Monitoring || m.previousState == WatchlistViewing {
+			m.lastUpdate = time.Now()
+			// 返回定时器命令以恢复自动刷新
+			var cmds []tea.Cmd
+			cmds = append(cmds, m.tickCmd())
+			// 立即触发一次股价更新
+			if stockPriceCmd := m.startStockPriceUpdates(); stockPriceCmd != nil {
+				cmds = append(cmds, stockPriceCmd)
+			}
+			return m, tea.Batch(cmds...)
+		}
+
 		return m, nil
 
 	case "left":
 		// 导航到前一个交易日（跳过周末）
 		if m.chartData != nil {
-			newDateStr, err := findPreviousTradingDay(m.chartViewDate)
-			if err != nil {
-				m.chartLoadError = fmt.Errorf("无法找到前一个交易日")
-				return m, nil
-			}
+			newDateStr := findPreviousTradingDay(m.chartViewStock, m.chartViewDate, m)
 
 			// 尝试加载前一个交易日的数据
 			data, err := m.loadIntradayDataForDate(m.chartViewStock, m.chartViewStockName, newDateStr)
@@ -612,10 +612,7 @@ func (m *Model) handleIntradayChartViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				// 最多再往前尝试10个交易日
 				found := false
 				for attempt := 0; attempt < 10; attempt++ {
-					newDateStr, err = findPreviousTradingDay(newDateStr)
-					if err != nil {
-						break
-					}
+					newDateStr = findPreviousTradingDay(m.chartViewStock, newDateStr, m)
 					data, err = m.loadIntradayDataForDate(m.chartViewStock, m.chartViewStockName, newDateStr)
 					if err == nil {
 						found = true

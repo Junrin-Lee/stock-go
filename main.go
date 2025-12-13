@@ -226,6 +226,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			newModel, cmd = m, nil
 		}
+	case fetchStockPriceTriggerMsg:
+		// 触发单个股票的价格获取（两阶段更新模式）
+		newModel, cmd = m, fetchStockPriceCmd(msg.symbol)
 	case stockPriceUpdateMsg:
 		// 处理股价数据更新
 		if msg.Error == nil && msg.Data != nil {
@@ -750,28 +753,35 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		selectedStock := m.portfolio.Stocks[m.portfolioCursor]
 		m.chartViewStock = selectedStock.Code
 		m.chartViewStockName = selectedStock.Name
-		m.chartViewDate = getSmartChartDate() // 智能选择日期
+
+		// 获取智能日期（与 worker 采集逻辑一致）
+		actualDate, _, err := GetTradingDayForCollection(selectedStock.Code, m)
+		if err != nil {
+			// 如果获取失败，降级为简单逻辑
+			actualDate = getSmartChartDate()
+		}
+		m.chartViewDate = actualDate
 		m.previousState = Monitoring
 
 		debugPrint("debug.chart.keyV", selectedStock.Code, selectedStock.Name, m.chartViewDate)
 
 		// 尝试加载数据
-		data, err := m.loadIntradayDataForDate(
+		data, loadErr := m.loadIntradayDataForDate(
 			selectedStock.Code,
 			selectedStock.Name,
-			m.chartViewDate,
+			actualDate,
 		)
 
-		if err != nil {
+		if loadErr != nil {
 			// 无数据 - 触发采集
-			debugPrint("debug.chart.noData", err)
+			debugPrint("debug.chart.noData", loadErr)
 			m.chartData = nil
 			m.chartLoadError = nil
 			m.state = IntradayChartViewing
 			return m, m.triggerIntradayDataCollection(
 				selectedStock.Code,
 				selectedStock.Name,
-				m.chartViewDate,
+				actualDate,
 			)
 		}
 
@@ -2327,17 +2337,24 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		selectedStock := filteredStocks[m.watchlistCursor]
 		m.chartViewStock = selectedStock.Code
 		m.chartViewStockName = selectedStock.Name
-		m.chartViewDate = getSmartChartDate() // 智能选择日期
+
+		// 获取智能日期（与 worker 采集逻辑一致）
+		actualDate, _, err := GetTradingDayForCollection(selectedStock.Code, m)
+		if err != nil {
+			// 如果获取失败，降级为简单逻辑
+			actualDate = getSmartChartDate()
+		}
+		m.chartViewDate = actualDate
 		m.previousState = WatchlistViewing
 
 		// 尝试加载数据
-		data, err := m.loadIntradayDataForDate(
+		data, loadErr := m.loadIntradayDataForDate(
 			selectedStock.Code,
 			selectedStock.Name,
-			m.chartViewDate,
+			actualDate,
 		)
 
-		if err != nil {
+		if loadErr != nil {
 			// 无数据 - 触发采集
 			m.chartData = nil
 			m.chartLoadError = nil
@@ -2345,7 +2362,7 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.triggerIntradayDataCollection(
 				selectedStock.Code,
 				selectedStock.Name,
-				m.chartViewDate,
+				actualDate,
 			)
 		}
 

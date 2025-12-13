@@ -90,40 +90,38 @@ func (m *Model) startStockPriceUpdates() tea.Cmd {
 		delay := time.Duration(len(cmds)) * 100 * time.Millisecond
 		// 修复闭包问题：将code变量复制到局部变量
 		stockCode := code
+
+		// 创建异步命令：延迟后执行 fetchStockPriceCmd
 		cmds = append(cmds, tea.Tick(delay, func(t time.Time) tea.Msg {
-			// 直接在这里执行获取操作，而不是返回Command
-			data := getStockPrice(stockCode)
-
-			// 更新缓存
-			m.stockPriceMutex.Lock()
-			defer m.stockPriceMutex.Unlock()
-
-			// 只有在成功获取数据时才更新缓存
-			if data != nil && data.Price > 0 {
-				m.stockPriceCache[stockCode] = &StockPriceCacheEntry{
-					Data:       data,
-					UpdateTime: time.Now(),
-					IsUpdating: false,
-				}
-			} else {
-				// 获取失败时，标记为不在更新状态，但不更新缓存，这样下次还会尝试获取
-				if entry, exists := m.stockPriceCache[stockCode]; exists {
-					entry.IsUpdating = false
-				}
-			}
-
-			var err error
-			if data == nil || data.Price <= 0 {
-				err = fmt.Errorf("failed to get stock price for %s", stockCode)
-			}
-
-			return stockPriceUpdateMsg{
-				Symbol: stockCode,
-				Data:   data,
-				Error:  err,
-			}
+			// 返回一个消息，触发实际的获取命令
+			return fetchStockPriceTriggerMsg{symbol: stockCode}
 		}))
 	}
 
 	return tea.Batch(cmds...)
+}
+
+// fetchStockPriceTriggerMsg 触发股价获取的消息
+type fetchStockPriceTriggerMsg struct {
+	symbol string
+}
+
+// fetchStockPriceCmd 异步获取单个股票价格（正确的 Bubble Tea 模式）
+func fetchStockPriceCmd(symbol string) tea.Cmd {
+	return func() tea.Msg {
+		// 在后台 goroutine 中执行 API 调用
+		data := getStockPrice(symbol)
+
+		var err error
+		if data == nil || data.Price <= 0 {
+			err = fmt.Errorf("failed to get stock price for %s", symbol)
+		}
+
+		// 返回消息，由 Update() 方法处理
+		return stockPriceUpdateMsg{
+			Symbol: symbol,
+			Data:   data,
+			Error:  err,
+		}
+	}
 }

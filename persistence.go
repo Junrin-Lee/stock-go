@@ -166,6 +166,12 @@ func getDefaultConfig() Config {
 			AutoUpdate:      true, // 自动更新开启
 		},
 		Markets: defaultMarketsConfig(), // 市场配置
+		IntradayCollection: IntradayCollectionConfig{
+			EnableAutoStop:        true, // 启用自动停止
+			CompletenessThreshold: 90.0, // 90% 完整性阈值
+			MaxConsecutiveErrors:  5,    // 最大连续错误5次
+			MinDatapoints:         20,   // 最小数据点20个
+		},
 	}
 }
 

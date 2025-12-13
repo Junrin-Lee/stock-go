@@ -145,3 +145,28 @@ func getCurrentDateForMarket(market MarketType, m *Model) string {
 
 	return time.Now().In(location).Format("20060102")
 }
+
+// getMarketLocation 根据市场类型返回对应的时区Location
+// marketType: 市场类型字符串 (例如 "CN", "US", "HK")
+// 返回：时区Location和可能的错误
+func getMarketLocation(marketType MarketType) (*time.Location, error) {
+	var timezone string
+
+	switch marketType {
+	case MarketChina:
+		timezone = "Asia/Shanghai"
+	case MarketUS:
+		timezone = "America/New_York"
+	case MarketHongKong:
+		timezone = "Asia/Hong_Kong"
+	default:
+		return nil, fmt.Errorf("unknown market type: %s", marketType)
+	}
+
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load timezone %s: %w", timezone, err)
+	}
+
+	return location, nil
+}

@@ -33,25 +33,435 @@ type IntradayData struct {
 
 // IntradayManager manages background fetching of intraday data
 type IntradayManager struct {
-	activeStocks  map[string]bool      // Currently tracking stocks
-	workerPool    chan struct{}        // Semaphore for max 10 concurrent workers
-	cancelChan    chan struct{}        // Channel to stop all workers
-	mu            sync.RWMutex         // Protects activeStocks
-	lastFetchTime map[string]time.Time // Track last fetch per stock
-	fetchInterval time.Duration        // 1 minute
+	activeStocks   map[string]bool           // Currently tracking stocks
+	workerPool     chan struct{}             // Semaphore for max 10 concurrent workers
+	cancelChan     chan struct{}             // Channel to stop all workers
+	mu             sync.RWMutex              // Protects activeStocks
+	lastFetchTime  map[string]time.Time      // Track last fetch per stock
+	fetchInterval  time.Duration             // 1 minute
+	workerMetadata map[string]*WorkerMetadata // Track each worker's state
+	metadataMutex  sync.RWMutex              // Protects workerMetadata
+	model          *Model                    // Reference to main model
 }
 
 // File locks for thread-safe file operations
 var intradayFileLocks sync.Map // map[string]*sync.Mutex
 
 // newIntradayManager creates and initializes an IntradayManager
-func newIntradayManager() *IntradayManager {
+func newIntradayManager(model *Model) *IntradayManager {
 	return &IntradayManager{
-		activeStocks:  make(map[string]bool),
-		workerPool:    make(chan struct{}, 10), // Max 10 concurrent workers
-		cancelChan:    make(chan struct{}),
-		lastFetchTime: make(map[string]time.Time),
-		fetchInterval: 1 * time.Minute,
+		activeStocks:   make(map[string]bool),
+		workerPool:     make(chan struct{}, 10), // Max 10 concurrent workers
+		cancelChan:     make(chan struct{}),
+		lastFetchTime:  make(map[string]time.Time),
+		fetchInterval:  1 * time.Minute,
+		workerMetadata: make(map[string]*WorkerMetadata),
+		model:          model,
+	}
+}
+
+// getTradingState 判断市场当前的交易状态
+// now: 当前时间（已转换为市场时区）
+// marketType: 市场类型
+// 返回：TradingState 表示市场状态
+func getTradingState(now time.Time, marketType MarketType) TradingState {
+	weekday := now.Weekday()
+
+	// 检查周末
+	if weekday == time.Saturday || weekday == time.Sunday {
+		return TradingStateWeekend
+	}
+
+	// TODO: 假日检测 (v2 enhancement)
+	// 目前假设工作日都是交易日
+
+	// 获取市场特定的交易时段
+	var morningStart, morningEnd, afternoonStart, afternoonEnd time.Time
+
+	switch marketType {
+	case MarketChina: // A股: 09:30-11:30, 13:00-15:00 CST
+		morningStart = time.Date(now.Year(), now.Month(), now.Day(), 9, 30, 0, 0, now.Location())
+		morningEnd = time.Date(now.Year(), now.Month(), now.Day(), 11, 30, 0, 0, now.Location())
+		afternoonStart = time.Date(now.Year(), now.Month(), now.Day(), 13, 0, 0, 0, now.Location())
+		afternoonEnd = time.Date(now.Year(), now.Month(), now.Day(), 15, 0, 0, 0, now.Location())
+
+	case MarketUS: // 美股: 09:30-16:00 EST/EDT (无午休)
+		morningStart = time.Date(now.Year(), now.Month(), now.Day(), 9, 30, 0, 0, now.Location())
+		afternoonEnd = time.Date(now.Year(), now.Month(), now.Day(), 16, 0, 0, 0, now.Location())
+		morningEnd = afternoonEnd    // 无午休
+		afternoonStart = morningStart // 无午休
+
+	case MarketHongKong: // 港股: 09:30-12:00, 13:00-16:00 HKT
+		morningStart = time.Date(now.Year(), now.Month(), now.Day(), 9, 30, 0, 0, now.Location())
+		morningEnd = time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, now.Location())
+		afternoonStart = time.Date(now.Year(), now.Month(), now.Day(), 13, 0, 0, 0, now.Location())
+		afternoonEnd = time.Date(now.Year(), now.Month(), now.Day(), 16, 0, 0, 0, now.Location())
+
+	default:
+		return TradingStatePostMarket
+	}
+
+	// 判断当前状态
+	if now.Before(morningStart) {
+		return TradingStatePreMarket
+	} else if (now.After(morningStart) && now.Before(morningEnd)) ||
+		(now.After(afternoonStart) && now.Before(afternoonEnd)) {
+		return TradingStateLive
+	} else {
+		return TradingStatePostMarket
+	}
+}
+
+// getExpectedDatapoints 计算完整交易日的预期数据点数量
+// marketType: 市场类型
+// isLiveMode: 是否为实时模式（如果是，返回较宽松的预期）
+// 返回: 预期的数据点数量
+//
+// A股: 09:30-11:30 (120分钟) + 13:00-15:00 (120分钟) = 240数据点
+// 美股: 09:30-16:00 (390分钟) = 390数据点
+// 港股: 09:30-12:00 (150分钟) + 13:00-16:00 (180分钟) = 330数据点
+func getExpectedDatapoints(marketType MarketType, isLiveMode bool) int {
+	switch marketType {
+	case MarketChina:
+		return 240 // 4小时 × 60分钟
+
+	case MarketUS:
+		return 390 // 6.5小时 × 60分钟
+
+	case MarketHongKong:
+		return 330 // 5.5小时 × 60分钟
+
+	default:
+		return 240 // 默认使用 A股 标准
+	}
+}
+
+// isDataComplete 检查本地分时数据是否完整
+// stockCode: 股票代码
+// date: 目标日期 (YYYYMMDD)
+// marketType: 市场类型
+// isLiveMode: 是否为实时模式（实时模式使用较低的完整性阈值）
+// 返回: (是否完整, 错误)
+func isDataComplete(stockCode string, date string, marketType MarketType, isLiveMode bool) (bool, error) {
+	// 构造文件路径
+	market := getMarketDirectory(stockCode) // 返回 "CN", "US", 或 "HK"
+	filePath := filepath.Join("data", "intraday", market, stockCode, date+".json")
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return false, nil // 文件不存在 -> 不完整（不是错误）
+	}
+
+	// 加载并解析文件
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false, err
+	}
+
+	var intradayData IntradayData
+	if err := json.Unmarshal(data, &intradayData); err != nil {
+		return false, err
+	}
+
+	// 统计数据点数量
+	actualDatapoints := len(intradayData.Datapoints)
+	expectedDatapoints := getExpectedDatapoints(marketType, isLiveMode)
+
+	// 定义完整性标准
+	minDatapoints := 20             // 绝对最小数据点（防止误判）
+	completenessThreshold := 90.0   // 完整性阈值（百分比）
+
+	// 实时模式使用较低的阈值
+	if isLiveMode {
+		completenessThreshold = 50.0 // 实时模式只需 50%
+	}
+
+	// 计算实际完整度
+	completenessPercent := (float64(actualDatapoints) / float64(expectedDatapoints)) * 100.0
+
+	// 检查是否满足标准
+	if actualDatapoints < minDatapoints {
+		return false, nil
+	}
+
+	if completenessPercent < completenessThreshold {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// findPreviousTradingDay 查找上一个交易日（支持多市场时区）
+// stockCode: 股票代码（用于检测市场类型）
+// currentDate: 当前日期 (YYYYMMDD)
+// m: Model 引用
+// 返回: 上一个交易日 (YYYYMMDD)
+func findPreviousTradingDay(stockCode string, currentDate string, m *Model) string {
+	// 获取市场类型和时区
+	marketType := getMarketType(stockCode)
+	location, err := getMarketLocation(marketType)
+	if err != nil {
+		// 降级到本地时区
+		location = time.Local
+	}
+
+	// 解析当前日期
+	date, err := time.ParseInLocation("20060102", currentDate, location)
+	if err != nil {
+		return currentDate // 解析失败，返回原日期
+	}
+
+	// 最多回溯 7 天，找到上一个交易日
+	for i := 1; i <= 7; i++ {
+		prevDate := date.AddDate(0, 0, -i)
+		weekday := prevDate.Weekday()
+
+		// 跳过周末（周六、周日）
+		if weekday == time.Saturday || weekday == time.Sunday {
+			continue
+		}
+
+		// TODO: 检查假日日历 (v2 enhancement)
+		// 目前假设非周末的工作日都是交易日
+
+		return prevDate.Format("20060102")
+	}
+
+	// 降级：如果 7 天内找不到，直接返回前一天
+	return date.AddDate(0, 0, -1).Format("20060102")
+}
+
+// GetTradingDayForCollection 决定应该采集哪天的数据以及采集模式
+// stockCode: 股票代码
+// m: Model 引用
+// 返回: (targetDate, mode, error)
+//   - targetDate: 目标日期 (YYYYMMDD)
+//   - mode: 采集模式 (Historical/Live/Complete)
+//   - error: 错误（如果有）
+func GetTradingDayForCollection(stockCode string, m *Model) (string, CollectionMode, error) {
+	// 步骤 1: 检测市场类型
+	marketType := getMarketType(stockCode)
+	if marketType == "" {
+		return "", CollectionModeComplete, fmt.Errorf("unable to detect market for stock: %s", stockCode)
+	}
+
+	// 步骤 2: 获取市场时区和当前时间
+	location, err := getMarketLocation(marketType)
+	if err != nil {
+		return "", CollectionModeComplete, err
+	}
+	now := time.Now().In(location)
+
+	// 步骤 3: 判断交易状态
+	tradingState := getTradingState(now, marketType)
+
+	switch tradingState {
+	case TradingStatePreMarket:
+		// 盘前 -> 获取上一个交易日的数据
+		prevDate := findPreviousTradingDay(stockCode, now.Format("20060102"), m)
+		return prevDate, CollectionModeHistorical, nil
+
+	case TradingStateLive:
+		// 交易中 -> 获取当日实时数据
+		return now.Format("20060102"), CollectionModeLive, nil
+
+	case TradingStatePostMarket:
+		// 盘后 -> 获取今天的完整数据
+		todayDate := now.Format("20060102")
+
+		// 检查今天的数据是否已经完整
+		complete, _ := isDataComplete(stockCode, todayDate, marketType, false)
+		if complete {
+			return todayDate, CollectionModeComplete, nil
+		}
+		return todayDate, CollectionModeHistorical, nil
+
+	case TradingStateWeekend, TradingStateHoliday:
+		// 周末/假日 -> 获取上一个交易日的数据
+		prevDate := findPreviousTradingDay(stockCode, now.Format("20060102"), m)
+		return prevDate, CollectionModeHistorical, nil
+
+	default:
+		return "", CollectionModeComplete, fmt.Errorf("unknown trading state")
+	}
+}
+
+// StartCollection 开始智能数据采集（入口点）
+// 根据市场状态和数据完整性自动决定采集策略
+// stockCode: 股票代码
+// stockName: 股票名称
+// 返回: error（如果启动失败）
+func (im *IntradayManager) StartCollection(stockCode, stockName string) error {
+	// 步骤 1: 决定应该采集什么数据
+	targetDate, mode, err := GetTradingDayForCollection(stockCode, im.model)
+	if err != nil {
+		return fmt.Errorf("failed to determine collection params for %s: %w", stockCode, err)
+	}
+
+	// 步骤 2: 如果数据已完整，跳过启动 worker
+	if mode == CollectionModeComplete {
+		im.model.addDebugLog(fmt.Sprintf(
+			"[Intraday] Skipping %s: data already complete for %s",
+			stockCode, targetDate))
+		return nil
+	}
+
+	// 步骤 3: 检查是否已有 worker 在运行
+	im.mu.Lock()
+	if im.activeStocks[stockCode] {
+		im.mu.Unlock()
+		im.model.addDebugLog(fmt.Sprintf("[Intraday] Worker already running for %s", stockCode))
+		return nil
+	}
+	im.mu.Unlock()
+
+	// 步骤 4: 初始化 worker 元数据
+	im.metadataMutex.Lock()
+	im.workerMetadata[stockCode] = &WorkerMetadata{
+		StockCode:         stockCode,
+		TargetDate:        targetDate,
+		Mode:              mode,
+		StartTime:         time.Now(),
+		LastUpdateTime:    time.Now(),
+		DatapointCount:    0,
+		ConsecutiveErrors: 0,
+		IsRunning:         true,
+	}
+	im.metadataMutex.Unlock()
+
+	// 步骤 5: 启动智能 worker
+	im.model.addDebugLog(fmt.Sprintf(
+		"[Intraday] Starting %s collection for %s (target: %s)",
+		mode.String(), stockCode, targetDate))
+
+	go im.startSmartWorker(stockCode, stockName, targetDate, mode)
+
+	return nil
+}
+
+// startSmartWorker 启动带有自动停止逻辑的智能 worker
+// stockCode: 股票代码
+// stockName: 股票名称
+// targetDate: 目标日期 (YYYYMMDD)
+// mode: 采集模式 (Historical/Live)
+func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate string, mode CollectionMode) {
+	// 标记 worker 为活动状态
+	im.mu.Lock()
+	im.activeStocks[stockCode] = true
+	im.mu.Unlock()
+
+	// 清理函数
+	defer func() {
+		im.mu.Lock()
+		delete(im.activeStocks, stockCode)
+		im.mu.Unlock()
+
+		im.metadataMutex.Lock()
+		if meta, exists := im.workerMetadata[stockCode]; exists {
+			meta.IsRunning = false
+		}
+		im.metadataMutex.Unlock()
+
+		im.model.addDebugLog(fmt.Sprintf("[Intraday] Worker stopped for %s", stockCode))
+	}()
+
+	// 创建定时器（1分钟间隔）
+	ticker := time.NewTicker(im.fetchInterval)
+	defer ticker.Stop()
+
+	// 获取配置（默认值）
+	maxConsecutiveErrors := 5
+	if im.model.config.IntradayCollection.MaxConsecutiveErrors > 0 {
+		maxConsecutiveErrors = im.model.config.IntradayCollection.MaxConsecutiveErrors
+	}
+
+	// 初始立即获取一次（跳过市场时间检查，使用 targetDate）
+	im.fetchAndSaveIntradayData(stockCode, stockName, im.model, false, targetDate)
+
+	// 主循环
+	for {
+		select {
+		case <-ticker.C:
+			// === 步骤 1: 获取并保存数据 ===
+			// 对于 Live 模式，检查市场是否开市
+			if mode == CollectionModeLive {
+				if !isMarketOpen(stockCode, im.model) {
+					continue // 市场未开，跳过本次采集
+				}
+			}
+
+			// 获取 worker 槽位（限制并发数）
+			im.workerPool <- struct{}{}
+			go func() {
+				defer func() { <-im.workerPool }()
+				err := im.fetchAndSaveIntradayData(stockCode, stockName, im.model, true, targetDate)
+
+				// 更新元数据
+				im.metadataMutex.Lock()
+				if meta, exists := im.workerMetadata[stockCode]; exists {
+					meta.LastUpdateTime = time.Now()
+					if err != nil {
+						meta.ConsecutiveErrors++
+					} else {
+						meta.ConsecutiveErrors = 0
+					}
+				}
+				im.metadataMutex.Unlock()
+			}()
+
+			// === 步骤 2: 检查自动停止条件 ===
+			im.metadataMutex.RLock()
+			meta, exists := im.workerMetadata[stockCode]
+			im.metadataMutex.RUnlock()
+
+			if !exists {
+				return // 元数据丢失，停止
+			}
+
+			// 条件 1: 连续错误过多
+			if meta.ConsecutiveErrors >= maxConsecutiveErrors {
+				im.model.addDebugLog(fmt.Sprintf(
+					"[Intraday] Worker for %s stopped: %d consecutive errors",
+					stockCode, meta.ConsecutiveErrors))
+				return
+			}
+
+			// 条件 2: Historical 模式 + 数据完整
+			if mode == CollectionModeHistorical {
+				marketType := getMarketType(stockCode)
+				complete, err := isDataComplete(stockCode, targetDate, marketType, false)
+				if err == nil && complete {
+					im.model.addDebugLog(fmt.Sprintf(
+						"[Intraday] Worker for %s stopped: historical data complete for %s",
+						stockCode, targetDate))
+					return
+				}
+			}
+
+			// 条件 3: Live 模式 + 市场关闭 + 数据完整
+			if mode == CollectionModeLive {
+				marketType := getMarketType(stockCode)
+				location, _ := getMarketLocation(marketType)
+				if location != nil {
+					now := time.Now().In(location)
+					tradingState := getTradingState(now, marketType)
+
+					if tradingState == TradingStatePostMarket {
+						complete, err := isDataComplete(stockCode, targetDate, marketType, false)
+						if err == nil && complete {
+							im.model.addDebugLog(fmt.Sprintf(
+								"[Intraday] Worker for %s stopped: market closed and data complete for %s",
+								stockCode, targetDate))
+							return
+						}
+					}
+				}
+			}
+
+		case <-im.cancelChan:
+			// 全局取消信号
+			return
+		}
 	}
 }
 
@@ -82,7 +492,8 @@ func (im *IntradayManager) startWorker(stockCode, stockName string, m *Model) {
 		defer ticker.Stop()
 
 		// Initial fetch (skip market hours check to get today's data even after market close)
-		im.fetchAndSaveIntradayData(stockCode, stockName, m, false)
+		// 使用空字符串作为 targetDate，让函数自动根据交易状态计算日期
+		im.fetchAndSaveIntradayData(stockCode, stockName, m, false, "")
 
 		// Periodic loop
 		for {
@@ -101,7 +512,8 @@ func (im *IntradayManager) startWorker(stockCode, stockName string, m *Model) {
 					defer func() {
 						<-im.workerPool // Release slot
 					}()
-					im.fetchAndSaveIntradayData(stockCode, stockName, m, true)
+					// 使用空字符串作为 targetDate，让函数自动根据交易状态计算日期
+					im.fetchAndSaveIntradayData(stockCode, stockName, m, true, "")
 				}()
 
 			case <-im.cancelChan:
@@ -112,38 +524,60 @@ func (im *IntradayManager) startWorker(stockCode, stockName string, m *Model) {
 }
 
 // fetchAndSaveIntradayData performs one fetch-merge-save cycle for a stock
-func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string, m *Model, checkMarketHours bool) {
+// targetDate: 目标日期 (YYYYMMDD)，如果为空则自动计算
+func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string, m *Model, checkMarketHours bool, targetDate string) error {
 	// Check if market is open (only if requested)
 	if checkMarketHours && !isMarketOpen(stockCode, m) {
-		return
+		return nil // Not an error, just skipping
 	}
 
 	// Fetch from API
 	datapoints, err := fetchIntradayDataFromAPI(stockCode)
 	if err != nil {
 		debugPrint("debug.intraday.fetchFail", stockCode, err)
-		return
+		return err
 	}
 
 	if len(datapoints) == 0 {
 		debugPrint("debug.intraday.noData", stockCode)
-		return
+		return fmt.Errorf("no datapoints returned for %s", stockCode)
 	}
 
-	// Prepare file path (使用市场时区的日期)
-	market := getMarketType(stockCode)
-	today := getCurrentDateForMarket(market, m)
+	// 确定目标日期：优先使用传入的 targetDate，否则根据交易状态计算
+	var today string
+	if targetDate != "" {
+		today = targetDate
+	} else {
+		// 降级逻辑：根据交易状态决定日期
+		market := getMarketType(stockCode)
+		location, err := getMarketLocation(market)
+		if err != nil {
+			// 如果无法获取时区，使用市场当前日期（向后兼容）
+			today = getCurrentDateForMarket(market, m)
+		} else {
+			now := time.Now().In(location)
+			tradingState := getTradingState(now, market)
+
+			// 盘前时，使用上一个交易日；盘中/盘后时，使用当天
+			if tradingState == TradingStatePreMarket || tradingState == TradingStateWeekend || tradingState == TradingStateHoliday {
+				today = findPreviousTradingDay(stockCode, now.Format("20060102"), m)
+			} else {
+				today = now.Format("20060102")
+			}
+		}
+	}
+
 	marketDir := getMarketDirectory(stockCode)
 	filePath := filepath.Join("data", "intraday", marketDir, stockCode, today+".json")
 
 	// Ensure directory exists (using new market-based structure)
 	if err := ensureIntradayDirectoryWithMarket(stockCode); err != nil {
 		debugPrint("debug.intraday.mkdirFail", stockCode, err)
-		return
+		return err
 	}
 
-	// 获取市场类型（已在上面获取）
-	// market := getMarketType(stockCode)
+	// 获取市场类型（用于保存到数据结构）
+	market := getMarketType(stockCode)
 
 	// Read existing data (if any)
 	existingData := &IntradayData{
@@ -181,10 +615,11 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 	// Write back to file
 	if err := saveIntradayData(filePath, existingData); err != nil {
 		debugPrint("debug.intraday.saveFail", stockCode, err)
-		return
+		return err
 	}
 
 	debugPrint("debug.intraday.saveSuccess", stockCode, len(existingData.Datapoints))
+	return nil
 }
 
 // fetchIntradayDataFromAPI tries all APIs in fallback order based on market type

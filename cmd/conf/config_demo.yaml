@@ -240,3 +240,34 @@ markets:
         # 港股交易日为周一至周五 (不包括节假日)
         # Hong Kong stocks trade Monday to Friday (excluding holidays)
         weekdays: [1, 2, 3, 4, 5]
+
+# 分时数据采集配置 Intraday Data Collection Configuration
+# 智能采集系统会根据市场状态自动决定采集策略
+# The smart collection system automatically determines collection strategy based on market state
+intraday_collection:
+    # 启用自动停止 Enable Auto-Stop
+    # true: Worker 在数据完整后自动停止 | false: Worker 持续运行
+    # true: workers auto-stop when data is complete | false: workers run continuously
+    # 建议启用以节省资源 (Recommended to save resources)
+    enable_auto_stop: true
+
+    # 完整性阈值 Completeness Threshold (百分比 percentage)
+    # 当实际数据点数 >= 预期数据点数的此百分比时，认为数据完整
+    # Data is considered complete when actual datapoints >= this percentage of expected
+    # 范围 Range: 50.0 - 100.0
+    # 推荐值 Recommended: 90.0 (90%)
+    completeness_threshold: 90.0
+
+    # 最大连续错误次数 Maximum Consecutive Errors
+    # Worker 遇到此数量的连续错误后自动停止，防止资源浪费
+    # Worker auto-stops after this many consecutive errors to prevent resource waste
+    # 范围 Range: 1 - 10
+    # 推荐值 Recommended: 5
+    max_consecutive_errors: 5
+
+    # 最小数据点数量 Minimum Datapoints
+    # 数据完整性验证的绝对最小值，防止误判
+    # Absolute minimum datapoints for completeness validation, prevents false positives
+    # 范围 Range: 10 - 100
+    # 推荐值 Recommended: 20
+    min_datapoints: 20
