@@ -1,6 +1,6 @@
 # Stock Monitor - 股票监控系统
 
-[![Version](https://img.shields.io/badge/version-v5.2-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.3-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -466,6 +466,48 @@ display:
 - 必需列缺失时会自动补全，确保界面正常工作
 - 修改配置后重启应用生效
 
+#### 分时数据采集配置 (v5.3+)
+
+v5.3 新增了智能的分时数据采集系统，支持通过配置文件进行定制。
+
+**默认配置（推荐）**:
+```yaml
+intraday_collection:
+  enable_auto_stop: true            # 启用智能自动停止
+  completeness_threshold: 90.0      # 完整性阈值（百分比）
+  max_consecutive_errors: 5         # 最大连续错误次数
+  min_datapoints: 20                # 最小数据点数量
+```
+
+**配置项说明**:
+
+| 配置项 | 含义 | 默认值 | 范围 | 说明 |
+|--------|------|--------|------|------|
+| `enable_auto_stop` | 启用自动停止 | true | true/false | 关闭时Worker持续运行 |
+| `completeness_threshold` | 完整性阈值 | 90.0 | 50.0-100.0 | 达到此比例时认为数据完整 |
+| `max_consecutive_errors` | 最大错误次数 | 5 | 1-20 | 连续错误超过此数时停止 |
+| `min_datapoints` | 最小数据点 | 20 | 10-100 | 数据点数小于此值时不判定完整 |
+
+**场景配置**:
+
+**低网络带宽**:
+```yaml
+intraday_collection:
+  enable_auto_stop: true
+  completeness_threshold: 85.0      # 降低阈值，快速停止
+  max_consecutive_errors: 3         # 较低容错
+  min_datapoints: 15
+```
+
+**数据质量优先**:
+```yaml
+intraday_collection:
+  enable_auto_stop: true
+  completeness_threshold: 95.0      # 提高阈值，确保完整
+  max_consecutive_errors: 10        # 较高容错
+  min_datapoints: 50
+```
+
 ---
 
 ## 支持的市场与API
@@ -532,24 +574,26 @@ A股实时数据:  腾讯 API → 新浪 API → 显示 "-"
 
 ## 版本历史
 
-### 当前版本 - v5.2 (2025年12月)
+### 当前版本 - v5.3 (2025年12月)
 
-**📊 可定制表格列与用户体验升级**
+**🛡️ 关键修复与智能数据采集增强**
 
-- **灵活的列配置**: 用户可通过配置文件自定义持股列表和自选列表显示的列
-- **持股列表**: 14个可配置列（4个必需列 + 10个可选列）
-- **自选列表**: 12个可配置列（5个必需列 + 7个可选列）
-- **简洁模式支持**: 只显示核心信息，适应小屏幕或专注需求
-- **详细模式支持**: 显示所有可用信息，全面分析股票数据
-- **自定义列顺序**: 按个人偏好调整列的显示顺序
-- **向后兼容**: 无配置时使用默认列设置，平滑升级体验
+- **自选列表死锁修复**: 修复v5.2中可能导致自选列表数据完全为空的关键死锁问题
+- **多市场分时数据采集修复**: 修复美股和港股分时数据采集失败的问题
+- **智能Worker状态追踪**: 新增Worker元数据系统，实时监控采集进度和错误
+- **三模式采集策略**: Historical/Live/Complete三种模式智能切换
+- **交易状态识别**: 支持5种交易状态识别（盘前/交易中/盘后/周末/假日）
+- **智能自动停止**: Worker在数据完整时自动停止，节省系统资源
+- **配置驱动控制**: 4个新增配置参数，可定制采集行为
+- **完全向后兼容**: 无breaking changes，平滑升级体验
 
 ### 版本历史
 
 | 版本 | 发布时间 | 主要更新 | 文档 |
 |------|----------|----------|------|
-| **v5.2** | 2025年12月 | 📊 可定制表格列、灵活配置、用户体验升级 | [查看详情](doc/version/v5.2.md) |
-| **v5.1** | 2025年12月 | 🌍 多市场支持、美股港股盘中数据、Yahoo API、单元测试 | [查看详情](doc/version/v5.1.md) |
+| **v5.3** | 2025年12月 | 🛡️ 关键修复、智能Worker系统、多市场时区增强 | [查看详情](doc/version/v5.3.md) |
+| v5.2 | 2025年12月 | 📊 可定制表格列、灵活配置、用户体验升级 | [查看详情](doc/version/v5.2.md) |
+| v5.1 | 2025年12月 | 🌍 多市场支持、美股港股盘中数据、Yahoo API、单元测试 | [查看详情](doc/version/v5.1.md) |
 | v5.0 | 2025年12月 | 🏗️ 架构现代化，完整模块化设计 | [查看详情](doc/version/v5.0.md) |
 | v4.9 | 2025年11月 | 分时图表增强，智能日期选择 | [查看详情](doc/version/v4.9.md) |
 | v4.8 | 2025年11月 | 多标签系统，用户体验优化 | [查看详情](doc/version/v4.8.md) |

@@ -1,6 +1,6 @@
 # Stock Monitor - Stock Monitoring System
 
-[![Version](https://img.shields.io/badge/version-v5.2-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.3-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -466,6 +466,48 @@ display:
 - Required columns are automatically added if missing
 - Restart application after config changes to take effect
 
+#### Intraday Collection Configuration (v5.3+)
+
+v5.3 introduces an intelligent intraday data collection system with customizable settings.
+
+**Default Configuration (Recommended)**:
+```yaml
+intraday_collection:
+  enable_auto_stop: true            # Enable smart auto-stop
+  completeness_threshold: 90.0      # Completeness threshold (percentage)
+  max_consecutive_errors: 5         # Max consecutive errors before stopping
+  min_datapoints: 20                # Minimum datapoints for completeness
+```
+
+**Configuration Parameters**:
+
+| Parameter | Meaning | Default | Range | Description |
+|-----------|---------|---------|-------|-------------|
+| `enable_auto_stop` | Enable auto-stop | true | true/false | When false, workers run continuously |
+| `completeness_threshold` | Completeness threshold | 90.0 | 50.0-100.0 | Percentage at which data is considered complete |
+| `max_consecutive_errors` | Max consecutive errors | 5 | 1-20 | Stop worker after this many consecutive failures |
+| `min_datapoints` | Minimum datapoints | 20 | 10-100 | Minimum datapoints required to judge completeness |
+
+**Scenario-Based Configurations**:
+
+**Low Network Bandwidth**:
+```yaml
+intraday_collection:
+  enable_auto_stop: true
+  completeness_threshold: 85.0      # Lower threshold for faster stopping
+  max_consecutive_errors: 3         # Lower tolerance
+  min_datapoints: 15
+```
+
+**Data Quality Priority**:
+```yaml
+intraday_collection:
+  enable_auto_stop: true
+  completeness_threshold: 95.0      # Higher threshold for completeness
+  max_consecutive_errors: 10        # Higher tolerance
+  min_datapoints: 50
+```
+
 ---
 
 ## Supported Markets & APIs
@@ -532,24 +574,26 @@ If you encounter issues, please provide:
 
 ## Version History
 
-### Current Version - v5.2 (December 2025)
+### Current Version - v5.3 (December 2025)
 
-**📊 Configurable Table Columns & UX Enhancements**
+**🛡️ Critical Fixes & Intelligent Data Collection Enhancements**
 
-- **Flexible Column Configuration**: Customize which columns display in Portfolio and Watchlist via config file
-- **Portfolio**: 14 configurable columns (4 required + 10 optional)
-- **Watchlist**: 12 configurable columns (5 required + 7 optional)
-- **Minimal Mode Support**: Show only essential info for small screens or focused analysis
-- **Detailed Mode Support**: Display all available data for comprehensive stock analysis
-- **Custom Column Order**: Arrange columns according to personal preferences
-- **Backward Compatible**: Uses default columns when not configured, seamless upgrade experience
+- **Watchlist Deadlock Fix**: Fixed critical deadlock that could cause watchlist data to be completely empty
+- **Multi-Market Intraday Collection Fix**: Fixed US/HK stock intraday data collection failures
+- **Intelligent Worker Tracking**: New Worker metadata system with real-time progress and error monitoring
+- **Three-Mode Collection Strategy**: Intelligent switching between Historical/Live/Complete modes
+- **Trading State Detection**: Support for 5 trading states (PreMarket/Live/PostMarket/Weekend/Holiday)
+- **Smart Auto-Stop**: Workers automatically stop when data is complete, saving system resources
+- **Config-Driven Control**: 4 new configuration parameters for customizing collection behavior
+- **Full Backward Compatibility**: No breaking changes, smooth upgrade experience
 
 ### Version History
 
 | Version | Release Date | Major Updates | Documentation |
 |---------|--------------|-----------------|----------------|
-| **v5.2** | Dec 2025 | 📊 Configurable table columns, flexible config, UX upgrades | [Details](doc/version/v5.2.md) |
-| **v5.1** | Dec 2025 | 🌍 Multi-market support, US/HK intraday data, Yahoo API, unit tests | [Details](doc/version/v5.1.md) |
+| **v5.3** | Dec 2025 | 🛡️ Critical fixes, intelligent worker system, multi-market timezone enhancements | [Details](doc/version/v5.3.md) |
+| v5.2 | Dec 2025 | 📊 Configurable table columns, flexible config, UX upgrades | [Details](doc/version/v5.2.md) |
+| v5.1 | Dec 2025 | 🌍 Multi-market support, US/HK intraday data, Yahoo API, unit tests | [Details](doc/version/v5.1.md) |
 | v5.0 | Dec 2025 | 🏗️ Architecture modernization, complete modular design | [Details](doc/version/v5.0.md) |
 | v4.9 | Nov 2025 | Intraday chart enhancement, smart date selection | [Details](doc/version/v4.9.md) |
 | v4.8 | Nov 2025 | Multi-tag system, UX optimization | [Details](doc/version/v4.8.md) |
