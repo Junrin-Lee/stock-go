@@ -1,23 +1,29 @@
 # AGENTS.md
 
-## Build & Run
+Quick reference for AI coding agents. See **CLAUDE.md** for full architecture details.
+
+## Build & Test
 ```bash
-go build -o cmd/stock-monitor    # Build executable
+go build -o cmd/stock-monitor    # Build
 go run main.go                   # Run directly
-./cmd/stock-monitor              # Run compiled binary
-go mod download                  # Install dependencies
+go test ./...                    # Run all tests
+go test -v -run TestConvertStockCodeForTencent ./  # Single test (use -run with test name pattern)
+gofmt -w . && go vet ./...       # Format and lint
 ```
 
-## Testing
-No test suite exists. Manual testing only. Debug mode: set `debug_mode: true` in `cmd/conf/config.yml`, press 'd' in app.
-
 ## Code Style
-- **Imports**: Standard library first (alphabetical), then third-party. Use aliases like `tea "github.com/charmbracelet/bubbletea"`
-- **Naming**: PascalCase for exported types/funcs, camelCase for private. JSON/YAML tags use snake_case
-- **Formatting**: Use `gofmt`. Tabs for indentation
-- **Error handling**: Early return on errors. Display "-" for missing data. Use `debugPrint()` for debug logs
-- **Concurrency**: Use `sync.RWMutex` for caches, worker pools with buffered channels (max 10), never mutate Model from goroutines—use `tea.Cmd` messages
-- **Comments**: Chinese for business logic, English for technical docs
+- **Imports**: stdlib first (alphabetical), then third-party with aliases (e.g., `tea "github.com/charmbracelet/bubbletea"`)
+- **Formatting**: `gofmt` with tabs (not spaces); Chinese comments for business logic, English for technical docs
+- **Naming**: Exported=PascalCase, private=camelCase, JSON/YAML tags=snake_case
+- **Errors**: Early return on errors, display "-" for missing data, use `debugPrint()` for debug logs
+- **Concurrency**: Use `sync.RWMutex` for shared state; never mutate Model from goroutines—send `tea.Cmd` messages instead
+- **Encoding**: UTF-8 source; GBK→UTF-8 conversion for Chinese API responses (see `api.go`)
 
-## Architecture
-Single `main` package. Bubble Tea MVC pattern with 13 states (see `consts.go`). Core logic in `main.go` (~6k lines). Supporting: `intraday.go`, `sort.go`, `color.go`, `consts.go`.
+## Key Files
+| Task | File |
+|------|------|
+| State machine & handlers | `main.go` |
+| API calls (multi-fallback) | `api.go` |
+| Data types | `types.go` |
+| Tests (reference pattern) | `intraday_test.go` |
+| Translations (keep in sync) | `i18n/zh.json`, `i18n/en.json` |
