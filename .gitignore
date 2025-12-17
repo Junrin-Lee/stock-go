@@ -13,6 +13,9 @@ cmd/stock-monitor
 
 # AI settings
 .claude
+.opencode
+opencode.json
+.mcp.json
 
 # macOS system files
 .DS_Store
