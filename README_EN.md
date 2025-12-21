@@ -1,6 +1,6 @@
 # Stock Monitor - Stock Monitoring System
 
-[![Version](https://img.shields.io/badge/version-v5.3-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.4-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -527,7 +527,7 @@ intraday_collection:
 |:--------:|-----|---------|---------|
 | 1 | **Tencent API** | A-Shares | Real-time quotes (primary) |
 | 2 | **Sina API** | A-Shares | Real-time quotes (backup), intraday data (primary) |
-| 3 | **East Money** | A-Shares | Intraday data (backup) |
+| 3 | **East Money** | A-Shares/HK | Intraday data (backup), HK turnover rate |
 | 4 | **Finnhub** | US/HK Stocks | Real-time quotes |
 | 5 | **TwelveData** | US Stocks | Stock search (backup) |
 
@@ -574,24 +574,22 @@ If you encounter issues, please provide:
 
 ## Version History
 
-### Current Version - v5.3 (December 2025)
+### Current Version - v5.4 (December 2025)
 
-**🛡️ Critical Fixes & Intelligent Data Collection Enhancements**
+**🔧 HK Stock Turnover Rate Fix**
 
-- **Watchlist Deadlock Fix**: Fixed critical deadlock that could cause watchlist data to be completely empty
-- **Multi-Market Intraday Collection Fix**: Fixed US/HK stock intraday data collection failures
-- **Intelligent Worker Tracking**: New Worker metadata system with real-time progress and error monitoring
-- **Three-Mode Collection Strategy**: Intelligent switching between Historical/Live/Complete modes
-- **Trading State Detection**: Support for 5 trading states (PreMarket/Live/PostMarket/Weekend/Holiday)
-- **Smart Auto-Stop**: Workers automatically stop when data is complete, saving system resources
-- **Config-Driven Control**: 4 new configuration parameters for customizing collection behavior
+- **HK Turnover Rate Fix**: Integrated East Money API as supplementary data source for HK stock turnover rates
+- **Root Cause**: Tencent API always returns 0 for HK stock turnover rate (API limitation)
+- **Solution**: Automatically fetch from East Money API when HK turnover rate is missing
+- **New Tests**: Added `api_test.go` with 3 unit test functions
 - **Full Backward Compatibility**: No breaking changes, smooth upgrade experience
 
 ### Version History
 
 | Version | Release Date | Major Updates | Documentation |
 |---------|--------------|-----------------|----------------|
-| **v5.3** | Dec 2025 | 🛡️ Critical fixes, intelligent worker system, multi-market timezone enhancements | [Details](doc/version/v5.3.md) |
+| **v5.4** | Dec 2025 | 🔧 HK turnover rate fix, East Money API integration | [Details](doc/version/v5.4.md) |
+| v5.3 | Dec 2025 | 🛡️ Critical fixes, intelligent worker system, multi-market timezone enhancements | [Details](doc/version/v5.3.md) |
 | v5.2 | Dec 2025 | 📊 Configurable table columns, flexible config, UX upgrades | [Details](doc/version/v5.2.md) |
 | v5.1 | Dec 2025 | 🌍 Multi-market support, US/HK intraday data, Yahoo API, unit tests | [Details](doc/version/v5.1.md) |
 | v5.0 | Dec 2025 | 🏗️ Architecture modernization, complete modular design | [Details](doc/version/v5.0.md) |

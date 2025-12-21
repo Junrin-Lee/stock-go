@@ -325,5 +325,13 @@
   "col.market_value": "市值",
   "col.tag": "标签",
   "col.turnover": "换手率",
-  "col.volume": "成交量"
+  "col.volume": "成交量",
+  "debug.api.eastmoneyTurnoverUrl": "[东方财富] 请求URL: %s",
+  "debug.api.eastmoneyTurnoverHttpFail": "[东方财富] HTTP请求失败: %v",
+  "debug.api.eastmoneyTurnoverReadFail": "[东方财富] 读取响应失败: %v",
+  "debug.api.eastmoneyTurnoverJsonFail": "[东方财富] JSON解析失败: %v",
+  "debug.api.eastmoneyTurnoverSuccess": "[东方财富] 港股换手率获取成功: %s, 换手率=%.2f%%, 成交量=%d",
+  "debug.api.hkTurnoverMissing": "[港股] 检测到换手率缺失: %s, 尝试东方财富API补充",
+  "debug.api.hkTurnoverEnhanced": "[港股] 换手率补充成功: %s, 换手率=%.2f%%",
+  "debug.api.hkTurnoverFallbackFail": "[港股] 换手率备用API失败: %v"
 }

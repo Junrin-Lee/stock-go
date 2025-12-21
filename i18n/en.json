@@ -325,5 +325,13 @@
   "col.market_value": "Value",
   "col.tag": "Tag",
   "col.turnover": "Turnover",
-  "col.volume": "Volume"
+  "col.volume": "Volume",
+  "debug.api.eastmoneyTurnoverUrl": "[EastMoney] Request URL: %s",
+  "debug.api.eastmoneyTurnoverHttpFail": "[EastMoney] HTTP request failed: %v",
+  "debug.api.eastmoneyTurnoverReadFail": "[EastMoney] Read response failed: %v",
+  "debug.api.eastmoneyTurnoverJsonFail": "[EastMoney] JSON parse failed: %v",
+  "debug.api.eastmoneyTurnoverSuccess": "[EastMoney] HK turnover fetched: %s, turnover=%.2f%%, volume=%d",
+  "debug.api.hkTurnoverMissing": "[HK Stock] Turnover missing: %s, trying EastMoney API",
+  "debug.api.hkTurnoverEnhanced": "[HK Stock] Turnover enhanced: %s, turnover=%.2f%%",
+  "debug.api.hkTurnoverFallbackFail": "[HK Stock] Turnover fallback failed: %v"
 }
