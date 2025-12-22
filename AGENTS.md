@@ -27,3 +27,10 @@ gofmt -w . && go vet ./...       # Format and lint
 | Data types | `types.go` |
 | Tests (reference pattern) | `intraday_test.go` |
 | Translations (keep in sync) | `i18n/zh.json`, `i18n/en.json` |
+
+## Plan Mode Agent Protocol
+**IMPORTANT**: When executing plans from plan mode agent:
+1. **First step**: Save plan document to `./doc/` directory BEFORE implementation
+   - Feature plans → `./doc/plans/`
+   - Bug fixes → `./doc/issues/`
+2. Only proceed with implementation after documentation is saved
