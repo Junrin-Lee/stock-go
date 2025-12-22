@@ -251,7 +251,7 @@ Stock data fetching has automatic fallback:
 ## Directory Structure
 
 ```
-stock-go/
+stock-monitor/
 ├── main.go                  # Core application: state machine, event handling (~3,150 lines)
 ├── api.go                   # External API integration with fallback logic (~1,250 lines)
 ├── intraday_chart.go       # Intraday chart visualization (~750 lines)

@@ -74,7 +74,7 @@ A professional command-line stock monitoring tool built with the Bubble Tea fram
 ```bash
 # 1. Clone the repository
 git clone <repository-url>
-cd stock-go
+cd stock-monitor
 
 # 2. Install dependencies
 go mod download
@@ -254,7 +254,7 @@ Press `V` key to view the intraday chart for the selected stock:
 ## Project Structure
 
 ```
-stock-go/
+stock-monitor/
 ├── main.go                 # Core app: state machine, event handling (3,156 lines)
 ├── api.go                  # API integration: multi-source with fallback (1,226 lines)
 ├── intraday_chart.go       # Intraday charts: Braille rendering (754 lines)

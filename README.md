@@ -74,7 +74,7 @@
 ```bash
 # 1. 克隆项目
 git clone <repository-url>
-cd stock-go
+cd stock-monitor
 
 # 2. 安装依赖
 go mod download
@@ -254,7 +254,7 @@ go build -o cmd/stock-monitor
 ## 项目结构
 
 ```
-stock-go/
+stock-monitor/
 ├── main.go                 # 核心应用：状态机、事件处理（3,156行）
 ├── api.go                  # API集成：多源数据获取与容错（1,226行）
 ├── intraday_chart.go       # 分时图表：Braille渲染（754行）
