@@ -588,19 +588,19 @@ If you encounter issues, please provide:
 
 | Version | Release Date | Major Updates | Documentation |
 |---------|--------------|-----------------|----------------|
-| **v5.5** | Dec 2025 | 🏷️ Watchlist market tag system, auto data migration | [Details](doc/version/v5.5.md) |
-| v5.4 | Dec 2025 | 🔧 HK turnover rate fix, East Money API integration | [Details](doc/version/v5.4.md) |
-| v5.3 | Dec 2025 | 🛡️ Critical fixes, intelligent worker system, multi-market timezone enhancements | [Details](doc/version/v5.3.md) |
-| v5.2 | Dec 2025 | 📊 Configurable table columns, flexible config, UX upgrades | [Details](doc/version/v5.2.md) |
-| v5.1 | Dec 2025 | 🌍 Multi-market support, US/HK intraday data, Yahoo API, unit tests | [Details](doc/version/v5.1.md) |
-| v5.0 | Dec 2025 | 🏗️ Architecture modernization, complete modular design | [Details](doc/version/v5.0.md) |
-| v4.9 | Nov 2025 | Intraday chart enhancement, smart date selection | [Details](doc/version/v4.9.md) |
-| v4.8 | Nov 2025 | Multi-tag system, UX optimization | [Details](doc/version/v4.8.md) |
-| v4.7 | Oct 2025 | Architecture optimization, i18n enhancement | [Details](doc/version/v4.7.md) |
-| v4.6 | Oct 2025 | Intraday data collection, async optimization | [Details](doc/version/v4.6.md) |
-| v4.5 | Sep 2025 | Advanced sorting system | [Details](doc/version/v4.5.md) |
+| **v5.5** | Dec 2025 | 🏷️ Watchlist market tag system, auto data migration | [Details](doc/changelogs/v5.5.md) |
+| v5.4 | Dec 2025 | 🔧 HK turnover rate fix, East Money API integration | [Details](doc/changelogs/v5.4.md) |
+| v5.3 | Dec 2025 | 🛡️ Critical fixes, intelligent worker system, multi-market timezone enhancements | [Details](doc/changelogs/v5.3.md) |
+| v5.2 | Dec 2025 | 📊 Configurable table columns, flexible config, UX upgrades | [Details](doc/changelogs/v5.2.md) |
+| v5.1 | Dec 2025 | 🌍 Multi-market support, US/HK intraday data, Yahoo API, unit tests | [Details](doc/changelogs/v5.1.md) |
+| v5.0 | Dec 2025 | 🏗️ Architecture modernization, complete modular design | [Details](doc/changelogs/v5.0.md) |
+| v4.9 | Nov 2025 | Intraday chart enhancement, smart date selection | [Details](doc/changelogs/v4.9.md) |
+| v4.8 | Nov 2025 | Multi-tag system, UX optimization | [Details](doc/changelogs/v4.8.md) |
+| v4.7 | Oct 2025 | Architecture optimization, i18n enhancement | [Details](doc/changelogs/v4.7.md) |
+| v4.6 | Oct 2025 | Intraday data collection, async optimization | [Details](doc/changelogs/v4.6.md) |
+| v4.5 | Sep 2025 | Advanced sorting system | [Details](doc/changelogs/v4.5.md) |
 
-View complete version history: [doc/version/](doc/version/)
+View complete version history: [doc/version/](doc/changelogs/)
 
 ---
 
