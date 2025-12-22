@@ -333,5 +333,9 @@
   "debug.api.eastmoneyTurnoverSuccess": "[东方财富] 港股换手率获取成功: %s, 换手率=%.2f%%, 成交量=%d",
   "debug.api.hkTurnoverMissing": "[港股] 检测到换手率缺失: %s, 尝试东方财富API补充",
   "debug.api.hkTurnoverEnhanced": "[港股] 换手率补充成功: %s, 换手率=%.2f%%",
-  "debug.api.hkTurnoverFallbackFail": "[港股] 换手率备用API失败: %v"
+  "debug.api.hkTurnoverFallbackFail": "[港股] 换手率备用API失败: %v",
+  "marketTag.china": "A股",
+  "marketTag.us": "美股",
+  "marketTag.hongkong": "港股",
+  "marketInfo": "市场"
 }

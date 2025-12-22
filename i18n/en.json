@@ -333,5 +333,9 @@
   "debug.api.eastmoneyTurnoverSuccess": "[EastMoney] HK turnover fetched: %s, turnover=%.2f%%, volume=%d",
   "debug.api.hkTurnoverMissing": "[HK Stock] Turnover missing: %s, trying EastMoney API",
   "debug.api.hkTurnoverEnhanced": "[HK Stock] Turnover enhanced: %s, turnover=%.2f%%",
-  "debug.api.hkTurnoverFallbackFail": "[HK Stock] Turnover fallback failed: %v"
+  "debug.api.hkTurnoverFallbackFail": "[HK Stock] Turnover fallback failed: %v",
+  "marketTag.china": "A-Share",
+  "marketTag.us": "US Stock",
+  "marketTag.hongkong": "HK Stock",
+  "marketInfo": "Market"
 }

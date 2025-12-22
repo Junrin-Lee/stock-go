@@ -49,9 +49,10 @@ type StockPriceCacheEntry struct {
 
 // WatchlistStock 自选股票数据结构
 type WatchlistStock struct {
-	Code string   `json:"code"`
-	Name string   `json:"name"`
-	Tags []string `json:"tags"` // 标签字段，支持多个标签
+	Code   string     `json:"code"`
+	Name   string     `json:"name"`
+	Tags   []string   `json:"tags"`             // 标签字段，仅存储用户自定义标签
+	Market MarketType `json:"market,omitempty"` // 市场类型标识（A股/美股/港股）
 }
 
 // Watchlist 自选股票列表
@@ -313,8 +314,8 @@ type WorkerMetadata struct {
 
 // IntradayCollectionConfig 分时数据采集配置
 type IntradayCollectionConfig struct {
-	EnableAutoStop        bool    `yaml:"enable_auto_stop"`        // 启用自动停止
-	CompletenessThreshold float64 `yaml:"completeness_threshold"`  // 完整性阈值 (百分比)
-	MaxConsecutiveErrors  int     `yaml:"max_consecutive_errors"`  // 最大连续错误次数
-	MinDatapoints         int     `yaml:"min_datapoints"`          // 最小数据点数量
+	EnableAutoStop        bool    `yaml:"enable_auto_stop"`       // 启用自动停止
+	CompletenessThreshold float64 `yaml:"completeness_threshold"` // 完整性阈值 (百分比)
+	MaxConsecutiveErrors  int     `yaml:"max_consecutive_errors"` // 最大连续错误次数
+	MinDatapoints         int     `yaml:"min_datapoints"`         // 最小数据点数量
 }

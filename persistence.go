@@ -41,10 +41,11 @@ func loadPortfolio() Portfolio {
 
 // WatchlistStockLegacy 旧版自选股数据结构（用于迁移兼容）
 type WatchlistStockLegacy struct {
-	Code string   `json:"code"`
-	Name string   `json:"name"`
-	Tag  string   `json:"tag,omitempty"`  // 旧格式的单个标签
-	Tags []string `json:"tags,omitempty"` // 新格式的多个标签
+	Code   string     `json:"code"`
+	Name   string     `json:"name"`
+	Tag    string     `json:"tag,omitempty"`    // 旧格式的单个标签
+	Tags   []string   `json:"tags,omitempty"`   // 新格式的多个标签
+	Market MarketType `json:"market,omitempty"` // 市场类型（用于兼容已有market字段的数据）
 }
 
 // WatchlistLegacy 旧版自选股列表（用于迁移兼容）
@@ -74,16 +75,34 @@ func loadWatchlist() Watchlist {
 			Name: legacyStock.Name,
 		}
 
-		// 处理标签字段的兼容性
-		if len(legacyStock.Tags) > 0 {
-			// 新格式：直接使用 Tags 数组
-			newStock.Tags = legacyStock.Tags
-		} else if legacyStock.Tag != "" {
-			// 旧格式：将单个 Tag 转换为 Tags 数组
-			newStock.Tags = []string{legacyStock.Tag}
+		// 处理市场字段的兼容性
+		if legacyStock.Market == "" {
+			// 自动识别市场类型
+			newStock.Market = getMarketType(legacyStock.Code)
 		} else {
-			// 没有标签：使用默认标签
-			newStock.Tags = []string{"-"}
+			newStock.Market = legacyStock.Market
+		}
+
+		// 处理标签字段的兼容性并清理市场标签
+		var userTags []string
+		if len(legacyStock.Tags) > 0 {
+			// 新格式：过滤掉市场标签，只保留用户自定义标签
+			for _, tag := range legacyStock.Tags {
+				if tag != "" && tag != "-" && !isMarketTag(tag) {
+					userTags = append(userTags, tag)
+				}
+			}
+			newStock.Tags = userTags
+		} else if legacyStock.Tag != "" {
+			// 旧格式：将单个 Tag 转换为 Tags 数组（如果不是市场标签）
+			if !isMarketTag(legacyStock.Tag) && legacyStock.Tag != "-" {
+				newStock.Tags = []string{legacyStock.Tag}
+			} else {
+				newStock.Tags = []string{}
+			}
+		} else {
+			// 没有标签：使用空数组
+			newStock.Tags = []string{}
 		}
 
 		watchlist.Stocks = append(watchlist.Stocks, newStock)

@@ -429,7 +429,7 @@ func (m *Model) GenerateWatchlistRow(watchStock *WatchlistStock, stockData *Stoc
 				row[i] = ""
 			}
 		case ColTag:
-			row[i] = watchStock.getTagsDisplay()
+			row[i] = watchStock.getTagsDisplay(m)
 		case ColCode:
 			row[i] = watchStock.Code
 		case ColName:

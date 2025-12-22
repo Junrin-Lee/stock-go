@@ -8,6 +8,34 @@ import (
 )
 
 // ============================================================================
+// 市场标签函数
+// ============================================================================
+
+// getMarketTagName 根据市场类型和语言获取标签名称（展示层使用）
+func (m *Model) getMarketTagName(market MarketType) string {
+	switch market {
+	case MarketChina:
+		return m.getText("marketTag.china")
+	case MarketUS:
+		return m.getText("marketTag.us")
+	case MarketHongKong:
+		return m.getText("marketTag.hongkong")
+	}
+	return "-"
+}
+
+// isMarketTag 判断标签是否为市场标签（用于迁移清理）
+func isMarketTag(tag string) bool {
+	marketTags := []string{"A股", "A-Share", "美股", "US Stock", "港股", "HK Stock"}
+	for _, mt := range marketTags {
+		if tag == mt {
+			return true
+		}
+	}
+	return false
+}
+
+// ============================================================================
 // 标签管理函数
 // ============================================================================
 
@@ -36,10 +64,21 @@ func (m *Model) renameTagForAllStocks(oldTag, newTag string) int {
 	return updatedCount
 }
 
-// getAvailableTags 获取所有可用的标签
+// getAvailableTags 获取所有可用的标签（包括市场标签）
 func (m *Model) getAvailableTags() []string {
 	tagMap := make(map[string]bool)
 
+	// 添加所有市场标签
+	for _, stock := range m.watchlist.Stocks {
+		if stock.Market != "" {
+			marketTag := m.getMarketTagName(stock.Market)
+			if marketTag != "-" {
+				tagMap[marketTag] = true
+			}
+		}
+	}
+
+	// 添加用户自定义标签
 	for _, stock := range m.watchlist.Stocks {
 		for _, tag := range stock.Tags {
 			if tag != "" && tag != "-" {
@@ -90,13 +129,12 @@ func (stock *WatchlistStock) removeTag(tag string) {
 	}
 }
 
-// getTagsDisplay 获取股票标签的显示字符串
-func (stock *WatchlistStock) getTagsDisplay() string {
-	if len(stock.Tags) == 0 {
-		return "-"
-	}
+// getTagsDisplay 获取股票标签的显示字符串（展示层动态组合市场标签和用户标签）
+func (stock *WatchlistStock) getTagsDisplay(m *Model) string {
+	// 从 market 字段生成市场标签
+	marketTag := m.getMarketTagName(stock.Market)
 
-	// 过滤掉空标签和默认标签
+	// 过滤用户自定义标签
 	var validTags []string
 	for _, tag := range stock.Tags {
 		if tag != "" && tag != "-" {
@@ -104,29 +142,26 @@ func (stock *WatchlistStock) getTagsDisplay() string {
 		}
 	}
 
-	if len(validTags) == 0 {
+	// 组合市场标签 + 用户标签（市场标签优先）
+	allTags := []string{marketTag}
+	allTags = append(allTags, validTags...)
+
+	// 如果只有市场标签且为 "-"，返回 "-"
+	if len(allTags) == 1 && allTags[0] == "-" {
 		return "-"
 	}
 
-	if len(validTags) == 1 {
-		return validTags[0]
+	// 如果只有一个标签（市场标签）
+	if len(allTags) == 1 {
+		return allTags[0]
 	}
 
 	// 多个标签时，用逗号分隔，但如果太长则显示数量
-	display := validTags[0]
-	if len(validTags) > 1 {
-		totalLen := len(display)
-		for _, tag := range validTags[1:] {
-			totalLen += len(tag) + 1 // +1 for comma
-		}
+	display := strings.Join(allTags, ",")
+	totalLen := len(display)
 
-		if totalLen > 15 { // 如果总长度超过15字符，显示数量
-			return fmt.Sprintf("%s+%d", validTags[0], len(validTags)-1)
-		} else {
-			for _, tag := range validTags[1:] {
-				display += "," + tag
-			}
-		}
+	if totalLen > 15 {
+		return fmt.Sprintf("%s+%d", allTags[0], len(allTags)-1)
 	}
 
 	return display
@@ -136,7 +171,7 @@ func (stock *WatchlistStock) getTagsDisplay() string {
 // 自选列表过滤和缓存
 // ============================================================================
 
-// getFilteredWatchlist 根据标签过滤自选股票（带缓存优化）
+// getFilteredWatchlist 根据标签过滤自选股票（支持市场标签，带缓存优化）
 func (m *Model) getFilteredWatchlist() []WatchlistStock {
 	// 如果没有过滤标签，直接返回完整列表
 	if m.selectedTag == "" {
@@ -151,6 +186,14 @@ func (m *Model) getFilteredWatchlist() []WatchlistStock {
 	// 重新计算过滤结果并缓存
 	var filtered []WatchlistStock
 	for _, stock := range m.watchlist.Stocks {
+		// 检查是否匹配市场标签
+		marketTag := m.getMarketTagName(stock.Market)
+		if marketTag == m.selectedTag {
+			filtered = append(filtered, stock)
+			continue
+		}
+
+		// 检查用户自定义标签
 		if stock.hasTag(m.selectedTag) {
 			filtered = append(filtered, stock)
 		}
@@ -249,10 +292,14 @@ func (m *Model) addToWatchlist(code, name string) bool {
 		return false // 已在列表中
 	}
 
+	// 识别市场类型
+	market := getMarketType(code)
+
 	watchStock := WatchlistStock{
-		Code: code,
-		Name: name,
-		Tags: []string{"-"}, // 默认标签
+		Code:   code,
+		Name:   name,
+		Market: market,     // 保存市场类型
+		Tags:   []string{}, // 初始为空，不包含市场标签
 	}
 	// 将新股票插入到列表首位，而不是末尾
 	m.watchlist.Stocks = append([]WatchlistStock{watchStock}, m.watchlist.Stocks...)
@@ -445,14 +492,18 @@ func (m *Model) viewWatchlistTagging() string {
 	filteredStocks := m.getFilteredWatchlist()
 	if m.watchlistCursor >= 0 && m.watchlistCursor < len(filteredStocks) {
 		stock := filteredStocks[m.watchlistCursor]
+		marketTag := m.getMarketTagName(stock.Market)
+
 		if m.language == Chinese {
 			s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay())
+			s += fmt.Sprintf("%s: %s\n", m.getText("marketInfo"), marketTag)
+			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay(m))
 			s += "请输入新标签(多个标签用逗号分隔): " + formatTextWithCursor(m.tagInput, m.tagInputCursor) + "\n\n"
 			s += "操作: ←/→移动光标, Enter确认, ESC/Q取消, Home/End跳转首尾"
 		} else {
 			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay())
+			s += fmt.Sprintf("%s: %s\n", m.getText("marketInfo"), marketTag)
+			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay(m))
 			s += "Enter new tags (comma separated): " + formatTextWithCursor(m.tagInput, m.tagInputCursor) + "\n\n"
 			s += "Actions: ←/→ move cursor, Enter confirm, ESC/Q cancel, Home/End jump"
 		}

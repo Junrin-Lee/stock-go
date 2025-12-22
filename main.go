@@ -1534,7 +1534,7 @@ func (m *Model) viewWatchlistTagSelect() string {
 		stock := filteredStocks[m.watchlistCursor]
 		if m.language == Chinese {
 			s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay())
+			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay(m))
 
 			// 显示该股票的标签，供删除使用
 			if len(stock.Tags) > 0 {
@@ -1557,7 +1557,7 @@ func (m *Model) viewWatchlistTagSelect() string {
 			}
 		} else {
 			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay())
+			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay(m))
 
 			// 显示该股票的标签，供删除使用
 			if len(stock.Tags) > 0 {
@@ -1977,10 +1977,10 @@ func (m *Model) viewWatchlistTagManage() string {
 		stock := filteredStocks[m.watchlistCursor]
 		if m.language == Chinese {
 			s += fmt.Sprintf("股票: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay())
+			s += fmt.Sprintf("当前标签: %s\n\n", stock.getTagsDisplay(m))
 		} else {
 			s += fmt.Sprintf("Stock: %s (%s)\n", stock.Name, stock.Code)
-			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay())
+			s += fmt.Sprintf("Current tags: %s\n\n", stock.getTagsDisplay(m))
 		}
 
 		// 显示所有可用标签，标记当前股票拥有的标签
