@@ -1,6 +1,6 @@
 # Stock Monitor - Stock Monitoring System
 
-[![Version](https://img.shields.io/badge/version-v5.4-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.5-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -574,21 +574,22 @@ If you encounter issues, please provide:
 
 ## Version History
 
-### Current Version - v5.4 (December 2025)
+### Current Version - v5.5 (December 2025)
 
-**🔧 HK Stock Turnover Rate Fix**
+**🏷️ Watchlist Market Tag System**
 
-- **HK Turnover Rate Fix**: Integrated East Money API as supplementary data source for HK stock turnover rates
-- **Root Cause**: Tencent API always returns 0 for HK stock turnover rate (API limitation)
-- **Solution**: Automatically fetch from East Money API when HK turnover rate is missing
-- **New Tests**: Added `api_test.go` with 3 unit test functions
-- **Full Backward Compatibility**: No breaking changes, smooth upgrade experience
+- **Automatic Market Recognition**: Auto-detect market type (A-Share/US Stock/HK Stock) from stock codes
+- **Market Tag Display**: Show market tags in watchlist, separated from user-defined tags
+- **Auto Data Migration**: Automatically handle legacy market tags and migrate to new structure
+- **Multi-language Support**: Market tags display in both Chinese and English
+- **Full Backward Compatibility**: Fully compatible with v5.4, zero migration risk
 
 ### Version History
 
 | Version | Release Date | Major Updates | Documentation |
 |---------|--------------|-----------------|----------------|
-| **v5.4** | Dec 2025 | 🔧 HK turnover rate fix, East Money API integration | [Details](doc/version/v5.4.md) |
+| **v5.5** | Dec 2025 | 🏷️ Watchlist market tag system, auto data migration | [Details](doc/version/v5.5.md) |
+| v5.4 | Dec 2025 | 🔧 HK turnover rate fix, East Money API integration | [Details](doc/version/v5.4.md) |
 | v5.3 | Dec 2025 | 🛡️ Critical fixes, intelligent worker system, multi-market timezone enhancements | [Details](doc/version/v5.3.md) |
 | v5.2 | Dec 2025 | 📊 Configurable table columns, flexible config, UX upgrades | [Details](doc/version/v5.2.md) |
 | v5.1 | Dec 2025 | 🌍 Multi-market support, US/HK intraday data, Yahoo API, unit tests | [Details](doc/version/v5.1.md) |
