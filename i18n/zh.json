@@ -337,5 +337,21 @@
   "marketTag.china": "A股",
   "marketTag.us": "美股",
   "marketTag.hongkong": "港股",
-  "marketInfo": "市场"
+  "marketInfo": "市场",
+  "debug.search.workerStart": "[搜索] Worker 启动: %s, 日期: %s",
+  "debug.search.workerStop": "[搜索] Worker 停止: %s",
+  "debug.search.workerAutoStop": "[搜索] Worker 自动停止: %s",
+  "debug.search.workerClosed": "[搜索] Worker 信号关闭",
+  "debug.search.marketClosed": "[搜索] 市场已关闭: %s",
+  "debug.search.fetchFail": "[搜索] 获取数据失败: %s, 错误: %v",
+  "debug.search.noData": "[搜索] 无数据: %s",
+  "debug.search.dataUpdated": "[搜索] 数据已更新: %s, 数据点: %d, 时间: %s",
+  "debug.search.cleanupComplete": "[搜索] 清理完成",
+  "debug.search.chartCreate": "[搜索] 创建图表: 宽度=%d, 高度=%d",
+  "debug.search.chartDataNil": "[搜索] 图表数据为空",
+  "debug.search.chartDataEmpty": "[搜索] 图表数据点为0",
+  "debug.search.chartDataPoints": "[搜索] 图表数据点数量: %d",
+  "debug.search.chartNoTimeFramework": "[搜索] 时间框架为空",
+  "debug.search.chartPriceRange": "[搜索] 价格范围: min=%.3f, max=%.3f, margin=%.3f",
+  "debug.search.chartSuccess": "[搜索] 图表创建成功"
 }

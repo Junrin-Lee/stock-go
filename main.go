@@ -294,6 +294,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			newModel, cmd = m, nil
 		}
+	case searchIntradayUpdateMsg:
+		// 搜索模式分时数据更新，触发 UI 重新渲染
+		// 继续监听下一次更新
+		newModel, cmd = m, m.waitForSearchIntradayUpdate()
 	default:
 		newModel, cmd = m, nil
 	}
@@ -1149,16 +1153,39 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.logUserAction(fmt.Sprintf("搜索成功: %s (%s)", m.searchResult.Name, m.searchResult.Symbol))
 
-		// 如果是从自选列表进入的搜索，跳转到确认页面
+		// 标记为搜索模式
+		m.isSearchMode = true
+
+		// 获取智能日期（当日或最近交易日）
+		actualDate, _, err := GetTradingDayForCollection(m.searchResult.Symbol, m)
+		if err != nil {
+			// 降级为简单逻辑
+			actualDate = getSmartChartDate()
+		}
+
+		// 设置图表参数
+		m.chartViewStock = m.searchResult.Symbol
+		m.chartViewStockName = m.searchResult.Name
+		m.chartViewDate = actualDate
+
+		// 清理输入
+		m.searchInput = ""
+		m.searchInputCursor = 0
+		m.message = ""
+
+		// 根据来源决定下一个状态
 		if m.searchFromWatchlist {
 			m.state = WatchlistSearchConfirm
 		} else {
 			m.state = SearchResultWithActions
 		}
-		m.searchInput = ""
-		m.searchInputCursor = 0
-		m.message = ""
-		return m, nil
+
+		// 两种状态都启动临时 Worker（自动显示图表）
+		return m, m.startSearchIntradayWorker(
+			m.searchResult.Symbol,
+			m.searchResult.Name,
+			actualDate,
+		)
 	case "left", "ctrl+b":
 		if m.searchInputCursor > 0 {
 			m.searchInputCursor--
@@ -2128,10 +2155,20 @@ func (m *Model) isStockInPortfolio(code string) bool {
 func (m *Model) handleSearchResultWithActions(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
+		// 停止搜索 worker 并清理数据
+		if m.isSearchMode {
+			m.stopSearchIntradayWorker()
+		}
+
 		m.state = MainMenu
 		m.message = ""
 		return m, nil
 	case "r":
+		// 重新搜索时也要清理旧数据
+		if m.isSearchMode {
+			m.stopSearchIntradayWorker()
+		}
+
 		m.state = SearchingStock
 		m.searchFromWatchlist = false
 		m.message = ""
@@ -2144,16 +2181,30 @@ func (m *Model) handleSearchResultWithActions(msg tea.KeyMsg) (tea.Model, tea.Cm
 			} else {
 				m.message = fmt.Sprintf(m.getText("alreadyInWatch"), m.searchResult.Symbol)
 			}
+
+			// 停止搜索 worker
+			if m.isSearchMode {
+				m.stopSearchIntradayWorker()
+			}
+
 			// 跳转到自选列表页面
 			m.state = WatchlistViewing
 			m.resetWatchlistCursor() // 重置游标到第一只股票
 			m.cursor = 0
 			m.lastUpdate = time.Now()
+
+			// 启动自选列表的分时数据采集
+			m.startIntradayDataCollection()
 		}
 		return m, m.tickCmd()
 	case "2":
 		// 添加到持股列表（进入添加流程）
 		if m.searchResult != nil {
+			// 停止搜索 worker
+			if m.isSearchMode {
+				m.stopSearchIntradayWorker()
+			}
+
 			m.state = AddingStock
 			m.addingStep = 1 // 跳过代码输入，直接到成本价输入
 			m.tempCode = m.searchResult.Symbol
@@ -2278,6 +2329,56 @@ func (m *Model) viewSearchResultWithActions() string {
 	t.AppendRow(table.Row(values))
 
 	s += t.Render() + "\n\n"
+
+	// === 新增：搜索模式分时图表（自动展示） ===
+	if m.isSearchMode {
+		// 渲染图表区域分隔线
+		s += strings.Repeat("─", 80) + "\n"
+		if m.language == Chinese {
+			s += "📈 实时分时图表 (每5秒自动刷新)\n\n"
+		} else {
+			s += "📈 Real-time Intraday Chart (Auto-refresh every 5s)\n\n"
+		}
+
+		// 渲染图表
+		if m.searchIntradayData != nil && len(m.searchIntradayData.Datapoints) > 0 {
+			// 创建图表（使用较小的嵌入式尺寸）
+			chartWidth := 100 // 嵌入式图表宽度
+			chartHeight := 15 // 嵌入式图表高度
+
+			chartModel := m.createSearchIntradayChart(chartWidth, chartHeight)
+			if chartModel != nil {
+				s += chartModel.View() + "\n"
+
+				// 显示更新信息
+				if m.language == Chinese {
+					s += fmt.Sprintf("最后更新: %s | 数据点: %d\n",
+						m.searchIntradayData.UpdatedAt,
+						len(m.searchIntradayData.Datapoints))
+				} else {
+					s += fmt.Sprintf("Last update: %s | Data points: %d\n",
+						m.searchIntradayData.UpdatedAt,
+						len(m.searchIntradayData.Datapoints))
+				}
+			} else {
+				// 图表创建失败（终端太小）
+				if m.language == Chinese {
+					s += "终端尺寸过小，无法显示图表\n"
+				} else {
+					s += "Terminal size too small to display chart\n"
+				}
+			}
+		} else {
+			// 数据尚未加载
+			if m.language == Chinese {
+				s += "正在获取分时数据...\n"
+			} else {
+				s += "Loading intraday data...\n"
+			}
+		}
+
+		s += "\n"
+	}
 
 	// 操作按钮提示
 	s += m.getText("actionHelp") + "\n"
@@ -2581,10 +2682,19 @@ func (m *Model) viewWatchlistViewing() string {
 func (m *Model) handleWatchlistSearchConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
+		// 停止搜索 worker 并清理数据
+		if m.isSearchMode {
+			m.stopSearchIntradayWorker()
+		}
+
 		m.state = WatchlistViewing
 		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.searchFromWatchlist = false
 		m.message = ""
+
+		// 启动自选列表的分时数据采集
+		m.startIntradayDataCollection()
+
 		return m, m.tickCmd() // 重启定时器
 	case "enter":
 		// 确认添加到自选列表
@@ -2595,14 +2705,28 @@ func (m *Model) handleWatchlistSearchConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd
 			} else {
 				m.message = fmt.Sprintf(m.getText("alreadyInWatch"), m.searchResult.Symbol)
 			}
+
+			// 停止搜索 worker
+			if m.isSearchMode {
+				m.stopSearchIntradayWorker()
+			}
+
 			m.state = WatchlistViewing
 			m.resetWatchlistCursor() // 重置游标到第一只股票
 			m.searchFromWatchlist = false
+
+			// 启动自选列表的分时数据采集
+			m.startIntradayDataCollection()
+
 			return m, m.tickCmd()
 		}
 		return m, nil
 	case "r":
-		// 重新搜索
+		// 重新搜索时也要清理旧数据
+		if m.isSearchMode {
+			m.stopSearchIntradayWorker()
+		}
+
 		m.state = SearchingStock
 		m.searchInput = ""
 		m.searchResult = nil
@@ -2698,6 +2822,56 @@ func (m *Model) viewWatchlistSearchConfirm() string {
 	t.AppendRow(values)
 
 	s += t.Render() + "\n\n"
+
+	// === 新增：搜索模式分时图表（自动展示） ===
+	if m.isSearchMode {
+		// 渲染图表区域分隔线
+		s += strings.Repeat("─", 80) + "\n"
+		if m.language == Chinese {
+			s += "📈 实时分时图表 (每5秒自动刷新)\n\n"
+		} else {
+			s += "📈 Real-time Intraday Chart (Auto-refresh every 5s)\n\n"
+		}
+
+		// 渲染图表
+		if m.searchIntradayData != nil && len(m.searchIntradayData.Datapoints) > 0 {
+			// 创建图表（使用较小的嵌入式尺寸）
+			chartWidth := 100 // 嵌入式图表宽度
+			chartHeight := 15 // 嵌入式图表高度
+
+			chartModel := m.createSearchIntradayChart(chartWidth, chartHeight)
+			if chartModel != nil {
+				s += chartModel.View() + "\n"
+
+				// 显示更新信息
+				if m.language == Chinese {
+					s += fmt.Sprintf("最后更新: %s | 数据点: %d\n",
+						m.searchIntradayData.UpdatedAt,
+						len(m.searchIntradayData.Datapoints))
+				} else {
+					s += fmt.Sprintf("Last update: %s | Data points: %d\n",
+						m.searchIntradayData.UpdatedAt,
+						len(m.searchIntradayData.Datapoints))
+				}
+			} else {
+				// 图表创建失败（终端太小）
+				if m.language == Chinese {
+					s += "终端尺寸过小，无法显示图表\n"
+				} else {
+					s += "Terminal size too small to display chart\n"
+				}
+			}
+		} else {
+			// 数据尚未加载
+			if m.language == Chinese {
+				s += "正在获取分时数据...\n"
+			} else {
+				s += "Loading intraday data...\n"
+			}
+		}
+
+		s += "\n"
+	}
 
 	if m.language == Chinese {
 		s += "按回车键添加到自选列表，ESC键返回，R键重新搜索\n"

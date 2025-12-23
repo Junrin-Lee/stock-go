@@ -892,3 +892,369 @@ func (m *Model) viewIntradayChart(termWidth, termHeight int) string {
 
 	return b.String()
 }
+
+// ============================================================================
+// 搜索模式分时数据采集（高频临时 Worker）
+// ============================================================================
+
+// startSearchIntradayWorker 为搜索模式启动高频临时数据采集
+// 特点：
+// 1. 5秒刷新间隔（高频）
+// 2. 只采集单只股票
+// 3. 数据存储在内存 (m.searchIntradayData)
+// 4. 不写入磁盘
+// 5. 首次立即执行
+func (m *Model) startSearchIntradayWorker(code, name, date string) tea.Cmd {
+	// 创建停止信号和更新通知 channel
+	m.searchIntradayWorker = make(chan struct{})
+	m.searchIntradayUpdateCh = make(chan struct{}, 10) // 带缓冲，避免阻塞
+
+	debugPrint("debug.search.workerStart", code, date)
+
+	// 启动临时 goroutine
+	go m.runSearchIntradayWorker(code, name, date)
+
+	// 启动监听更新的 cmd
+	return m.waitForSearchIntradayUpdate()
+}
+
+// runSearchIntradayWorker 运行搜索模式的高频临时 worker
+func (m *Model) runSearchIntradayWorker(code, name, date string) {
+	// 使用 5 秒间隔的 ticker（高频刷新）
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	// 首次立即执行数据获取（不等待第一个 tick）
+	m.fetchAndStoreSearchIntradayData(code, name, date)
+
+	// 定时采集循环
+	for {
+		select {
+		case <-ticker.C:
+			// 检查是否仍在搜索模式
+			if !m.isSearchMode || m.state != SearchResultWithActions {
+				debugPrint("debug.search.workerAutoStop", code)
+				return
+			}
+
+			// 检查市场是否开市（闭市时降低频率）
+			if !isMarketOpen(code, m) {
+				debugPrint("debug.search.marketClosed", code)
+				// 市场关闭时仍然执行一次获取（获取当日完整数据）
+				// 然后停止 worker
+				m.fetchAndStoreSearchIntradayData(code, name, date)
+				return
+			}
+
+			// 采集数据并更新内存
+			m.fetchAndStoreSearchIntradayData(code, name, date)
+
+		case <-m.searchIntradayWorker:
+			// 收到停止信号
+			debugPrint("debug.search.workerStop", code)
+			return
+		}
+	}
+}
+
+// fetchAndStoreSearchIntradayData 获取并存储搜索模式的分时数据（仅内存）
+func (m *Model) fetchAndStoreSearchIntradayData(code, name, date string) {
+	// 从 API 获取最新数据
+	datapoints, err := fetchIntradayDataFromAPI(code)
+	if err != nil {
+		debugPrint("debug.search.fetchFail", code, err)
+		// 不返回错误，继续下次尝试
+		return
+	}
+
+	if len(datapoints) == 0 {
+		debugPrint("debug.search.noData", code)
+		return
+	}
+
+	// 获取市场类型
+	market := getMarketType(code)
+
+	// 获取昨收价（用于图表颜色判断）
+	prevClose := 0.0
+	if m.searchResult != nil {
+		prevClose = m.searchResult.PrevClose
+	}
+
+	// 直接使用新数据替换（不需要合并，每次都是完整数据）
+	m.searchIntradayData = &IntradayData{
+		Code:       code,
+		Name:       name,
+		Date:       date,
+		Market:     market,
+		Datapoints: datapoints, // 直接使用新数据
+		UpdatedAt:  time.Now().Format("2006-01-02 15:04:05"),
+		PrevClose:  prevClose,
+	}
+
+	debugPrint("debug.search.dataUpdated", code, len(datapoints), time.Now().Format("15:04:05"))
+
+	// 发送更新通知，触发 UI 重新渲染
+	if m.searchIntradayUpdateCh != nil {
+		select {
+		case m.searchIntradayUpdateCh <- struct{}{}:
+			// 通知已发送
+		default:
+			// channel 满了，跳过（不阻塞）
+		}
+	}
+}
+
+// stopSearchIntradayWorker 停止搜索模式的临时 worker
+func (m *Model) stopSearchIntradayWorker() {
+	if m.searchIntradayWorker != nil {
+		close(m.searchIntradayWorker)
+		m.searchIntradayWorker = nil
+		debugPrint("debug.search.workerClosed")
+	}
+
+	// 关闭更新通知 channel
+	if m.searchIntradayUpdateCh != nil {
+		close(m.searchIntradayUpdateCh)
+		m.searchIntradayUpdateCh = nil
+	}
+
+	// 清理内存数据
+	m.searchIntradayData = nil
+	m.isSearchMode = false
+
+	debugPrint("debug.search.cleanupComplete")
+}
+
+// createSearchIntradayChart 为搜索模式创建分时图表
+// 与 createIntradayChart 的区别:
+// 1. 数据源: m.searchIntradayData (内存) vs m.chartData (磁盘/内存)
+// 2. 尺寸: 较小的嵌入式图表 vs 全屏图表
+// 3. 时间轴: 简化的时间标签 vs 完整时间标签
+func (m *Model) createSearchIntradayChart(termWidth, termHeight int) *linechart.Model {
+	debugPrint("debug.search.chartCreate", termWidth, termHeight)
+
+	if m.searchIntradayData == nil {
+		debugPrint("debug.search.chartDataNil")
+		return nil
+	}
+
+	if len(m.searchIntradayData.Datapoints) == 0 {
+		debugPrint("debug.search.chartDataEmpty")
+		return nil
+	}
+
+	debugPrint("debug.search.chartDataPoints", len(m.searchIntradayData.Datapoints))
+
+	// 最小大小检查（搜索模式使用更小的最小尺寸）
+	minWidth := 40
+	minHeight := 8
+
+	if termWidth < minWidth || termHeight < minHeight {
+		return nil
+	}
+
+	// 计算可用空间（搜索模式使用更紧凑的布局）
+	chartWidth := termWidth - 4
+	if chartWidth < minWidth {
+		chartWidth = minWidth
+	}
+	chartHeight := termHeight - 6 // 减少padding
+	if chartHeight < minHeight {
+		chartHeight = minHeight
+	}
+
+	// === 创建完整时间框架（根据市场配置动态生成） ===
+	timeFramework := m.createFixedTimeRange(
+		m.searchIntradayData.Date,
+		m.searchIntradayData.Market,
+	)
+
+	if len(timeFramework) == 0 {
+		debugPrint("debug.search.chartNoTimeFramework")
+		return nil
+	}
+
+	// === 将实际数据填充到时间框架中 ===
+	dataMap := make(map[string]float64)
+	for _, dp := range m.searchIntradayData.Datapoints {
+		dataMap[dp.Time] = dp.Price
+	}
+
+	// 填充价格值（使用最后已知价格填充空白）
+	var lastKnownPrice float64
+	if len(m.searchIntradayData.Datapoints) > 0 {
+		lastKnownPrice = m.searchIntradayData.Datapoints[0].Price
+	}
+
+	dataPoints := make([]float64, len(timeFramework))
+	timeLabels := make([]string, len(timeFramework))
+
+	for i, tp := range timeFramework {
+		timeKey := tp.Time.Format("15:04")
+		timeLabels[i] = timeKey
+
+		if price, exists := dataMap[timeKey]; exists {
+			dataPoints[i] = price
+			lastKnownPrice = price
+		} else {
+			dataPoints[i] = lastKnownPrice
+		}
+	}
+
+	// === 智能计算Y轴范围 ===
+	actualPrices := make([]float64, len(m.searchIntradayData.Datapoints))
+	for i, dp := range m.searchIntradayData.Datapoints {
+		actualPrices[i] = dp.Price
+	}
+
+	minPrice, maxPrice, margin := calculateAdaptiveMargin(actualPrices)
+
+	debugPrint("debug.search.chartPriceRange", minPrice, maxPrice, margin)
+
+	// === 设置样式：A股红涨绿跌，非A股绿涨红跌 ===
+	lastPrice := m.searchIntradayData.Datapoints[len(m.searchIntradayData.Datapoints)-1].Price
+	prevClose := m.searchIntradayData.PrevClose
+
+	comparisonBase := prevClose
+	if comparisonBase == 0 {
+		comparisonBase = m.searchIntradayData.Datapoints[0].Price
+	}
+
+	isAShare := strings.HasPrefix(m.searchIntradayData.Code, "SH") ||
+		strings.HasPrefix(m.searchIntradayData.Code, "SZ")
+
+	var chartStyle lipgloss.Style
+	if lastPrice > comparisonBase {
+		if isAShare {
+			chartStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9")) // 红色
+		} else {
+			chartStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // 绿色
+		}
+	} else if lastPrice < comparisonBase {
+		if isAShare {
+			chartStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // 绿色
+		} else {
+			chartStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9")) // 红色
+		}
+	} else {
+		chartStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15")) // 白色
+	}
+
+	// === 创建简化的 Y 轴标签格式化器 ===
+	yLabelFormatter := func(index int, value float64) string {
+		if value >= 100 {
+			return fmt.Sprintf("%.1f", value)
+		} else if value >= 10 {
+			return fmt.Sprintf("%.2f", value)
+		} else {
+			return fmt.Sprintf("%.3f", value)
+		}
+	}
+
+	// === 创建简化的 X 轴标签格式化器（搜索模式只显示开盘和收盘）===
+	xLabelFormatter := func(index int, value float64) string {
+		idx := int(math.Round(value))
+		if idx < 0 || idx >= len(timeLabels) {
+			return ""
+		}
+
+		timeLabel := timeLabels[idx]
+		parts := strings.Split(timeLabel, ":")
+		if len(parts) != 2 {
+			return ""
+		}
+		hour, _ := strconv.Atoi(parts[0])
+		minute, _ := strconv.Atoi(parts[1])
+		totalMinutes := hour*60 + minute
+
+		// 根据市场类型显示不同的时间标签
+		switch m.searchIntradayData.Market {
+		case MarketChina:
+			// A股：9:30 和 15:00
+			diff1 := totalMinutes - 570
+			if diff1 < 0 {
+				diff1 = -diff1
+			}
+			diff2 := totalMinutes - 900
+			if diff2 < 0 {
+				diff2 = -diff2
+			}
+			if diff1 <= 5 { // 9:30 ± 5分钟
+				return "09:30"
+			} else if diff2 <= 10 { // 15:00 ± 10分钟
+				return "15:00"
+			}
+		case MarketUS:
+			// 美股：9:30 和 16:00
+			diff1 := totalMinutes - 570
+			if diff1 < 0 {
+				diff1 = -diff1
+			}
+			diff2 := totalMinutes - 960
+			if diff2 < 0 {
+				diff2 = -diff2
+			}
+			if diff1 <= 5 { // 9:30 ± 5分钟
+				return "09:30"
+			} else if diff2 <= 10 { // 16:00 ± 10分钟
+				return "16:00"
+			}
+		case MarketHongKong:
+			// 港股：9:30 和 16:00
+			diff1 := totalMinutes - 570
+			if diff1 < 0 {
+				diff1 = -diff1
+			}
+			diff2 := totalMinutes - 960
+			if diff2 < 0 {
+				diff2 = -diff2
+			}
+			if diff1 <= 5 { // 9:30 ± 5分钟
+				return "09:30"
+			} else if diff2 <= 10 { // 16:00 ± 10分钟
+				return "16:00"
+			}
+		}
+
+		return ""
+	}
+
+	// === 创建图表 ===
+	lc := linechart.New(chartWidth, chartHeight,
+		0, float64(len(dataPoints)-1),
+		minPrice-margin, maxPrice+margin,
+		linechart.WithXYSteps(4, 4), // 减少刻度数量
+		linechart.WithXLabelFormatter(xLabelFormatter),
+		linechart.WithYLabelFormatter(yLabelFormatter),
+		linechart.WithStyles(lipgloss.Style{}, lipgloss.Style{}, chartStyle),
+	)
+
+	// === 使用 Braille 字符绘制数据点 ===
+	for i := 0; i < len(dataPoints)-1; i++ {
+		p1 := canvas.Float64Point{X: float64(i), Y: dataPoints[i]}
+		p2 := canvas.Float64Point{X: float64(i + 1), Y: dataPoints[i+1]}
+		lc.DrawBrailleLineWithStyle(p1, p2, chartStyle)
+	}
+
+	lc.DrawXYAxisAndLabel()
+
+	debugPrint("debug.search.chartSuccess")
+	return &lc
+}
+
+// waitForSearchIntradayUpdate 监听搜索模式数据更新通知
+func (m *Model) waitForSearchIntradayUpdate() tea.Cmd {
+	return func() tea.Msg {
+		// 阻塞等待 channel 消息
+		if m.searchIntradayUpdateCh != nil {
+			_, ok := <-m.searchIntradayUpdateCh
+			if ok {
+				// 收到更新通知，返回消息触发 UI 重新渲染
+				return searchIntradayUpdateMsg{}
+			}
+		}
+		// channel 已关闭，返回 nil
+		return nil
+	}
+}

@@ -224,6 +224,14 @@ type Model struct {
 	chartLoadError        error         // 加载错误(如有)
 	chartIsCollecting     bool          // 是否正在自动采集数据
 	chartCollectStartTime time.Time     // 开始采集的时间
+
+	// For search mode intraday - 搜索模式临时分时数据
+	isSearchMode           bool          // 是否处于搜索模式（用于区分数据来源）
+	searchIntradayData     *IntradayData // 搜索模式的临时分时数据(仅内存)
+	searchIntradayWorker   chan struct{} // 临时 worker 停止信号
+	searchIntradayUpdateCh chan struct{} // 数据更新通知 channel
+	searchChartWidth       int           // 搜索图表宽度（响应式布局）
+	searchChartHeight      int           // 搜索图表高度
 }
 
 // tickMsg 定时刷新消息
@@ -241,6 +249,9 @@ type checkDataAvailabilityMsg struct {
 	code string
 	date string
 }
+
+// searchIntradayUpdateMsg 搜索模式分时数据更新消息
+type searchIntradayUpdateMsg struct{}
 
 // TimePoint 图表时间点数据
 type TimePoint struct {

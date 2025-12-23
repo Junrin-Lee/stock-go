@@ -337,5 +337,21 @@
   "marketTag.china": "A-Share",
   "marketTag.us": "US Stock",
   "marketTag.hongkong": "HK Stock",
-  "marketInfo": "Market"
+  "marketInfo": "Market",
+  "debug.search.workerStart": "[Search] Worker started: %s, date: %s",
+  "debug.search.workerStop": "[Search] Worker stopped: %s",
+  "debug.search.workerAutoStop": "[Search] Worker auto-stopped: %s",
+  "debug.search.workerClosed": "[Search] Worker signal closed",
+  "debug.search.marketClosed": "[Search] Market closed: %s",
+  "debug.search.fetchFail": "[Search] Fetch failed: %s, error: %v",
+  "debug.search.noData": "[Search] No data: %s",
+  "debug.search.dataUpdated": "[Search] Data updated: %s, datapoints: %d, time: %s",
+  "debug.search.cleanupComplete": "[Search] Cleanup complete",
+  "debug.search.chartCreate": "[Search] Create chart: width=%d, height=%d",
+  "debug.search.chartDataNil": "[Search] Chart data is nil",
+  "debug.search.chartDataEmpty": "[Search] Chart data is empty",
+  "debug.search.chartDataPoints": "[Search] Chart datapoints: %d",
+  "debug.search.chartNoTimeFramework": "[Search] Time framework is empty",
+  "debug.search.chartPriceRange": "[Search] Price range: min=%.3f, max=%.3f, margin=%.3f",
+  "debug.search.chartSuccess": "[Search] Chart created successfully"
 }
