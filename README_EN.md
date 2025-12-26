@@ -1,6 +1,6 @@
 # Stock Monitor - Stock Monitoring System
 
-[![Version](https://img.shields.io/badge/version-v5.5-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.7-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -574,21 +574,24 @@ If you encounter issues, please provide:
 
 ## Version History
 
-### Current Version - v5.5 (December 2025)
+### Current Version - v5.7 (December 2025)
 
-**🏷️ Watchlist Market Tag System**
+**🏷️ Watchlist Tag Grouping System**
 
-- **Automatic Market Recognition**: Auto-detect market type (A-Share/US Stock/HK Stock) from stock codes
-- **Market Tag Display**: Show market tags in watchlist, separated from user-defined tags
-- **Auto Data Migration**: Automatically handle legacy market tags and migrate to new structure
-- **Multi-language Support**: Market tags display in both Chinese and English
-- **Full Backward Compatibility**: Fully compatible with v5.4, zero migration risk
+- **Tag Group Display**: Clear separation of market groups and user-defined tags with grouped UI design
+- **Position Memory**: Remember last selected tag and quickly return to previous position
+- **Boundary Stop**: List stops at top/bottom edges, no circular scrolling for better navigation
+- **Visual Optimization**: Clear group separators for improved readability
+- **Complete Bilingual Support**: Full Chinese and English support
+- **Full Backward Compatibility**: Fully compatible with v5.6 and earlier versions
 
 ### Version History
 
 | Version | Release Date | Major Updates | Documentation |
 |---------|--------------|-----------------|----------------|
-| **v5.5** | Dec 2025 | 🏷️ Watchlist market tag system, auto data migration | [Details](doc/changelogs/v5.5.md) |
+| **v5.7** | Dec 2025 | 🏷️ Watchlist tag grouping system, position memory, boundary stop | [Details](doc/changelogs/v5.7.md) |
+| v5.6 | Dec 2025 | 🔍 Search view enhancement, real-time intraday charts, auto-refresh | [Details](doc/changelogs/v5.6.md) |
+| v5.5 | Dec 2025 | 🏷️ Watchlist market tag system, auto data migration | [Details](doc/changelogs/v5.5.md) |
 | v5.4 | Dec 2025 | 🔧 HK turnover rate fix, East Money API integration | [Details](doc/changelogs/v5.4.md) |
 | v5.3 | Dec 2025 | 🛡️ Critical fixes, intelligent worker system, multi-market timezone enhancements | [Details](doc/changelogs/v5.3.md) |
 | v5.2 | Dec 2025 | 📊 Configurable table columns, flexible config, UX upgrades | [Details](doc/changelogs/v5.2.md) |
