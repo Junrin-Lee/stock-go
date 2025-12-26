@@ -353,5 +353,11 @@
   "debug.search.chartDataPoints": "[Search] Chart datapoints: %d",
   "debug.search.chartNoTimeFramework": "[Search] Time framework is empty",
   "debug.search.chartPriceRange": "[Search] Price range: min=%.3f, max=%.3f, margin=%.3f",
-  "debug.search.chartSuccess": "[Search] Chart created successfully"
+  "debug.search.chartSuccess": "[Search] Chart created successfully",
+  "watchlist.selectGroup": "=== Select Tag Group ===",
+  "watchlist.currentFilter": "Current filter",
+  "watchlist.noTags": "No tags available",
+  "group.marketTags": "Market Groups",
+  "group.userTags": "User Tags",
+  "group.helpText": "Actions: ↑/↓ select, Enter confirm, C clear filter, ESC/Q back"
 }

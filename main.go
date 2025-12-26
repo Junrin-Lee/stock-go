@@ -1220,7 +1220,7 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleSearchResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc":
+	case "esc", "q":
 		m.state = MainMenu
 		m.message = ""
 		return m, nil
@@ -2154,7 +2154,7 @@ func (m *Model) isStockInPortfolio(code string) bool {
 
 func (m *Model) handleSearchResultWithActions(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc":
+	case "esc", "q":
 		// 停止搜索 worker 并清理数据
 		if m.isSearchMode {
 			m.stopSearchIntradayWorker()
@@ -2516,18 +2516,25 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = ""
 		return m, nil
 	case "g":
-		// 分组查看
-		m.availableTags = m.getAvailableTags()
-		if len(m.availableTags) == 0 {
-			if m.language == Chinese {
-				m.message = "没有可用的标签"
-			} else {
-				m.message = "No available tags"
-			}
+		// 分组查看 (v5.6: 使用分类标签分组，记住上次选择的位置)
+		m.tagGroups = m.getTagGroups()
+		totalTags := m.getTotalTagCount()
+
+		if totalTags == 0 {
+			m.message = m.getText("watchlist.noTags")
 			return m, nil
 		}
-		m.state = WatchlistGroupSelect
+
+		// 尝试恢复到上次选择的标签位置
 		m.cursor = 0
+		if m.lastSelectedGroupTag != "" {
+			position := m.findTagPositionInGroups(m.lastSelectedGroupTag)
+			if position >= 0 {
+				m.cursor = position
+			}
+		}
+
+		m.state = WatchlistGroupSelect
 		m.message = ""
 		return m, nil
 	case "c":

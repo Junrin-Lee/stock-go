@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -93,6 +94,129 @@ func (m *Model) getAvailableTags() []string {
 	}
 
 	return tags
+}
+
+// getMarketTags 获取市场标签（固定顺序：A股 -> 美股 -> 港股）- v5.6
+// 只返回自选列表中实际存在的市场标签
+func (m *Model) getMarketTags() []string {
+	// 检查自选列表中存在哪些市场
+	hasMarket := make(map[MarketType]bool)
+	for _, stock := range m.watchlist.Stocks {
+		if stock.Market != "" {
+			hasMarket[stock.Market] = true
+		}
+	}
+
+	// 按固定顺序返回：中国 -> 美国 -> 香港
+	tags := make([]string, 0, 3)
+
+	if hasMarket[MarketChina] {
+		tags = append(tags, m.getMarketTagName(MarketChina))
+	}
+	if hasMarket[MarketUS] {
+		tags = append(tags, m.getMarketTagName(MarketUS))
+	}
+	if hasMarket[MarketHongKong] {
+		tags = append(tags, m.getMarketTagName(MarketHongKong))
+	}
+
+	return tags
+}
+
+// getUserTags 获取用户自定义标签（字母排序）- v5.6
+func (m *Model) getUserTags() []string {
+	// 收集所有唯一的用户标签
+	tagSet := make(map[string]bool)
+	for _, stock := range m.watchlist.Stocks {
+		for _, tag := range stock.Tags {
+			if tag != "" && tag != "-" {
+				tagSet[tag] = true
+			}
+		}
+	}
+
+	// 转换为切片
+	tags := make([]string, 0, len(tagSet))
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+
+	// 字母排序
+	sort.Strings(tags)
+
+	return tags
+}
+
+// getTagGroups 获取分类的标签分组（用于分组选择视图）- v5.6
+func (m *Model) getTagGroups() []TagGroup {
+	groups := make([]TagGroup, 0, 2)
+
+	// 添加市场标签分组
+	marketTags := m.getMarketTags()
+	if len(marketTags) > 0 {
+		groups = append(groups, TagGroup{
+			Name: m.getText("group.marketTags"),
+			Tags: marketTags,
+		})
+	}
+
+	// 添加用户标签分组
+	userTags := m.getUserTags()
+	if len(userTags) > 0 {
+		groups = append(groups, TagGroup{
+			Name: m.getText("group.userTags"),
+			Tags: userTags,
+		})
+	}
+
+	return groups
+}
+
+// getTagAtCursor 获取当前光标位置的标签名称 - v5.6
+// 如果光标越界则返回空字符串
+func (m *Model) getTagAtCursor() string {
+	currentPos := 0
+
+	for _, group := range m.tagGroups {
+		// 检查光标是否在当前分组的范围内
+		groupEndPos := currentPos + len(group.Tags)
+		if m.cursor >= currentPos && m.cursor < groupEndPos {
+			localIndex := m.cursor - currentPos
+			return group.Tags[localIndex]
+		}
+		currentPos = groupEndPos
+	}
+
+	return ""
+}
+
+// getTotalTagCount 获取所有分组的标签总数 - v5.6
+func (m *Model) getTotalTagCount() int {
+	count := 0
+	for _, group := range m.tagGroups {
+		count += len(group.Tags)
+	}
+	return count
+}
+
+// findTagPositionInGroups 查找标签在分组中的位置 - v5.6
+// 返回标签的全局位置索引，如果未找到则返回 -1
+func (m *Model) findTagPositionInGroups(tagName string) int {
+	if tagName == "" {
+		return -1
+	}
+
+	currentPos := 0
+	for _, group := range m.tagGroups {
+		for _, tag := range group.Tags {
+			if tag == tagName {
+				return currentPos
+			}
+			currentPos++
+		}
+	}
+
+	return -1 // 未找到
 }
 
 // ============================================================================
@@ -434,44 +558,56 @@ func (m *Model) handleWatchlistTagging(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// handleWatchlistGroupSelect 处理自选股票分组选择
+// handleWatchlistGroupSelect 处理自选股票分组选择 (v5.6: 支持分组显示和边界停留)
 func (m *Model) handleWatchlistGroupSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		if m.cursor >= 0 && m.cursor < len(m.availableTags) {
-			m.selectedTag = m.availableTags[m.cursor]
+		// 选择标签并应用过滤
+		selectedTag := m.getTagAtCursor()
+		if selectedTag != "" {
+			m.selectedTag = selectedTag
+			m.lastSelectedGroupTag = selectedTag // 记住这次选择的标签
 		}
 		m.invalidateWatchlistCache() // 使缓存失效
 		m.state = WatchlistViewing
 		m.message = ""
-		m.resetWatchlistCursor() // 重置游标到第一只股票（考虑过滤）
+		m.resetWatchlistCursor() // 重置游标到第一只股票
 		return m, m.tickCmd()    // 重启定时器
+
 	case "esc", "q":
-		m.selectedTag = ""           // 清除过滤
-		m.invalidateWatchlistCache() // 使缓存失效
-		m.state = WatchlistViewing
-		m.resetWatchlistCursor() // 重置游标到第一只股票
-		m.message = ""
-		return m, m.tickCmd() // 重启定时器
-	case "c":
-		// 清除过滤，显示所有股票
+		// 清除过滤并返回
 		m.selectedTag = ""
-		m.invalidateWatchlistCache() // 使缓存失效
+		m.invalidateWatchlistCache()
 		m.state = WatchlistViewing
-		m.resetWatchlistCursor() // 重置游标到第一只股票
+		m.resetWatchlistCursor()
 		m.message = ""
-		return m, m.tickCmd() // 重启定时器
+		return m, m.tickCmd()
+
+	case "c":
+		// 快捷键：清除过滤
+		m.selectedTag = ""
+		m.invalidateWatchlistCache()
+		m.state = WatchlistViewing
+		m.resetWatchlistCursor()
+		m.message = ""
+		return m, m.tickCmd()
+
 	case "up", "k", "w":
+		// 向上移动，边界停留
 		if m.cursor > 0 {
 			m.cursor--
 		}
 		return m, nil
+
 	case "down", "j", "s":
-		if m.cursor < len(m.availableTags)-1 {
+		// 向下移动，边界停留
+		totalTags := m.getTotalTagCount()
+		if m.cursor < totalTags-1 {
 			m.cursor++
 		}
 		return m, nil
 	}
+
 	return m, nil
 }
 
@@ -512,48 +648,49 @@ func (m *Model) viewWatchlistTagging() string {
 	return s
 }
 
-// viewWatchlistGroupSelect 分组选择视图
+// viewWatchlistGroupSelect 分组选择视图 (v5.6: 区分市场分组和用户标签)
 func (m *Model) viewWatchlistGroupSelect() string {
 	var s string
 
-	if m.language == Chinese {
-		s += "=== 选择标签分组 ===\n\n"
-	} else {
-		s += "=== Select Tag Group ===\n\n"
-	}
+	// 标题
+	s += m.getText("watchlist.selectGroup") + "\n\n"
 
 	// 显示当前过滤状态
 	if m.selectedTag != "" {
-		if m.language == Chinese {
-			s += fmt.Sprintf("当前过滤: %s\n\n", m.selectedTag)
-		} else {
-			s += fmt.Sprintf("Current filter: %s\n\n", m.selectedTag)
-		}
+		s += fmt.Sprintf("%s: %s\n\n", m.getText("watchlist.currentFilter"), m.selectedTag)
 	}
 
-	// 显示可用标签列表
-	if len(m.availableTags) == 0 {
-		if m.language == Chinese {
-			s += "暂无可用标签\n"
-		} else {
-			s += "No tags available\n"
+	// 检查是否有可用标签
+	if len(m.tagGroups) == 0 {
+		s += m.getText("watchlist.noTags") + "\n"
+		s += "\n" + m.getText("group.helpText") + "\n"
+		return s
+	}
+
+	// 渲染每个分组及其标签
+	currentPos := 0
+	for groupIdx, group := range m.tagGroups {
+		// 分组之间添加空行
+		if groupIdx > 0 {
+			s += "\n"
 		}
-	} else {
-		for i, tag := range m.availableTags {
+
+		// 分组标题（带分隔符）
+		s += fmt.Sprintf("--- %s ---\n", group.Name)
+
+		// 渲染该分组的标签
+		for _, tag := range group.Tags {
 			cursor := " "
-			if i == m.cursor {
+			if currentPos == m.cursor {
 				cursor = ">"
 			}
 			s += fmt.Sprintf("%s %s\n", cursor, tag)
+			currentPos++
 		}
 	}
 
-	s += "\n"
-	if m.language == Chinese {
-		s += "操作: ↑/↓选择, Enter确认, C清除过滤, ESC/Q返回"
-	} else {
-		s += "Actions: ↑/↓ select, Enter confirm, C clear filter, ESC/Q back"
-	}
+	// 帮助文本
+	s += "\n" + m.getText("group.helpText") + "\n"
 
 	return s
 }

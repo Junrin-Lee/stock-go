@@ -178,18 +178,20 @@ type Model struct {
 	watchlistCursor    int // 自选列表当前选中行
 
 	// For watchlist tagging and grouping
-	selectedTag        string   // 当前选择的标签过滤
-	availableTags      []string // 所有可用的标签列表
-	tagInput           string   // 标签输入框内容
-	tagInputCursor     int      // 标签输入光标位置
-	tagSelectCursor    int      // 标签选择界面的游标位置
-	currentStockTags   []string // 当前选中股票的标签列表（用于删除管理）
-	tagManageCursor    int      // 标签管理界面的游标位置
-	tagRemoveCursor    int      // 标签删除选择界面的游标位置
-	isInRemoveMode     bool     // 是否处于删除模式
-	tagToEdit          string   // 要编辑的原标签名称
-	tagEditInput       string   // 标签编辑输入框内容
-	tagEditInputCursor int      // 标签编辑输入光标位置
+	selectedTag           string     // 当前选择的标签过滤
+	availableTags         []string   // 所有可用的标签列表
+	tagGroups             []TagGroup // 标签分组（市场分组 + 用户标签）- v5.6
+	lastSelectedGroupTag  string     // 上次在分组选择中选中的标签（用于记住位置）- v5.6
+	tagInput              string     // 标签输入框内容
+	tagInputCursor     int        // 标签输入光标位置
+	tagSelectCursor    int        // 标签选择界面的游标位置
+	currentStockTags   []string   // 当前选中股票的标签列表（用于删除管理）
+	tagManageCursor    int        // 标签管理界面的游标位置
+	tagRemoveCursor    int        // 标签删除选择界面的游标位置
+	isInRemoveMode     bool       // 是否处于删除模式
+	tagToEdit          string     // 要编辑的原标签名称
+	tagEditInput       string     // 标签编辑输入框内容
+	tagEditInputCursor int        // 标签编辑输入光标位置
 
 	// Performance optimization - cached filtered watchlist
 	cachedFilteredWatchlist  []WatchlistStock // 缓存的过滤后自选列表
@@ -329,4 +331,10 @@ type IntradayCollectionConfig struct {
 	CompletenessThreshold float64 `yaml:"completeness_threshold"` // 完整性阈值 (百分比)
 	MaxConsecutiveErrors  int     `yaml:"max_consecutive_errors"` // 最大连续错误次数
 	MinDatapoints         int     `yaml:"min_datapoints"`         // 最小数据点数量
+}
+
+// TagGroup 标签分组结构 (v5.6)
+type TagGroup struct {
+	Name string   // 分组名称 (如 "市场分组", "自定义标签")
+	Tags []string // 该分组下的标签列表
 }

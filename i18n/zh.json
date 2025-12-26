@@ -353,5 +353,11 @@
   "debug.search.chartDataPoints": "[搜索] 图表数据点数量: %d",
   "debug.search.chartNoTimeFramework": "[搜索] 时间框架为空",
   "debug.search.chartPriceRange": "[搜索] 价格范围: min=%.3f, max=%.3f, margin=%.3f",
-  "debug.search.chartSuccess": "[搜索] 图表创建成功"
+  "debug.search.chartSuccess": "[搜索] 图表创建成功",
+  "watchlist.selectGroup": "=== 选择标签分组 ===",
+  "watchlist.currentFilter": "当前过滤",
+  "watchlist.noTags": "暂无可用标签",
+  "group.marketTags": "市场分组",
+  "group.userTags": "自定义标签",
+  "group.helpText": "操作: ↑/↓选择, Enter确认, C清除过滤, ESC/Q返回"
 }
