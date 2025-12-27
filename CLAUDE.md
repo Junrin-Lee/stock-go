@@ -32,13 +32,16 @@ go mod download
 # Install core dependencies manually (if needed)
 go get github.com/charmbracelet/bubbletea@v1.3.6
 go get github.com/jedib0t/go-pretty/v6@v6.6.8
+go get github.com/NimbleMarkets/ntcharts@v0.3.1
 go get golang.org/x/text@v0.28.0
 go get gopkg.in/yaml.v3@v3.0.1
 ```
 
 ### Testing & Debugging
 - **Test Suite**: Growing test coverage with `api_test.go` (API fallback logic, code conversion) and `intraday_test.go` (market detection, collection modes)
-- **Run Tests**: `go test -v ./` to run all tests
+- **Run All Tests**: `go test -v ./` to run all tests
+- **Run Specific Test**: `go test -v -run TestFunctionName` (e.g., `go test -v -run TestAPIFallback`)
+- **Run Tests in Specific File**: `go test -v -run . api_test.go` or `go test -v -run . intraday_test.go`
 - **Debug Mode**: Enable in `cmd/conf/config.yml` (`debug_mode: true`), then press 'd' in app to view logs
 
 ## Architecture Overview
@@ -250,6 +253,13 @@ Stock data fetching has automatic fallback:
 - Runtime config changes (language, debug mode) auto-saved
 - Internationalization via `i18n/zh.json` and `i18n/en.json`
 
+### 6. **Tag Grouping System (v5.7)**
+- **Separation of Concerns**: Market tags (auto-generated: A-share, US, HK) and user tags (custom labels) displayed in separate groups
+- **Position Memory**: Application remembers last selected tag using `lastSelectedGroupTag` field in Model
+- **Boundary Stop Navigation**: Cursor stops at list boundaries (no circular scrolling) for predictable UX
+- **Group-Aware Rendering**: Tag selection UI uses group separators and section headers for clarity
+- Implementation in `watchlist.go`: `renderWatchlistGroupSelection()` function handles grouped display
+
 ## Directory Structure
 
 ```
@@ -295,6 +305,9 @@ stock-monitor/
 ├── i18n/
 │   ├── zh.json            # Chinese translations (~250 strings)
 │   └── en.json            # English translations (~250 strings)
+│
+├── tools/
+│   └── migrate_intraday_structure.go  # Data migration utility (one-time use)
 │
 ├── doc/
 │   ├── issues/
@@ -525,6 +538,35 @@ The `doc/issues/plans/` directory should be created if it doesn't exist when the
 3. **API Failures**: Always provide fallback behavior - never let API failures crash the app
 4. **Sort State**: Remember that sorting must be re-applied after data updates for real-time accuracy
 
+### Debugging Specific Issues
+
+When debugging issues, these commands and approaches are helpful:
+
+```bash
+# Test API fallback logic
+go test -v -run TestAPIFallback
+
+# Test market detection and code conversion
+go test -v -run TestConvert
+
+# Check intraday data collection logic
+go test -v -run TestIntraday
+
+# Build with race detector (for concurrency issues)
+go build -race -o cmd/stock-monitor
+
+# Run with verbose logging (enable debug_mode in config first)
+./cmd/stock-monitor
+# Then press 'd' in monitoring view to see logs
+```
+
+**Common debugging scenarios:**
+- **Stock prices show "-"**: Check `api.go` fallback chain, verify stock code format in `types.go`
+- **Intraday data not collecting**: Verify timezone detection in `timezone.go`, check worker pool in `intraday.go`
+- **UI rendering issues**: Look at `ui_utils.go` table formatting, check Chinese width calculations
+- **Cache not working**: Examine TTL logic in `cache.go`, verify RWMutex usage
+- **State transitions failing**: Trace state machine in `main.go` Update() method, check handler functions
+
 ## File Encoding Notes
 
 - **Source Code**: UTF-8
@@ -574,7 +616,7 @@ When modifying the codebase, use this guide to quickly locate what you need:
 
 ## Important Notes for Future Development
 
-1. **v5.5 Modular architecture** - 20 focused modules (17 core + 2 test files + consts) with clear responsibilities. Main.go (~2,961 lines, further reduced from v5.3's ~3,150) is purely an orchestration layer. New market tag system (v5.5) separates market identification from user tags. timezone.go module handles market-specific timezone conversions and trading hours detection. Current design is near-optimal for project size.
+1. **v5.7 Modular architecture** - 20 focused modules (17 core + 2 test files + consts) with clear responsibilities. Main.go (~2,961 lines, further reduced from v5.3's ~3,150) is purely an orchestration layer. Tag grouping system (v5.7) introduces separated market/user tag displays with position memory and boundary stop behavior. Market tag system (v5.5) separates market identification from user tags. timezone.go module handles market-specific timezone conversions and trading hours detection. Current design is near-optimal for project size.
 
 2. **Data Storage** - Uses JSON files (portfolio.json, watchlist.json). For >1000 stocks or complex queries, consider migrating to SQLite in v6.0. v5.5 includes automatic data migration for legacy market tags.
 
