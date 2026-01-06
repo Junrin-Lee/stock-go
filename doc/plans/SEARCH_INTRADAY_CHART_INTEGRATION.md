@@ -1494,7 +1494,6 @@ func (p *HistoryPlayer) play() {
 
 - [分时图表实现方案](./INTRADAY_CHART_IMPLEMENTATION_PLAN.md)
 - [分时数据采集功能](./INTRADAY_FEATURE.md)
-- [项目架构文档](../../CLAUDE.md)
 
 ---
 

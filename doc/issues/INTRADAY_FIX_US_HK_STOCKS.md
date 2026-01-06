@@ -321,7 +321,6 @@ ok  	stock-monitor	1.116s
 
 - [doc/issues/INTRADAY_FEATURE.md](../plans/INTRADAY_FEATURE.md) - Intraday功能原始设计文档
 - [doc/version/v5.0.md](../changelogs/v5.0.md) - v5.0版本架构文档
-- [CLAUDE.md](../../CLAUDE.md) - 项目总体文档
 
 ---
 
