@@ -228,16 +228,22 @@ Press `V` key to view the intraday chart for the selected stock:
 
 | Module | Lines | Responsibility | Description |
 |--------|:-----:|----------------|-------------|
-| `main.go` | 3,156 | State Machine & Event Handling | Core app logic, 19 states, Bubble Tea event loop |
-| `api.go` | 1,226 | API Integration | Multi-source data fetching with auto fallback |
-| `intraday_chart.go` | 754 | Intraday Charts | Braille rendering, smart date selection, adaptive Y-axis |
-| `intraday.go` | 616 | Intraday Collection | Background worker pool (max 10 concurrent), per-minute updates |
-| `watchlist.go` | 508 | Watchlist Management | Multi-tag operations, filtering, grouping, search |
+| `main.go` | 3,142 | State Machine & Event Handling | Core app logic, 19 states, Bubble Tea event loop |
+| `intraday.go` | 1,539 | Intraday Collection | Background worker pool (max 10 concurrent), per-minute updates, intelligent worker management |
+| `api.go` | 1,355 | API Integration | Multi-source data fetching with auto fallback (Tencent, Sina, East Money) |
+| `intraday_chart.go` | 1,260 | Intraday Charts | Braille rendering, smart date selection, adaptive Y-axis, search mode support |
+| `watchlist.go` | 696 | Watchlist Management | Multi-tag operations, filtering, grouping, search, market tags, tag grouping |
+| `columns.go` | 492 | Column Configuration | Customizable table columns, flexible configuration |
+| `persistence.go` | 353 | Data Persistence | JSON/YAML read/write, backup restore, data migration |
+| `types.go` | 341 | Data Structures | Stock, StockData, Config, MarketType, TagGroup and other core types |
+| `intraday_test.go` | 328 | Intraday Tests | Market detection, collection modes, worker management, datapoint comparison tests |
 | `sort.go` | 238 | Sorting Engine | 11 portfolio fields + 7 watchlist fields sorting |
-| `types.go` | 215 | Data Structures | Stock, StockData, Config and other core types |
-| `persistence.go` | 171 | Data Persistence | JSON/YAML read/write, backup restore |
-| `cache.go` | 129 | Price Cache | 30-second TTL, RWMutex concurrent protection |
 | `ui_utils.go` | 194 | UI Utilities | Table formatting, Chinese width handling, pagination |
+| `timezone.go` | 172 | Timezone Handling | Multi-market timezone conversion, trading state detection |
+| `debug.go` | 160 | Debug Logging | 1000-entry buffer, scrollable viewer, conditional logging |
+| `format.go` | 156 | Formatting | Number formatting, price display, percentage calculations |
+| `cache.go` | 127 | Price Cache | 30-second TTL, RWMutex concurrent protection |
+| `api_test.go` | 87 | API Tests | API fallback logic, code conversion, HK stock detection tests |
 
 ### Technology Stack
 

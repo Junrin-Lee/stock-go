@@ -228,16 +228,22 @@ go build -o cmd/stock-monitor
 
 | 模块 | 代码行数 | 职责 | 说明 |
 |------|:--------:|------|------|
-| `main.go` | 3,156 | 状态机与事件处理 | 核心应用逻辑，19个状态，Bubble Tea 事件循环 |
-| `api.go` | 1,226 | API 集成 | 多数据源获取与自动容错机制 |
-| `intraday_chart.go` | 754 | 分时图表 | Braille 字符渲染，智能日期选择，自适应Y轴 |
-| `intraday.go` | 616 | 分时采集 | 后台工作池（最多10并发），每分钟自动更新 |
-| `watchlist.go` | 508 | 自选管理 | 多标签操作、筛选、分组、搜索 |
+| `main.go` | 3,142 | 状态机与事件处理 | 核心应用逻辑，19个状态，Bubble Tea 事件循环 |
+| `intraday.go` | 1,539 | 分时采集 | 后台工作池（最多10并发），每分钟自动更新，智能worker管理 |
+| `api.go` | 1,355 | API 集成 | 多数据源获取与自动容错机制（腾讯、新浪、东方财富） |
+| `intraday_chart.go` | 1,260 | 分时图表 | Braille 字符渲染，智能日期选择，自适应Y轴，搜索模式支持 |
+| `watchlist.go` | 696 | 自选管理 | 多标签操作、筛选、分组、搜索、市场标签、标签分组 |
+| `columns.go` | 492 | 列配置系统 | 可定制表格列，灵活配置 |
+| `persistence.go` | 353 | 数据持久化 | JSON/YAML 读写，备份恢复，数据迁移 |
+| `types.go` | 341 | 数据结构 | Stock, StockData, Config, MarketType, TagGroup 等核心类型 |
+| `intraday_test.go` | 328 | 分时测试 | 市场检测、采集模式、worker管理、数据比较测试 |
 | `sort.go` | 238 | 排序引擎 | 11个持股字段 + 7个自选字段排序 |
-| `types.go` | 215 | 数据结构 | Stock, StockData, Config 等核心类型 |
-| `persistence.go` | 171 | 数据持久化 | JSON/YAML 读写，备份恢复 |
-| `cache.go` | 129 | 价格缓存 | 30秒 TTL，RWMutex 并发保护 |
 | `ui_utils.go` | 194 | UI 工具 | 表格格式化，中文宽度处理，分页 |
+| `timezone.go` | 172 | 时区处理 | 多市场时区转换，交易状态检测 |
+| `debug.go` | 160 | 调试日志 | 1000条缓冲，滚动查看器，条件日志 |
+| `format.go` | 156 | 格式化 | 数字格式化，价格显示，百分比计算 |
+| `cache.go` | 127 | 价格缓存 | 30秒 TTL，RWMutex 并发保护 |
+| `api_test.go` | 87 | API测试 | API回退逻辑、代码转换、港股检测测试 |
 
 ### 技术栈
 

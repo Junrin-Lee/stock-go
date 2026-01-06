@@ -31,17 +31,34 @@ type IntradayData struct {
 	PrevClose  float64             `json:"prev_close,omitempty"` // 昨日收盘价（向后兼容）
 }
 
+// DatapointDiffResult 表示数据点比较结果
+type DatapointDiffResult struct {
+	HasPriceChanges  bool // 是否有价格变化
+	HasNewEntries    bool // 是否有新时间点
+	PriceChangeCount int  // 价格变化数量
+	NewEntryCount    int  // 新时间点数量
+}
+
+// SaveDecision 表示保存决策
+type SaveDecision int
+
+const (
+	SaveDecisionSkip   SaveDecision = iota // 跳过保存（无任何变化）
+	SaveDecisionAppend                     // 追加新数据（仅新时间点）
+	SaveDecisionUpdate                     // 增量更新（有价格变化）
+)
+
 // IntradayManager manages background fetching of intraday data
 type IntradayManager struct {
-	activeStocks   map[string]bool           // Currently tracking stocks
-	workerPool     chan struct{}             // Semaphore for max 10 concurrent workers
-	cancelChan     chan struct{}             // Channel to stop all workers
-	mu             sync.RWMutex              // Protects activeStocks
-	lastFetchTime  map[string]time.Time      // Track last fetch per stock
-	fetchInterval  time.Duration             // 1 minute
+	activeStocks   map[string]bool            // Currently tracking stocks
+	workerPool     chan struct{}              // Semaphore for max 10 concurrent workers
+	cancelChan     chan struct{}              // Channel to stop all workers
+	mu             sync.RWMutex               // Protects activeStocks
+	lastFetchTime  map[string]time.Time       // Track last fetch per stock
+	fetchInterval  time.Duration              // 1 minute
 	workerMetadata map[string]*WorkerMetadata // Track each worker's state
-	metadataMutex  sync.RWMutex              // Protects workerMetadata
-	model          *Model                    // Reference to main model
+	metadataMutex  sync.RWMutex               // Protects workerMetadata
+	model          *Model                     // Reference to main model
 }
 
 // File locks for thread-safe file operations
@@ -88,7 +105,7 @@ func getTradingState(now time.Time, marketType MarketType) TradingState {
 	case MarketUS: // 美股: 09:30-16:00 EST/EDT (无午休)
 		morningStart = time.Date(now.Year(), now.Month(), now.Day(), 9, 30, 0, 0, now.Location())
 		afternoonEnd = time.Date(now.Year(), now.Month(), now.Day(), 16, 0, 0, 0, now.Location())
-		morningEnd = afternoonEnd    // 无午休
+		morningEnd = afternoonEnd     // 无午休
 		afternoonStart = morningStart // 无午休
 
 	case MarketHongKong: // 港股: 09:30-12:00, 13:00-16:00 HKT
@@ -168,8 +185,8 @@ func isDataComplete(stockCode string, date string, marketType MarketType, isLive
 	expectedDatapoints := getExpectedDatapoints(marketType, isLiveMode)
 
 	// 定义完整性标准
-	minDatapoints := 20             // 绝对最小数据点（防止误判）
-	completenessThreshold := 90.0   // 完整性阈值（百分比）
+	minDatapoints := 20           // 绝对最小数据点（防止误判）
+	completenessThreshold := 90.0 // 完整性阈值（百分比）
 
 	// 实时模式使用较低的阈值
 	if isLiveMode {
@@ -325,6 +342,7 @@ func (im *IntradayManager) StartCollection(stockCode, stockName string) error {
 		LastUpdateTime:    time.Now(),
 		DatapointCount:    0,
 		ConsecutiveErrors: 0,
+		ConsecutiveSkips:  0, // 初始化连续跳过计数
 		IsRunning:         true,
 	}
 	im.metadataMutex.Unlock()
@@ -390,11 +408,11 @@ func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate str
 				}
 			}
 
-			// 获取 worker 槽位（限制并发数）
+			//获取 worker 槽位（限制并发数）
 			im.workerPool <- struct{}{}
 			go func() {
 				defer func() { <-im.workerPool }()
-				err := im.fetchAndSaveIntradayData(stockCode, stockName, im.model, true, targetDate)
+				decision, err := im.fetchAndSaveIntradayData(stockCode, stockName, im.model, true, targetDate)
 
 				// 更新元数据
 				im.metadataMutex.Lock()
@@ -402,8 +420,15 @@ func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate str
 					meta.LastUpdateTime = time.Now()
 					if err != nil {
 						meta.ConsecutiveErrors++
+						meta.ConsecutiveSkips = 0 // 重置连续跳过计数
 					} else {
 						meta.ConsecutiveErrors = 0
+						// 根据 SaveDecision 更新计数器
+						if decision == SaveDecisionSkip {
+							meta.ConsecutiveSkips++
+						} else {
+							meta.ConsecutiveSkips = 0 // 有数据变化，重置连续跳过计数
+						}
 					}
 				}
 				im.metadataMutex.Unlock()
@@ -426,7 +451,15 @@ func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate str
 				return
 			}
 
-			// 条件 2: Historical 模式 + 数据完整
+			// 条件 2: 连续 Skip 次数过多（数据完全一致）
+			maxConsecutiveSkips := 3 // 连续 3 次数据完全一致即停止
+			if meta.ConsecutiveSkips >= maxConsecutiveSkips {
+				debugPrint("debug.intraday.consecutiveSkips", stockCode, meta.ConsecutiveSkips)
+				debugPrint("debug.intraday.stopDataStable", stockCode)
+				return
+			}
+
+			// 条件 3: Historical 模式 + 数据完整
 			if mode == CollectionModeHistorical {
 				marketType := getMarketType(stockCode)
 				complete, err := isDataComplete(stockCode, targetDate, marketType, false)
@@ -438,7 +471,7 @@ func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate str
 				}
 			}
 
-			// 条件 3: Live 模式 + 市场关闭 + 数据完整
+			// 条件 4: Live 模式 + 市场关闭 + 数据完整
 			if mode == CollectionModeLive {
 				marketType := getMarketType(stockCode)
 				location, _ := getMarketLocation(marketType)
@@ -449,9 +482,7 @@ func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate str
 					if tradingState == TradingStatePostMarket {
 						complete, err := isDataComplete(stockCode, targetDate, marketType, false)
 						if err == nil && complete {
-							im.model.addDebugLog(fmt.Sprintf(
-								"[Intraday] Worker for %s stopped: market closed and data complete for %s",
-								stockCode, targetDate))
+							debugPrint("debug.intraday.stopPostMarketComplete", stockCode, targetDate)
 							return
 						}
 					}
@@ -525,22 +556,23 @@ func (im *IntradayManager) startWorker(stockCode, stockName string, m *Model) {
 
 // fetchAndSaveIntradayData performs one fetch-merge-save cycle for a stock
 // targetDate: 目标日期 (YYYYMMDD)，如果为空则自动计算
-func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string, m *Model, checkMarketHours bool, targetDate string) error {
+// 返回: (SaveDecision, error) - 保存决策和错误（如果有）
+func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string, m *Model, checkMarketHours bool, targetDate string) (SaveDecision, error) {
 	// Check if market is open (only if requested)
 	if checkMarketHours && !isMarketOpen(stockCode, m) {
-		return nil // Not an error, just skipping
+		return SaveDecisionSkip, nil // Not an error, just skipping
 	}
 
 	// Fetch from API
 	datapoints, err := fetchIntradayDataFromAPI(stockCode)
 	if err != nil {
 		debugPrint("debug.intraday.fetchFail", stockCode, err)
-		return err
+		return SaveDecisionUpdate, err
 	}
 
 	if len(datapoints) == 0 {
 		debugPrint("debug.intraday.noData", stockCode)
-		return fmt.Errorf("no datapoints returned for %s", stockCode)
+		return SaveDecisionUpdate, fmt.Errorf("no datapoints returned for %s", stockCode)
 	}
 
 	// 确定目标日期：优先使用传入的 targetDate，否则根据交易状态计算
@@ -573,7 +605,7 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 	// Ensure directory exists (using new market-based structure)
 	if err := ensureIntradayDirectoryWithMarket(stockCode); err != nil {
 		debugPrint("debug.intraday.mkdirFail", stockCode, err)
-		return err
+		return SaveDecisionUpdate, err
 	}
 
 	// 获取市场类型（用于保存到数据结构）
@@ -595,9 +627,29 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 		}
 	}
 
-	// Merge datapoints (deduplicate by time)
-	existingData.Datapoints = mergeDatapoints(existingData.Datapoints, datapoints)
-	existingData.UpdatedAt = time.Now().Format("2006-01-02 15:04:05")
+	// 增量更新决策逻辑
+	newTimestamp := time.Now().Format("2006-01-02 15:04:05")
+	decision := shouldSaveIntradayData(existingData.Datapoints, datapoints)
+	diff := compareDatapoints(existingData.Datapoints, datapoints)
+
+	switch decision {
+	case SaveDecisionSkip:
+		// 完全无变化，跳过保存
+		debugPrint("debug.intraday.skipSave", stockCode, existingData.UpdatedAt, newTimestamp)
+		return SaveDecisionSkip, nil
+
+	case SaveDecisionAppend:
+		// 仅追加新时间点，更新时间戳
+		existingData.Datapoints = mergeDatapoints(existingData.Datapoints, datapoints)
+		existingData.UpdatedAt = newTimestamp
+		debugPrint("debug.intraday.appendOnly", stockCode, diff.NewEntryCount)
+
+	case SaveDecisionUpdate:
+		// 有价格变化，完整更新
+		existingData.Datapoints = mergeDatapoints(existingData.Datapoints, datapoints)
+		existingData.UpdatedAt = newTimestamp
+		debugPrint("debug.intraday.priceUpdate", stockCode, diff.PriceChangeCount, diff.NewEntryCount)
+	}
 
 	// NEW: 如果 existingData.PrevClose 为空，从缓存获取
 	if existingData.PrevClose == 0 {
@@ -615,11 +667,11 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 	// Write back to file
 	if err := saveIntradayData(filePath, existingData); err != nil {
 		debugPrint("debug.intraday.saveFail", stockCode, err)
-		return err
+		return decision, err
 	}
 
 	debugPrint("debug.intraday.saveSuccess", stockCode, len(existingData.Datapoints))
-	return nil
+	return decision, nil
 }
 
 // fetchIntradayDataFromAPI tries all APIs in fallback order based on market type
@@ -903,6 +955,57 @@ func mergeDatapoints(existing, new []IntradayDataPoint) []IntradayDataPoint {
 	})
 
 	return result
+}
+
+// compareDatapoints 比较已有和新的数据点，检测价格变化
+// 时间复杂度: O(n+m)
+func compareDatapoints(existing, new []IntradayDataPoint) DatapointDiffResult {
+	result := DatapointDiffResult{}
+
+	// 构建已有数据的 map (时间 -> 价格)
+	existingMap := make(map[string]float64, len(existing))
+	for _, dp := range existing {
+		existingMap[dp.Time] = dp.Price
+	}
+
+	// 比较每个新数据点
+	for _, dp := range new {
+		existingPrice, exists := existingMap[dp.Time]
+		if !exists {
+			// 新时间点
+			result.HasNewEntries = true
+			result.NewEntryCount++
+		} else if existingPrice != dp.Price {
+			// 价格变化
+			result.HasPriceChanges = true
+			result.PriceChangeCount++
+		}
+	}
+
+	return result
+}
+
+// shouldSaveIntradayData 决定保存策略
+func shouldSaveIntradayData(existing, new []IntradayDataPoint) SaveDecision {
+	// 首次写入
+	if len(existing) == 0 {
+		return SaveDecisionUpdate
+	}
+
+	diff := compareDatapoints(existing, new)
+
+	// 有价格变化 → 增量更新
+	if diff.HasPriceChanges {
+		return SaveDecisionUpdate
+	}
+
+	// 有新时间点但无价格变化 → 追加
+	if diff.HasNewEntries {
+		return SaveDecisionAppend
+	}
+
+	// 完全无变化 → 跳过
+	return SaveDecisionSkip
 }
 
 // ensureIntradayDirectory creates the directory structure for a stock if needed

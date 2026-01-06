@@ -114,3 +114,215 @@ func TestPadHKStockCodeIntraday(t *testing.T) {
 		}
 	}
 }
+
+// TestCompareDatapoints 测试数据点比较函数
+func TestCompareDatapoints(t *testing.T) {
+	tests := []struct {
+		name               string
+		oldDatapoints      []IntradayDataPoint
+		newDatapoints      []IntradayDataPoint
+		expectedNewCount   int
+		expectedPriceCount int
+		desc               string
+	}{
+		{
+			name: "完全相同的数据",
+			oldDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			expectedNewCount:   0,
+			expectedPriceCount: 0,
+			desc:               "数据完全相同应该返回0个新增和0个价格变化",
+		},
+		{
+			name: "仅有新增时间点",
+			oldDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+				{Time: "09:32", Price: 101.0},
+				{Time: "09:33", Price: 101.5},
+			},
+			expectedNewCount:   2,
+			expectedPriceCount: 0,
+			desc:               "仅追加新时间点，价格变化计数应为0",
+		},
+		{
+			name: "仅有价格变化",
+			oldDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.2}, // 价格变化
+				{Time: "09:31", Price: 100.8}, // 价格变化
+			},
+			expectedNewCount:   0,
+			expectedPriceCount: 2,
+			desc:               "价格变化应该被正确识别",
+		},
+		{
+			name: "同时有新增和价格变化",
+			oldDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.2}, // 价格变化
+				{Time: "09:31", Price: 100.5}, // 价格不变
+				{Time: "09:32", Price: 101.0}, // 新增时间点
+			},
+			expectedNewCount:   1,
+			expectedPriceCount: 1,
+			desc:               "应该同时识别新增时间点和价格变化",
+		},
+		{
+			name:          "空数据对比",
+			oldDatapoints: []IntradayDataPoint{},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+			},
+			expectedNewCount:   1,
+			expectedPriceCount: 0,
+			desc:               "旧数据为空，所有新数据应视为新增",
+		},
+		{
+			name: "价格微小差异（浮点数精度）",
+			oldDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.123},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.123001}, // 微小差异
+			},
+			expectedNewCount:   0,
+			expectedPriceCount: 1,
+			desc:               "即使微小的价格差异也应该被识别",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := compareDatapoints(tt.oldDatapoints, tt.newDatapoints)
+
+			if result.NewEntryCount != tt.expectedNewCount {
+				t.Errorf("%s: NewEntryCount = %d, expected %d",
+					tt.desc, result.NewEntryCount, tt.expectedNewCount)
+			}
+
+			if result.PriceChangeCount != tt.expectedPriceCount {
+				t.Errorf("%s: PriceChangeCount = %d, expected %d",
+					tt.desc, result.PriceChangeCount, tt.expectedPriceCount)
+			}
+		})
+	}
+}
+
+// TestShouldSaveIntradayData 测试保存决策函数
+func TestShouldSaveIntradayData(t *testing.T) {
+	tests := []struct {
+		name               string
+		existingDatapoints []IntradayDataPoint
+		newDatapoints      []IntradayDataPoint
+		expectedDecision   SaveDecision
+		desc               string
+	}{
+		{
+			name:               "首次写入（空数据）",
+			existingDatapoints: []IntradayDataPoint{},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+			},
+			expectedDecision: SaveDecisionUpdate,
+			desc:             "首次写入应该返回Update决策",
+		},
+		{
+			name: "数据完全相同",
+			existingDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			expectedDecision: SaveDecisionSkip,
+			desc:             "数据完全相同应该跳过保存",
+		},
+		{
+			name: "仅有新增时间点（无价格变化）",
+			existingDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+				{Time: "09:32", Price: 101.0},
+				{Time: "09:33", Price: 101.5},
+			},
+			expectedDecision: SaveDecisionAppend,
+			desc:             "仅追加新数据点应该返回Append决策",
+		},
+		{
+			name: "有价格变化（无新增）",
+			existingDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.2}, // 价格变化
+				{Time: "09:31", Price: 100.8}, // 价格变化
+			},
+			expectedDecision: SaveDecisionUpdate,
+			desc:             "有价格变化应该返回Update决策",
+		},
+		{
+			name: "同时有新增和价格变化",
+			existingDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.2}, // 价格变化
+				{Time: "09:31", Price: 100.5}, // 价格不变
+				{Time: "09:32", Price: 101.0}, // 新增时间点
+			},
+			expectedDecision: SaveDecisionUpdate,
+			desc:             "有价格变化时应该优先返回Update决策",
+		},
+		{
+			name: "多个新增时间点（无价格变化）",
+			existingDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+			},
+			newDatapoints: []IntradayDataPoint{
+				{Time: "09:30", Price: 100.0},
+				{Time: "09:31", Price: 100.5},
+				{Time: "09:32", Price: 101.0},
+				{Time: "09:33", Price: 101.5},
+				{Time: "09:34", Price: 102.0},
+			},
+			expectedDecision: SaveDecisionAppend,
+			desc:             "多个新增时间点但无价格变化应该返回Append",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldSaveIntradayData(tt.existingDatapoints, tt.newDatapoints)
+
+			if result != tt.expectedDecision {
+				t.Errorf("%s: shouldSaveIntradayData() = %v, expected %v",
+					tt.desc, result, tt.expectedDecision)
+			}
+		})
+	}
+}
