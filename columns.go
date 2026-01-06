@@ -266,7 +266,7 @@ func buildColumnList(configIDs []string, registry map[ColumnID]*ColumnMetadata) 
 			result = append(result, meta)
 		} else {
 			// 静默忽略无效列ID（在debug模式下会记录）
-			debugPrint("debug.config.invalidColumn", idStr)
+			logDebug("log.config.invalidColumn", idStr)
 		}
 	}
 	return result

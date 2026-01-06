@@ -103,7 +103,7 @@ type SystemConfig struct {
 	Language      string `yaml:"language"`       // 默认语言 "zh" 或 "en"
 	AutoStart     bool   `yaml:"auto_start"`     // 有数据时自动进入监控模式
 	StartupModule string `yaml:"startup_module"` // 启动模块 "portfolio"(持股) 或 "watchlist"(自选)
-	DebugMode     bool   `yaml:"debug_mode"`     // 调试模式开关
+	LogLevel      string `yaml:"log_level"`      // 日志级别 "debug", "info", "warn", "error"
 }
 
 // DisplayConfig 显示设置
@@ -138,10 +138,7 @@ type Model struct {
 	portfolio       Portfolio
 	watchlist       Watchlist // 自选股票列表
 	config          Config    // 系统配置
-	debugMode       bool
 	language        Language
-	debugLogs       []string // 调试日志存储
-	debugScrollPos  int      // debug日志滚动位置
 
 	// For stock addition
 	addingStep         int

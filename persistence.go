@@ -160,7 +160,7 @@ func getDefaultConfig() Config {
 			Language:      "en",        // 默认英文
 			AutoStart:     true,        // 有数据时自动进入监控模式
 			StartupModule: "portfolio", // 默认启动持股模块
-			DebugMode:     false,       // 调试模式关闭
+			LogLevel:      "info",      // 默认日志级别
 		},
 		Display: DisplayConfig{
 			ColorScheme:        "professional", // 专业配色方案
@@ -219,25 +219,25 @@ func loadConfig() Config {
 	// 验证并设置高亮颜色的默认值
 	if config.Display.PortfolioHighlight == "" {
 		config.Display.PortfolioHighlight = "yellow" // 默认黄色背景
-		debugPrint("debug.config.defaultHighlight", config.Display.PortfolioHighlight)
+		logDebug("log.config.defaultHighlight", config.Display.PortfolioHighlight)
 	} else {
-		debugPrint("debug.config.loadedHighlight", config.Display.PortfolioHighlight)
+		logDebug("log.config.loadedHighlight", config.Display.PortfolioHighlight)
 	}
 
 	// 如果 Markets 为空，填充默认值（向后兼容）
 	if config.Markets.China.Timezone == "" {
 		config.Markets = defaultMarketsConfig()
-		debugPrint("debug.config.defaultMarkets", "填充默认市场配置")
+		logDebug("log.config.defaultMarkets", "填充默认市场配置")
 	}
 
 	// 向后兼容：如果列配置为空，使用默认值
 	if len(config.Display.PortfolioColumns) == 0 {
 		config.Display.PortfolioColumns = getDefaultConfig().Display.PortfolioColumns
-		debugPrint("debug.config.defaultPortfolioColumns", "使用默认持股列表列配置")
+		logDebug("log.config.defaultPortfolioColumns", "使用默认持股列表列配置")
 	}
 	if len(config.Display.WatchlistColumns) == 0 {
 		config.Display.WatchlistColumns = getDefaultConfig().Display.WatchlistColumns
-		debugPrint("debug.config.defaultWatchlistColumns", "使用默认自选列表列配置")
+		logDebug("log.config.defaultWatchlistColumns", "使用默认自选列表列配置")
 	}
 
 	// 验证列配置
@@ -294,7 +294,7 @@ func smartMergeRequiredColumns(userConfig []string, required []string, valid map
 			inserted[col] = true
 		} else {
 			// 静默忽略无效列ID，在debug模式下记录
-			debugPrint("debug.config.invalidColumn", col)
+			logDebug("log.config.invalidColumn", col)
 		}
 	}
 

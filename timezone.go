@@ -14,7 +14,7 @@ func parseTimeInMarket(date string, timeStr string, marketConfig MarketConfig) (
 	location, err := time.LoadLocation(marketConfig.Timezone)
 	if err != nil {
 		// 降级到本地时区
-		debugPrint("debug.timezone.loadFail", marketConfig.Timezone, err)
+		logDebug("log.timezone.loadFail", marketConfig.Timezone, err)
 		location = time.Local
 	}
 
@@ -63,7 +63,7 @@ func isMarketOpenForConfig(checkTime time.Time, marketConfig MarketConfig) bool 
 	// 转换检查时间到市场时区
 	location, err := time.LoadLocation(marketConfig.Timezone)
 	if err != nil {
-		debugPrint("debug.timezone.invalidLocation", marketConfig.Timezone, err)
+		logDebug("log.timezone.invalidLocation", marketConfig.Timezone, err)
 		return false
 	}
 
@@ -95,7 +95,7 @@ func isMarketOpenForConfig(checkTime time.Time, marketConfig MarketConfig) bool 
 		endParts := strings.Split(session.EndTime, ":")
 
 		if len(startParts) != 2 || len(endParts) != 2 {
-			debugPrint("debug.timezone.invalidSessionTime", session.StartTime, session.EndTime)
+			logDebug("log.timezone.invalidSessionTime", session.StartTime, session.EndTime)
 			continue
 		}
 
@@ -105,7 +105,7 @@ func isMarketOpenForConfig(checkTime time.Time, marketConfig MarketConfig) bool 
 		endMin, err4 := strconv.Atoi(endParts[1])
 
 		if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
-			debugPrint("debug.timezone.parseSessionTimeFail", session.StartTime, session.EndTime)
+			logDebug("log.timezone.parseSessionTimeFail", session.StartTime, session.EndTime)
 			continue
 		}
 
@@ -139,7 +139,7 @@ func getCurrentDateForMarket(market MarketType, m *Model) string {
 
 	location, err := time.LoadLocation(timezone)
 	if err != nil {
-		debugPrint("debug.timezone.loadFail", timezone, err)
+		logDebug("log.timezone.loadFail", timezone, err)
 		return time.Now().Format("20060102")
 	}
 

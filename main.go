@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -12,7 +13,10 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
-// 类型定义已移动到 types.go
+// globalModel 全局模型引用，用于日志记录的 i18n 支持
+var globalModel *Model
+
+// 获取主菜单项
 // i18n 相关函数已移动到 i18n.go
 
 // 获取主菜单项
@@ -21,7 +25,6 @@ func (m *Model) getMenuItems() []string {
 		m.getText("stockList"),
 		m.getText("watchlist"),
 		m.getText("stockSearch"),
-		m.getText("debugMode"),
 		m.getText("language"),
 		m.getText("exit"),
 	}
@@ -32,6 +35,15 @@ func main() {
 	os.MkdirAll("data", 0755)
 	os.MkdirAll("cmd/conf", 0755)
 	os.MkdirAll("i18n", 0755)
+
+	// 初始化日志系统（在所有初始化之前）
+	logDir := filepath.Join(".", "data", "logs")
+	logLevel := LogInfo // 默认 INFO 级别
+	if err := InitLogger(logDir, logLevel); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer globalLogger.Sync()
 
 	// 加载 i18n 文件
 	loadI18nFiles()
@@ -83,11 +95,8 @@ func main() {
 		portfolio:          portfolio,
 		watchlist:          watchlist,
 		config:             config,
-		debugMode:          config.System.DebugMode,
 		language:           language,
 		lastUpdate:         lastUpdate,
-		debugLogs:          make([]string, 0),
-		debugScrollPos:     0,     // 初始滚动位置
 		portfolioScrollPos: 0,     // 持股列表滚动位置
 		watchlistScrollPos: 0,     // 自选列表滚动位置
 		portfolioCursor:    0,     // 持股列表游标
@@ -125,26 +134,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// debug滚动快捷键，在任何状态下都可用
-		if m.debugMode {
-			keyStr := msg.String()
-
-			switch keyStr {
-			case "pgup":
-				m.scrollDebugUp()
-				return m, nil
-			case "pgdown":
-				m.scrollDebugDown()
-				return m, nil
-			case "home":
-				m.scrollDebugToTop()
-				return m, nil
-			case "end":
-				m.scrollDebugToBottom()
-				return m, nil
-			}
-		}
-
 		// 持股列表和自选列表滚动快捷键
 		if m.state == Monitoring || m.state == WatchlistViewing {
 			keyStr := msg.String()
@@ -246,7 +235,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.stockPriceMutex.Unlock()
-			debugPrint("debug.cache.updated", msg.Symbol)
+			logDebug("log.cache.updated", msg.Symbol)
 
 			// 如果当前在自选列表且已启用排序，重新应用排序以保持顺序正确
 			if m.state == WatchlistViewing && m.watchlistIsSorted {
@@ -265,7 +254,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				entry.IsUpdating = false
 			}
 			m.stockPriceMutex.Unlock()
-			debugPrint("debug.cache.error", msg.Symbol, msg.Error)
+			logError("log.cache.error", msg.Symbol, msg.Error)
 		}
 		newModel, cmd = m, nil
 	case checkDataAvailabilityMsg:
@@ -360,8 +349,7 @@ func (m *Model) View() string {
 		mainContent = ""
 	}
 
-	// 添加调试面板
-	return mainContent + m.renderDebugPanel()
+	return mainContent
 }
 
 func (m *Model) handleMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -389,7 +377,7 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 	m.message = "" // 清除之前的消息
 	switch m.currentMenuItem {
 	case 0: // 股票列表
-		m.logUserAction("debug.action.enterPortfolio")
+		logInfo("log.action.enterPortfolio")
 		m.state = Monitoring
 		m.resetPortfolioCursor() // 重置游标到第一只股票
 		m.lastUpdate = time.Now()
@@ -399,7 +387,7 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 
 		return m, m.tickCmd()
 	case 1: // 自选股票
-		m.logUserAction("debug.action.enterWatchlist")
+		logInfo("log.action.enterWatchlist")
 		m.state = WatchlistViewing
 		m.resetWatchlistCursor() // 重置游标到第一只股票
 		m.cursor = 0
@@ -420,36 +408,23 @@ func (m *Model) executeMenuItem() (tea.Model, tea.Cmd) {
 
 		return m, tea.Batch(cmds...)
 	case 2: // 股票搜索
-		m.logUserAction("debug.action.enterSearch")
+		logInfo("log.action.enterSearch")
 		m.state = SearchingStock
 		m.searchInput = ""
 		m.searchResult = nil
 		m.searchFromWatchlist = false
 		m.message = ""
 		return m, nil
-	case 3: // 调试模式
-		if m.debugMode {
-			m.logUserAction("debug.action.debugOff")
-		} else {
-			m.logUserAction("debug.action.debugOn")
-		}
-		m.debugMode = !m.debugMode
-		m.config.System.DebugMode = m.debugMode
-		// 保存配置到文件
-		if err := saveConfig(m.config); err != nil && m.debugMode {
-			m.message = fmt.Sprintf("Warning: Failed to save config: %v", err)
-		}
-		return m, nil
-	case 4: // 语言选择页面
-		m.logUserAction("debug.action.enterLanguage")
+	case 3: // 语言选择页面
+		logInfo("log.action.enterLanguage")
 		m.state = LanguageSelection
 		m.languageCursor = 0
 		if m.language == English {
 			m.languageCursor = 1
 		}
 		return m, nil
-	case 5: // 退出
-		m.logUserAction("debug.action.exit")
+	case 4: // 退出
+		logInfo("log.action.exit")
 		m.savePortfolio()
 		m.saveWatchlist()
 		return m, tea.Quit
@@ -466,13 +441,7 @@ func (m *Model) viewMainMenu() string {
 			prefix = "► "
 		}
 
-		if item == "debugMode" {
-			debugStatus := m.getText("off")
-			if m.debugMode {
-				debugStatus = m.getText("on")
-			}
-			s += fmt.Sprintf("%s%s: %s\n", prefix, item, debugStatus)
-		} else if i == 4 { // 语言选择
+		if i == 3 { // 语言选择
 			langStatus := m.getText("english")
 			if m.language == Chinese {
 				langStatus = m.getText("chinese")
@@ -572,7 +541,7 @@ func (m *Model) processAddingStep() (tea.Model, tea.Cmd) {
 
 			// 如果直接获取失败，尝试作为搜索关键词搜索
 			if stockData == nil || stockData.Price <= 0 {
-				debugPrint("debug.api.addStockFail", m.input)
+				logWarn("log.api.addStockFail", m.input)
 				stockData = searchStockBySymbol(m.input)
 			}
 		}
@@ -705,7 +674,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = m.getText("emptyPortfolio")
 			return m, nil
 		}
-		m.logUserAction("debug.action.enterEdit")
+		logInfo("log.action.enterEdit")
 		m.previousState = m.state // 记录当前状态
 		m.state = EditingStock
 		m.editingStep = 1 // 开始编辑成本价
@@ -736,7 +705,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "a":
 		// 跳转到添加股票页面
-		m.logUserAction("debug.action.enterAdd")
+		logInfo("log.action.enterAdd")
 		m.previousState = m.state // 记录当前状态
 		m.state = AddingStock
 		m.addingStep = 0
@@ -767,7 +736,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.chartViewDate = actualDate
 		m.previousState = Monitoring
 
-		debugPrint("debug.chart.keyV", selectedStock.Code, selectedStock.Name, m.chartViewDate)
+		logDebug("log.chart.keyV", selectedStock.Code, selectedStock.Name, m.chartViewDate)
 
 		// 尝试加载数据
 		data, loadErr := m.loadIntradayDataForDate(
@@ -778,7 +747,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		if loadErr != nil {
 			// 无数据 - 触发采集
-			debugPrint("debug.chart.noData", loadErr)
+			logDebug("log.chart.noData", loadErr)
 			m.chartData = nil
 			m.chartLoadError = nil
 			m.state = IntradayChartViewing
@@ -790,7 +759,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		// 数据存在 - 创建图表
-		debugPrint("debug.chart.dataLoaded", len(data.Datapoints))
+		logDebug("log.chart.dataLoaded", len(data.Datapoints))
 		m.chartData = data
 		m.chartLoadError = nil
 		m.chartIsCollecting = false
@@ -798,7 +767,7 @@ func (m *Model) handleMonitoring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "s":
 		// 进入排序菜单
-		m.logUserAction("debug.action.enterSort")
+		logInfo("log.action.enterSort")
 		m.state = PortfolioSorting
 		// 智能定位光标到当前排序字段
 		m.portfolioSortCursor = m.findSortFieldIndex(m.portfolioSortField, true)
@@ -968,8 +937,6 @@ func (s *Stock) CalculateTotalQuantity() int {
 
 // API 相关函数 (getStockInfo, getStockPrice, searchStock*, tryXXXAPI 等) 已移动到 api.go
 // 缓存相关函数 (getStockPriceFromCache, startStockPriceUpdates) 已移动到 cache.go
-
-// debug 相关函数 (debugPrint, addDebugLog, renderDebugPanel, logUserAction) 已移动到 debug.go
 // scroll 相关函数 (scrollPortfolioUp/Down, scrollWatchlistUp/Down) 已移动到 scroll.go
 
 func (m *Model) handleEditingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -1143,15 +1110,15 @@ func (m *Model) handleSearchingStock(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = m.getText("enterSearch")[:len(m.getText("enterSearch"))-2] // 去掉": "后缀
 			return m, nil
 		}
-		m.logUserAction(fmt.Sprintf("搜索股票: %s", m.searchInput))
+		logInfo("搜索股票: %s", m.searchInput)
 		m.message = m.getText("searching")
 		m.searchResult = getStockInfo(m.searchInput)
 		if m.searchResult == nil || m.searchResult.Name == "" {
-			m.logUserAction(fmt.Sprintf("搜索失败: %s", m.searchInput))
+			logInfo("搜索失败: %s", m.searchInput)
 			m.message = fmt.Sprintf(m.getText("searchNotFound"), m.searchInput)
 			return m, nil
 		}
-		m.logUserAction(fmt.Sprintf("搜索成功: %s (%s)", m.searchResult.Name, m.searchResult.Symbol))
+		logInfo("搜索成功: %s (%s)", m.searchResult.Name, m.searchResult.Symbol)
 
 		// 标记为搜索模式
 		m.isSearchMode = true
@@ -1389,7 +1356,7 @@ func (m *Model) handleLanguageSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.config.System.Language = "en"
 		}
 		// 保存配置到文件
-		if err := saveConfig(m.config); err != nil && m.debugMode {
+		if err := saveConfig(m.config); err != nil {
 			m.message = fmt.Sprintf("Warning: Failed to save config: %v", err)
 		}
 		// 更新菜单项
@@ -2475,7 +2442,7 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "a":
 		// 跳转到股票搜索页面
-		m.logUserAction("debug.action.watchlistSearch")
+		logInfo("log.action.watchlistSearch")
 		m.state = SearchingStock
 		m.searchInput = ""
 		m.searchResult = nil
@@ -2484,7 +2451,7 @@ func (m *Model) handleWatchlistViewing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "s":
 		// 进入排序菜单
-		m.logUserAction("debug.action.watchlistSort")
+		logInfo("log.action.watchlistSort")
 		m.state = WatchlistSorting
 		// 智能定位光标到当前排序字段
 		m.watchlistSortCursor = m.findSortFieldIndex(m.watchlistSortField, false)
@@ -2708,7 +2675,7 @@ func (m *Model) handleWatchlistSearchConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		if m.searchResult != nil {
 			if m.addToWatchlist(m.searchResult.Symbol, m.searchResult.Name) {
 				m.message = fmt.Sprintf(m.getText("addWatchSuccess"), m.searchResult.Name, m.searchResult.Symbol)
-				m.logUserAction(fmt.Sprintf("添加到自选列表: %s (%s)", m.searchResult.Name, m.searchResult.Symbol))
+				logInfo("添加到自选列表: %s (%s)", m.searchResult.Name, m.searchResult.Symbol)
 			} else {
 				m.message = fmt.Sprintf(m.getText("alreadyInWatch"), m.searchResult.Symbol)
 			}

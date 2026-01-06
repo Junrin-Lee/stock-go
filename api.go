@@ -27,7 +27,7 @@ func getStockInfo(symbol string) *StockData {
 
 		// 如果直接获取失败，尝试作为搜索关键词搜索
 		if stockData == nil || stockData.Price <= 0 {
-			debugPrint("debug.api.directFail", symbol)
+			logError("log.api.directFail", symbol)
 			stockData = searchStockBySymbol(symbol)
 		}
 	}
@@ -86,61 +86,61 @@ func getMarketType(symbol string) MarketType {
 // searchStockBySymbol 通过符号搜索股票（支持美股等国际股票）
 func searchStockBySymbol(symbol string) *StockData {
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	debugPrint("debug.api.symbolSearch", symbol)
+	logDebug("log.api.symbolSearch", symbol)
 
 	// 策略1: 使用TwelveData搜索API
 	result := searchStockByTwelveDataAPI(symbol)
 	if result != nil && result.Price > 0 {
-		debugPrint("debug.api.twelveDataSuccess", result.Name, result.Symbol)
+		logInfo("log.api.twelveDataSuccess", result.Name, result.Symbol)
 		return result
 	}
 
 	// 策略2: 尝试腾讯API（可能支持部分国际股票）
 	result = searchStockByTencentAPI(symbol)
 	if result != nil && result.Price > 0 {
-		debugPrint("debug.api.tencentSuccess", result.Name, result.Symbol)
+		logInfo("log.api.tencentSuccess", result.Name, result.Symbol)
 		return result
 	}
 
 	// 策略3: 尝试新浪API（可能支持部分国际股票）
 	result = searchStockBySinaAPI(symbol)
 	if result != nil && result.Price > 0 {
-		debugPrint("debug.api.sinaSuccess", result.Name, result.Symbol)
+		logInfo("log.api.sinaSuccess", result.Name, result.Symbol)
 		return result
 	}
 
-	debugPrint("debug.api.allSymbolFailed")
+	logDebug("log.api.allSymbolFailed")
 	return nil
 }
 
 // searchChineseStock 通过API搜索中文股票名称
 func searchChineseStock(chineseName string) *StockData {
 	chineseName = strings.TrimSpace(chineseName)
-	debugPrint("debug.api.chineseSearch", chineseName)
+	logDebug("log.api.chineseSearch", chineseName)
 
 	// 策略1: 使用腾讯搜索API
 	result := searchStockByTencentAPI(chineseName)
 	if result != nil && result.Price > 0 {
-		debugPrint("debug.api.tencentSearchSuccess", result.Name, result.Symbol)
+		logInfo("log.api.tencentSearchSuccess", result.Name, result.Symbol)
 		return result
 	}
 
 	// 策略2: 尝试新浪财经搜索API
 	result = searchStockBySinaAPI(chineseName)
 	if result != nil && result.Price > 0 {
-		debugPrint("debug.api.sinaSearchSuccess", result.Name, result.Symbol)
+		logInfo("log.api.sinaSearchSuccess", result.Name, result.Symbol)
 		return result
 	}
 
 	// 策略3: 尝试更多的搜索关键词变形
 	result = tryAdvancedSearch(chineseName)
 	if result != nil && result.Price > 0 {
-		debugPrint("debug.api.advancedSearchSuccess", result.Name, result.Symbol)
+		logInfo("log.api.advancedSearchSuccess", result.Name, result.Symbol)
 		return result
 	}
 
 	// 所有搜索策略都失败
-	debugPrint("debug.api.allSearchFailed")
+	logDebug("log.api.allSearchFailed")
 	return nil
 }
 
@@ -150,27 +150,27 @@ func searchChineseStock(chineseName string) *StockData {
 
 // searchStockByTwelveDataAPI 使用TwelveData搜索API查找股票
 func searchStockByTwelveDataAPI(keyword string) *StockData {
-	debugPrint("debug.api.twelveDataSearchStart", keyword)
+	logDebug("log.api.twelveDataSearchStart", keyword)
 
 	// 先尝试符号搜索
 	searchUrl := fmt.Sprintf("https://api.twelvedata.com/symbol_search?symbol=%s&apikey=demo", keyword)
-	debugPrint("debug.api.twelveDataSearchUrl", searchUrl)
+	logDebug("log.api.twelveDataSearchUrl", searchUrl)
 
 	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Get(searchUrl)
 	if err != nil {
-		debugPrint("debug.api.twelveDataSearchHttpFail", err)
+		logError("log.api.twelveDataSearchHttpFail", err)
 		return nil
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debugPrint("debug.api.twelveDataSearchReadFail", err)
+		logError("log.api.twelveDataSearchReadFail", err)
 		return nil
 	}
 
-	debugPrint("debug.api.twelveDataSearchResponse", string(body))
+	logDebug("log.api.twelveDataSearchResponse", string(body))
 
 	var searchResult struct {
 		Data []struct {
@@ -182,12 +182,12 @@ func searchStockByTwelveDataAPI(keyword string) *StockData {
 	}
 
 	if err := json.Unmarshal(body, &searchResult); err != nil {
-		debugPrint("debug.api.twelveDataSearchJsonFail", err)
+		logError("log.api.twelveDataSearchJsonFail", err)
 		return nil
 	}
 
 	if len(searchResult.Data) == 0 {
-		debugPrint("debug.api.twelveDataSearchNoMatch")
+		logDebug("log.api.twelveDataSearchNoMatch")
 		return nil
 	}
 
@@ -207,7 +207,7 @@ func searchStockByTwelveDataAPI(keyword string) *StockData {
 		selectedName = searchResult.Data[0].InstrumentName
 	}
 
-	debugPrint("debug.api.twelveDataSearchSelect", selectedName, selectedSymbol)
+	logDebug("log.api.twelveDataSearchSelect", selectedName, selectedSymbol)
 
 	// 获取股票报价
 	return tryTwelveDataAPI(selectedSymbol)
@@ -216,37 +216,37 @@ func searchStockByTwelveDataAPI(keyword string) *StockData {
 // tryTwelveDataAPI 使用TwelveData API获取股票报价
 func tryTwelveDataAPI(symbol string) *StockData {
 	convertedSymbol := strings.ToUpper(strings.TrimSpace(symbol))
-	debugPrint("debug.api.twelveDataConvert", symbol, convertedSymbol)
+	logDebug("log.api.twelveDataConvert", symbol, convertedSymbol)
 
 	// 使用TwelveData API获取股票报价
 	url := fmt.Sprintf("https://api.twelvedata.com/quote?symbol=%s&apikey=demo", convertedSymbol)
-	debugPrint("debug.api.twelveDataUrl", url)
+	logDebug("log.api.twelveDataUrl", url)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		debugPrint("debug.api.twelveDataHttpFail", err)
+		logError("log.api.twelveDataHttpFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debugPrint("debug.api.twelveDataReadFail", err)
+		logError("log.api.twelveDataReadFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
-	debugPrint("debug.api.twelveDataResponse", string(body))
+	logDebug("log.api.twelveDataResponse", string(body))
 
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		debugPrint("debug.api.twelveDataJsonFail", err)
+		logError("log.api.twelveDataJsonFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	// 检查是否有错误信息
 	if errMsg, hasErr := result["message"]; hasErr {
-		debugPrint("debug.api.twelveDataApiError", errMsg)
+		logError("log.api.twelveDataApiError", errMsg)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -260,24 +260,24 @@ func tryTwelveDataAPI(symbol string) *StockData {
 	prevCloseStr, prevOk := result["previous_close"].(string)
 
 	if !closeOk || !prevOk {
-		debugPrint("debug.api.twelveDataInvalidData")
+		logDebug("log.api.twelveDataInvalidData")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	current, err := strconv.ParseFloat(closeStr, 64)
 	if err != nil {
-		debugPrint("debug.api.twelveDataPriceFail", err)
+		logError("log.api.twelveDataPriceFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	previous, err := strconv.ParseFloat(prevCloseStr, 64)
 	if err != nil {
-		debugPrint("debug.api.twelveDataPrevCloseFail", err)
+		logError("log.api.twelveDataPrevCloseFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	if current <= 0 {
-		debugPrint("debug.api.twelveDataInvalidPrice")
+		logDebug("log.api.twelveDataInvalidPrice")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -304,7 +304,7 @@ func tryTwelveDataAPI(symbol string) *StockData {
 		changePercent = (change / previous) * 100
 	}
 
-	debugPrint("debug.api.twelveDataGetSuccess",
+	logInfo("log.api.twelveDataGetSuccess",
 		name, current, change, changePercent, openPrice, maxPrice, minPrice, volume)
 
 	return &StockData{
@@ -328,16 +328,16 @@ func tryTwelveDataAPI(symbol string) *StockData {
 
 // searchStockByTencentAPI 使用腾讯搜索API查找股票
 func searchStockByTencentAPI(keyword string) *StockData {
-	debugPrint("debug.api.tencentSearchStart", keyword)
+	logDebug("log.api.tencentSearchStart", keyword)
 
 	// 腾讯股票搜索API URL - 使用t=all支持A股、港股、美股搜索
 	url := fmt.Sprintf("https://smartbox.gtimg.cn/s3/?q=%s&t=all", keyword)
-	debugPrint("debug.api.tencentSearchUrl", url)
+	logDebug("log.api.tencentSearchUrl", url)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		debugPrint("debug.api.tencentSearchReqFail", err)
+		logError("log.api.tencentSearchReqFail", err)
 		return nil
 	}
 
@@ -349,28 +349,28 @@ func searchStockByTencentAPI(keyword string) *StockData {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		debugPrint("debug.api.tencentSearchHttpFail", err)
+		logError("log.api.tencentSearchHttpFail", err)
 		return nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		debugPrint("debug.api.tencentSearchStatusFail", resp.StatusCode)
+		logError("log.api.tencentSearchStatusFail", resp.StatusCode)
 		return nil
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debugPrint("debug.api.tencentSearchReadFail", err)
+		logError("log.api.tencentSearchReadFail", err)
 		return nil
 	}
 
 	content, err := gbkToUtf8(body)
 	if err != nil {
-		debugPrint("debug.api.tencentSearchEncodeFail", err)
+		logError("log.api.tencentSearchEncodeFail", err)
 		content = string(body)
 	}
-	debugPrint("debug.api.tencentSearchResponse", content[:min(300, len(content))])
+	logDebug("log.api.tencentSearchResponse", content[:min(300, len(content))])
 
 	// 解析搜索结果
 	return parseSearchResults(content, keyword)
@@ -379,15 +379,15 @@ func searchStockByTencentAPI(keyword string) *StockData {
 // tryTencentAPI 使用腾讯API获取股票价格
 func tryTencentAPI(symbol string) *StockData {
 	tencentSymbol := convertStockSymbolForTencent(symbol)
-	debugPrint("debug.api.tencentConvert", symbol, tencentSymbol)
+	logDebug("log.api.tencentConvert", symbol, tencentSymbol)
 
 	url := fmt.Sprintf("https://qt.gtimg.cn/q=%s", tencentSymbol)
-	debugPrint("debug.api.tencentUrl", url)
+	logDebug("log.api.tencentUrl", url)
 
 	client := &http.Client{Timeout: 8 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		debugPrint("debug.api.tencentReqFail", err)
+		logError("log.api.tencentReqFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -399,32 +399,32 @@ func tryTencentAPI(symbol string) *StockData {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		debugPrint("debug.api.tencentHttpFail", err)
+		logError("log.api.tencentHttpFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debugPrint("debug.api.tencentReadFail", err)
+		logError("log.api.tencentReadFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	content, err := gbkToUtf8(body)
 	if err != nil {
-		debugPrint("debug.api.tencentEncodeFail", err)
+		logError("log.api.tencentEncodeFail", err)
 		content = string(body)
 	}
-	debugPrint("debug.api.tencentResponse", content[:min(100, len(content))])
+	logDebug("log.api.tencentResponse", content[:min(100, len(content))])
 
 	if !strings.Contains(content, "~") {
-		debugPrint("debug.api.tencentFormatError")
+		logError("log.api.tencentFormatError")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	fields := strings.Split(content, "~")
 	if len(fields) < 5 {
-		debugPrint("debug.api.tencentFieldsError")
+		logError("log.api.tencentFieldsError")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -432,13 +432,13 @@ func tryTencentAPI(symbol string) *StockData {
 
 	price, err := strconv.ParseFloat(fields[3], 64)
 	if err != nil || price <= 0 {
-		debugPrint("debug.api.tencentPriceError", fields[3])
+		logError("log.api.tencentPriceError", fields[3])
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	previousClose, err := strconv.ParseFloat(fields[4], 64)
 	if err != nil || previousClose <= 0 {
-		debugPrint("debug.api.tencentPrevCloseError", fields[4])
+		logError("log.api.tencentPrevCloseError", fields[4])
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -466,7 +466,7 @@ func tryTencentAPI(symbol string) *StockData {
 	change := price - previousClose
 	changePercent := (change / previousClose) * 100
 
-	debugPrint("debug.api.tencentSuccess", stockName, price, change, changePercent, openPrice, maxPrice, minPrice, turnoverRate, volume)
+	logInfo("log.api.tencentSuccess", stockName, price, change, changePercent, openPrice, maxPrice, minPrice, turnoverRate, volume)
 
 	return &StockData{
 		Symbol:        symbol,
@@ -529,7 +529,7 @@ func padHKStockCode(code string) string {
 
 // parseSearchResults 解析腾讯搜索结果
 func parseSearchResults(content, keyword string) *StockData {
-	debugPrint("debug.api.parseSearchStart")
+	logDebug("log.api.parseSearchStart")
 
 	// 尝试解析新的腾讯格式 (v_hint=)
 	result := parseTencentHintFormat(content)
@@ -550,7 +550,7 @@ func parseSearchResults(content, keyword string) *StockData {
 // parseTencentHintFormat 解析腾讯Hint格式的搜索结果
 func parseTencentHintFormat(content string) *StockData {
 	// 格式: v_hint="sz~000880~潍柴重机~wczj~GP-A"
-	debugPrint("debug.api.tryTencentHint")
+	logDebug("log.api.tryTencentHint")
 
 	// 查找v_hint=
 	if !strings.Contains(content, "v_hint=") {
@@ -570,12 +570,12 @@ func parseTencentHintFormat(content string) *StockData {
 	}
 
 	data := content[startPos : startPos+endPos]
-	debugPrint("debug.api.extractedData", data)
+	logDebug("log.api.extractedData", data)
 
 	// 按^分割多个结果，取第一个
 	results := strings.Split(data, "^")
 	if len(results) == 0 {
-		debugPrint("debug.api.noSearchResult")
+		logDebug("log.api.noSearchResult")
 		return nil
 	}
 
@@ -583,7 +583,7 @@ func parseTencentHintFormat(content string) *StockData {
 	firstResult := results[0]
 	fields := strings.Split(firstResult, "~")
 	if len(fields) < 3 {
-		debugPrint("debug.api.fieldsNotEnough", len(fields))
+		logDebug("log.api.fieldsNotEnough", len(fields))
 		return nil
 	}
 
@@ -597,13 +597,13 @@ func parseTencentHintFormat(content string) *StockData {
 		name = decodedName
 	}
 
-	debugPrint("debug.api.parseResultDetail", market, code, name)
+	logDebug("log.api.parseResultDetail", market, code, name)
 
 	// 对于搜索结果，直接返回第一个匹配项（因为用户输入的关键词已经被API处理过了）
 	if true {
 		// 转换为标准格式
 		standardCode := strings.ToUpper(market) + code
-		debugPrint("debug.api.tencentHintFound", name, standardCode)
+		logDebug("log.api.tencentHintFound", name, standardCode)
 
 		// 获取详细信息
 		stockData := getStockPrice(standardCode)
@@ -622,20 +622,20 @@ func parseJSONSearchResults(content, keyword string) *StockData {
 	// 尝试解析为JSON
 	var searchResult map[string]interface{}
 	if err := json.Unmarshal([]byte(content), &searchResult); err != nil {
-		debugPrint("debug.api.jsonParseFail", err)
+		logError("log.api.jsonParseFail", err)
 		return nil
 	}
 
 	// 查找数据字段
 	data, ok := searchResult["data"]
 	if !ok {
-		debugPrint("debug.api.noDataField")
+		logDebug("log.api.noDataField")
 		return nil
 	}
 
 	dataArray, ok := data.([]interface{})
 	if !ok {
-		debugPrint("debug.api.dataNotArray")
+		logDebug("log.api.dataNotArray")
 		return nil
 	}
 
@@ -655,7 +655,7 @@ func parseJSONSearchResults(content, keyword string) *StockData {
 
 		// 检查名称是否匹配关键词
 		if strings.Contains(name, keyword) {
-			debugPrint("debug.api.jsonFormatFound", name, code)
+			logDebug("log.api.jsonFormatFound", name, code)
 
 			// 转换为标准格式
 			standardCode := convertJSONCodeToStandard(code)
@@ -675,7 +675,7 @@ func parseJSONSearchResults(content, keyword string) *StockData {
 
 // parseLegacySearchResults 解析旧格式的搜索结果
 func parseLegacySearchResults(content, keyword string) *StockData {
-	debugPrint("debug.api.useLegacyFormat")
+	logDebug("log.api.useLegacyFormat")
 	// 腾讯搜索结果格式分析
 	// 格式类似: v_s_关键词="sz002415~海康威视~002415~7.450~-0.160~-2.105~15270~7705~7565~7.610"
 	lines := strings.Split(content, "\n")
@@ -707,7 +707,7 @@ func parseLegacySearchResults(content, keyword string) *StockData {
 
 		// 检查名称是否匹配关键词
 		if strings.Contains(name, keyword) {
-			debugPrint("debug.api.legacyFormatFound", name, code)
+			logDebug("log.api.legacyFormatFound", name, code)
 
 			// 转换为标准格式
 			standardCode := convertToStandardCode(code, shortCode)
@@ -768,28 +768,28 @@ func convertToStandardCode(code, shortCode string) string {
 
 // searchStockBySinaAPI 使用新浪财经搜索API查找股票
 func searchStockBySinaAPI(keyword string) *StockData {
-	debugPrint("debug.api.sinaSearchStart", keyword)
+	logDebug("log.api.sinaSearchStart", keyword)
 
 	// 新浪财经搜索API URL
 	url := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,13,14,15&key=%s", keyword)
-	debugPrint("debug.api.sinaRequestUrl", url)
+	logDebug("log.api.sinaRequestUrl", url)
 
 	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		debugPrint("debug.api.sinaHttpFail", err)
+		logError("log.api.sinaHttpFail", err)
 		return nil
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debugPrint("debug.api.sinaReadFail", err)
+		logError("log.api.sinaReadFail", err)
 		return nil
 	}
 
 	content := string(body)
-	debugPrint("debug.api.sinaResponse", content)
+	logDebug("log.api.sinaResponse", content)
 
 	// 解析新浪搜索结果
 	return parseSinaSearchResults(content, keyword)
@@ -824,7 +824,7 @@ func parseSinaSearchResults(content, keyword string) *StockData {
 
 		// 检查名称是否匹配关键词
 		if strings.Contains(name, keyword) {
-			debugPrint("debug.api.sinaSearchFound", name, code)
+			logDebug("log.api.sinaSearchFound", name, code)
 
 			// 转换为标准格式
 			standardCode := convertSinaCodeToStandard(code)
@@ -885,7 +885,7 @@ func tryAdvancedSearch(chineseName string) *StockData {
 			continue // 跳过原始关键词，避免重复搜索
 		}
 
-		debugPrint("debug.api.tryKeywordVariation", keyword)
+		logDebug("log.api.tryKeywordVariation", keyword)
 		result := searchStockByTencentAPI(keyword)
 		if result != nil && result.Price > 0 {
 			return result
@@ -947,16 +947,16 @@ func generateSearchKeywords(name string) []string {
 // tryFMPFreeAPI 使用免费的Financial Modeling Prep API (不需要API key的基础功能)
 func tryFMPFreeAPI(symbol string) *StockData {
 	convertedSymbol := strings.ToUpper(strings.TrimSpace(symbol))
-	debugPrint("debug.api.fmpSearch", convertedSymbol)
+	logDebug("log.api.fmpSearch", convertedSymbol)
 
 	// 尝试使用免费的实时报价接口
 	url := fmt.Sprintf("https://financialmodelingprep.com/api/v3/quote/%s", convertedSymbol)
-	debugPrint("debug.api.fmpRequestUrl", url)
+	logDebug("log.api.fmpRequestUrl", url)
 
 	client := &http.Client{Timeout: 8 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		debugPrint("debug.api.fmpRequestFail", err)
+		logError("log.api.fmpRequestFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -965,33 +965,33 @@ func tryFMPFreeAPI(symbol string) *StockData {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		debugPrint("debug.api.fmpHttpFail", err)
+		logError("log.api.fmpHttpFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debugPrint("debug.api.fmpReadFail", err)
+		logError("log.api.fmpReadFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
-	debugPrint("debug.api.fmpResponse", string(body))
+	logDebug("log.api.fmpResponse", string(body))
 
 	// 检查是否是错误响应
 	if strings.Contains(string(body), "Error Message") {
-		debugPrint("debug.api.fmpError")
+		logError("log.api.fmpError")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	var results []map[string]any
 	if err := json.Unmarshal(body, &results); err != nil {
-		debugPrint("debug.api.fmpJsonFail", err)
+		logError("log.api.fmpJsonFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	if len(results) == 0 {
-		debugPrint("debug.api.fmpNoData")
+		logDebug("log.api.fmpNoData")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -1029,7 +1029,7 @@ func tryFMPFreeAPI(symbol string) *StockData {
 	}
 
 	if price <= 0 {
-		debugPrint("debug.api.fmpPriceInvalid")
+		logDebug("log.api.fmpPriceInvalid")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -1039,7 +1039,7 @@ func tryFMPFreeAPI(symbol string) *StockData {
 		changePercent = (change / previousClose) * 100
 	}
 
-	debugPrint("debug.api.fmpSuccess", name, price, change, changePercent)
+	logInfo("log.api.fmpSuccess", name, price, change, changePercent)
 
 	return &StockData{
 		Symbol:        symbol,
@@ -1063,16 +1063,16 @@ func tryFMPFreeAPI(symbol string) *StockData {
 // tryYahooFinanceAPI 使用Yahoo Finance API作为备用方案
 func tryYahooFinanceAPI(symbol string) *StockData {
 	convertedSymbol := strings.ToUpper(strings.TrimSpace(symbol))
-	debugPrint("debug.api.yahooSearch", convertedSymbol)
+	logDebug("log.api.yahooSearch", convertedSymbol)
 
 	// 使用Yahoo Finance的chart API接口，这个接口更稳定
 	url := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=1d", convertedSymbol)
-	debugPrint("debug.api.yahooRequestUrl", url)
+	logDebug("log.api.yahooRequestUrl", url)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		debugPrint("debug.api.yahooRequestFail", err)
+		logError("log.api.yahooRequestFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -1084,23 +1084,23 @@ func tryYahooFinanceAPI(symbol string) *StockData {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		debugPrint("debug.api.yahooHttpFail", err)
+		logError("log.api.yahooHttpFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 429 {
-		debugPrint("debug.api.yahooRateLimit")
+		logDebug("log.api.yahooRateLimit")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debugPrint("debug.api.yahooReadFail", err)
+		logError("log.api.yahooReadFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
-	debugPrint("debug.api.yahooResponse", string(body))
+	logDebug("log.api.yahooResponse", string(body))
 
 	var yahooResp struct {
 		Chart struct {
@@ -1130,17 +1130,17 @@ func tryYahooFinanceAPI(symbol string) *StockData {
 	}
 
 	if err := json.Unmarshal(body, &yahooResp); err != nil {
-		debugPrint("debug.api.yahooJsonFail", err)
+		logError("log.api.yahooJsonFail", err)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	if yahooResp.Chart.Error != nil {
-		debugPrint("debug.api.yahooError", yahooResp.Chart.Error)
+		logError("log.api.yahooError", yahooResp.Chart.Error)
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
 	if len(yahooResp.Chart.Result) == 0 {
-		debugPrint("debug.api.yahooNoData")
+		logDebug("log.api.yahooNoData")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -1148,7 +1148,7 @@ func tryYahooFinanceAPI(symbol string) *StockData {
 	meta := result.Meta
 
 	if meta.RegularMarketPrice <= 0 {
-		debugPrint("debug.api.yahooPriceInvalid")
+		logDebug("log.api.yahooPriceInvalid")
 		return &StockData{Symbol: symbol, Price: 0}
 	}
 
@@ -1194,7 +1194,7 @@ func tryYahooFinanceAPI(symbol string) *StockData {
 		name = symbol
 	}
 
-	debugPrint("debug.api.yahooSuccess", name, meta.RegularMarketPrice, change, changePercent, openPrice, highPrice, lowPrice, volume)
+	logInfo("log.api.yahooSuccess", name, meta.RegularMarketPrice, change, changePercent, openPrice, highPrice, lowPrice, volume)
 
 	return &StockData{
 		Symbol:        symbol,
@@ -1221,21 +1221,21 @@ func getStockPrice(symbol string) *StockData {
 		data := tryTencentAPI(symbol)
 		if data.Price > 0 {
 			if isHKStock(symbol) && data.TurnoverRate == 0 {
-				debugPrint("debug.api.hkTurnoverMissing", symbol)
+				logDebug("log.api.hkTurnoverMissing", symbol)
 				turnover, volume, err := tryEastMoneyHKTurnover(symbol)
 				if err == nil {
 					data.TurnoverRate = turnover
 					if volume > 0 {
 						data.Volume = volume
 					}
-					debugPrint("debug.api.hkTurnoverEnhanced", symbol, turnover)
+					logDebug("log.api.hkTurnoverEnhanced", symbol, turnover)
 				} else {
-					debugPrint("debug.api.hkTurnoverFallbackFail", err)
+					logError("log.api.hkTurnoverFallbackFail", err)
 				}
 			}
 			return data
 		}
-		debugPrint("debug.api.tencentFail")
+		logError("log.api.tencentFail")
 	}
 
 	data := tryFinnhubAPI(symbol)
@@ -1243,7 +1243,7 @@ func getStockPrice(symbol string) *StockData {
 		return data
 	}
 
-	debugPrint("debug.api.allApiFail")
+	logError("log.api.allApiFail")
 	return nil
 }
 
@@ -1267,7 +1267,7 @@ func tryFinnhubAPI(symbol string) *StockData {
 		return data
 	}
 
-	debugPrint("debug.api.allUsApiFail")
+	logError("log.api.allUsApiFail")
 	return &StockData{Symbol: symbol, Price: 0}
 }
 
@@ -1289,19 +1289,19 @@ func tryEastMoneyHKTurnover(symbol string) (float64, int64, error) {
 		"https://push2.eastmoney.com/api/qt/stock/get?secid=%s&fields=f47,f168",
 		emCode,
 	)
-	debugPrint("debug.api.eastmoneyTurnoverUrl", url)
+	logDebug("log.api.eastmoneyTurnoverUrl", url)
 
 	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		debugPrint("debug.api.eastmoneyTurnoverHttpFail", err)
+		logError("log.api.eastmoneyTurnoverHttpFail", err)
 		return 0, 0, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debugPrint("debug.api.eastmoneyTurnoverReadFail", err)
+		logError("log.api.eastmoneyTurnoverReadFail", err)
 		return 0, 0, err
 	}
 
@@ -1313,7 +1313,7 @@ func tryEastMoneyHKTurnover(symbol string) (float64, int64, error) {
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		debugPrint("debug.api.eastmoneyTurnoverJsonFail", err)
+		logError("log.api.eastmoneyTurnoverJsonFail", err)
 		return 0, 0, err
 	}
 
@@ -1321,7 +1321,7 @@ func tryEastMoneyHKTurnover(symbol string) (float64, int64, error) {
 	turnover := float64(result.Data.F168) / 100.0
 	volume := result.Data.F47
 
-	debugPrint("debug.api.eastmoneyTurnoverSuccess", symbol, turnover, volume)
+	logInfo("log.api.eastmoneyTurnoverSuccess", symbol, turnover, volume)
 	return turnover, volume, nil
 }
 

@@ -317,9 +317,8 @@ func (im *IntradayManager) StartCollection(stockCode, stockName string) error {
 
 	// 步骤 2: 如果数据已完整，跳过启动 worker
 	if mode == CollectionModeComplete {
-		im.model.addDebugLog(fmt.Sprintf(
-			"[Intraday] Skipping %s: data already complete for %s",
-			stockCode, targetDate))
+		logInfoDirect("[Intraday] Skipping %s: data already complete for %s",
+			stockCode, targetDate)
 		return nil
 	}
 
@@ -327,7 +326,7 @@ func (im *IntradayManager) StartCollection(stockCode, stockName string) error {
 	im.mu.Lock()
 	if im.activeStocks[stockCode] {
 		im.mu.Unlock()
-		im.model.addDebugLog(fmt.Sprintf("[Intraday] Worker already running for %s", stockCode))
+		logInfoDirect("[Intraday] Worker already running for %s", stockCode)
 		return nil
 	}
 	im.mu.Unlock()
@@ -348,9 +347,8 @@ func (im *IntradayManager) StartCollection(stockCode, stockName string) error {
 	im.metadataMutex.Unlock()
 
 	// 步骤 5: 启动智能 worker
-	im.model.addDebugLog(fmt.Sprintf(
-		"[Intraday] Starting %s collection for %s (target: %s)",
-		mode.String(), stockCode, targetDate))
+	logInfoDirect("[Intraday] Starting %s collection for %s (target: %s)",
+		mode.String(), stockCode, targetDate)
 
 	go im.startSmartWorker(stockCode, stockName, targetDate, mode)
 
@@ -380,7 +378,7 @@ func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate str
 		}
 		im.metadataMutex.Unlock()
 
-		im.model.addDebugLog(fmt.Sprintf("[Intraday] Worker stopped for %s", stockCode))
+		logInfoDirect("[Intraday] Worker stopped for %s", stockCode)
 	}()
 
 	// 创建定时器（1分钟间隔）
@@ -445,17 +443,16 @@ func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate str
 
 			// 条件 1: 连续错误过多
 			if meta.ConsecutiveErrors >= maxConsecutiveErrors {
-				im.model.addDebugLog(fmt.Sprintf(
-					"[Intraday] Worker for %s stopped: %d consecutive errors",
-					stockCode, meta.ConsecutiveErrors))
+				logInfoDirect("[Intraday] Worker for %s stopped: %d consecutive errors",
+					stockCode, meta.ConsecutiveErrors)
 				return
 			}
 
 			// 条件 2: 连续 Skip 次数过多（数据完全一致）
 			maxConsecutiveSkips := 3 // 连续 3 次数据完全一致即停止
 			if meta.ConsecutiveSkips >= maxConsecutiveSkips {
-				debugPrint("debug.intraday.consecutiveSkips", stockCode, meta.ConsecutiveSkips)
-				debugPrint("debug.intraday.stopDataStable", stockCode)
+				logDebug("log.intraday.consecutiveSkips", stockCode, meta.ConsecutiveSkips)
+				logDebug("log.intraday.stopDataStable", stockCode)
 				return
 			}
 
@@ -464,9 +461,8 @@ func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate str
 				marketType := getMarketType(stockCode)
 				complete, err := isDataComplete(stockCode, targetDate, marketType, false)
 				if err == nil && complete {
-					im.model.addDebugLog(fmt.Sprintf(
-						"[Intraday] Worker for %s stopped: historical data complete for %s",
-						stockCode, targetDate))
+					logInfoDirect("[Intraday] Worker for %s stopped: historical data complete for %s",
+						stockCode, targetDate)
 					return
 				}
 			}
@@ -482,7 +478,7 @@ func (im *IntradayManager) startSmartWorker(stockCode, stockName, targetDate str
 					if tradingState == TradingStatePostMarket {
 						complete, err := isDataComplete(stockCode, targetDate, marketType, false)
 						if err == nil && complete {
-							debugPrint("debug.intraday.stopPostMarketComplete", stockCode, targetDate)
+							logDebug("log.intraday.stopPostMarketComplete", stockCode, targetDate)
 							return
 						}
 					}
@@ -513,10 +509,10 @@ func (im *IntradayManager) startWorker(stockCode, stockName string, m *Model) {
 			im.mu.Lock()
 			delete(im.activeStocks, stockCode)
 			im.mu.Unlock()
-			debugPrint("debug.intraday.workerStop", stockCode)
+			logDebug("log.intraday.workerStop", stockCode)
 		}()
 
-		debugPrint("debug.intraday.workerStart", stockCode, stockName)
+		logDebug("log.intraday.workerStart", stockCode, stockName)
 
 		// Create ticker
 		ticker := time.NewTicker(im.fetchInterval)
@@ -566,12 +562,12 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 	// Fetch from API
 	datapoints, err := fetchIntradayDataFromAPI(stockCode)
 	if err != nil {
-		debugPrint("debug.intraday.fetchFail", stockCode, err)
+		logDebug("log.intraday.fetchFail", stockCode, err)
 		return SaveDecisionUpdate, err
 	}
 
 	if len(datapoints) == 0 {
-		debugPrint("debug.intraday.noData", stockCode)
+		logDebug("log.intraday.noData", stockCode)
 		return SaveDecisionUpdate, fmt.Errorf("no datapoints returned for %s", stockCode)
 	}
 
@@ -604,7 +600,7 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 
 	// Ensure directory exists (using new market-based structure)
 	if err := ensureIntradayDirectoryWithMarket(stockCode); err != nil {
-		debugPrint("debug.intraday.mkdirFail", stockCode, err)
+		logDebug("log.intraday.mkdirFail", stockCode, err)
 		return SaveDecisionUpdate, err
 	}
 
@@ -635,20 +631,20 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 	switch decision {
 	case SaveDecisionSkip:
 		// 完全无变化，跳过保存
-		debugPrint("debug.intraday.skipSave", stockCode, existingData.UpdatedAt, newTimestamp)
+		logDebug("log.intraday.skipSave", stockCode, existingData.UpdatedAt, newTimestamp)
 		return SaveDecisionSkip, nil
 
 	case SaveDecisionAppend:
 		// 仅追加新时间点，更新时间戳
 		existingData.Datapoints = mergeDatapoints(existingData.Datapoints, datapoints)
 		existingData.UpdatedAt = newTimestamp
-		debugPrint("debug.intraday.appendOnly", stockCode, diff.NewEntryCount)
+		logDebug("log.intraday.appendOnly", stockCode, diff.NewEntryCount)
 
 	case SaveDecisionUpdate:
 		// 有价格变化，完整更新
 		existingData.Datapoints = mergeDatapoints(existingData.Datapoints, datapoints)
 		existingData.UpdatedAt = newTimestamp
-		debugPrint("debug.intraday.priceUpdate", stockCode, diff.PriceChangeCount, diff.NewEntryCount)
+		logDebug("log.intraday.priceUpdate", stockCode, diff.PriceChangeCount, diff.NewEntryCount)
 	}
 
 	// NEW: 如果 existingData.PrevClose 为空，从缓存获取
@@ -660,17 +656,17 @@ func (im *IntradayManager) fetchAndSaveIntradayData(stockCode, stockName string,
 		m.stockPriceMutex.RUnlock()
 
 		if existingData.PrevClose > 0 {
-			debugPrint("debug.intraday.prevCloseSet", stockCode, existingData.PrevClose)
+			logDebug("log.intraday.prevCloseSet", stockCode, existingData.PrevClose)
 		}
 	}
 
 	// Write back to file
 	if err := saveIntradayData(filePath, existingData); err != nil {
-		debugPrint("debug.intraday.saveFail", stockCode, err)
+		logDebug("log.intraday.saveFail", stockCode, err)
 		return decision, err
 	}
 
-	debugPrint("debug.intraday.saveSuccess", stockCode, len(existingData.Datapoints))
+	logDebug("log.intraday.saveSuccess", stockCode, len(existingData.Datapoints))
 	return decision, nil
 }
 
@@ -681,18 +677,18 @@ func fetchIntradayDataFromAPI(stockCode string) ([]IntradayDataPoint, error) {
 
 	// US stocks: Use Yahoo Finance API (best for US stocks)
 	if market == MarketUS {
-		debugPrint("debug.intraday.marketTypeUS", stockCode)
+		logDebug("log.intraday.marketTypeUS", stockCode)
 
 		data, err := tryGetIntradayFromYahoo(stockCode)
 		if err == nil && len(data) > 0 {
-			debugPrint("debug.intraday.yahooSuccess", stockCode, len(data))
+			logDebug("log.intraday.yahooSuccess", stockCode, len(data))
 			return data, nil
 		}
 		if err != nil {
 			lastErr = err
-			debugPrint("debug.intraday.yahooFail", stockCode, err)
+			logDebug("log.intraday.yahooFail", stockCode, err)
 		} else {
-			debugPrint("debug.intraday.yahooNoData", stockCode)
+			logDebug("log.intraday.yahooNoData", stockCode)
 		}
 
 		return nil, fmt.Errorf("Yahoo Finance API失败: %w", lastErr)
@@ -700,90 +696,90 @@ func fetchIntradayDataFromAPI(stockCode string) ([]IntradayDataPoint, error) {
 
 	// Hong Kong stocks: Try Tencent first, then Yahoo Finance as fallback
 	if market == MarketHongKong {
-		debugPrint("debug.intraday.marketTypeHK", stockCode)
+		logDebug("log.intraday.marketTypeHK", stockCode)
 
 		// Try Tencent API (primary for HK stocks)
 		data, err := tryGetIntradayFromTencent(stockCode)
 		if err == nil && len(data) > 0 {
-			debugPrint("debug.intraday.tencentSuccess", stockCode, len(data))
+			logDebug("log.intraday.tencentSuccess", stockCode, len(data))
 			return data, nil
 		}
 		if err != nil {
 			lastErr = err
-			debugPrint("debug.intraday.tencentFail", stockCode, err)
+			logDebug("log.intraday.tencentFail", stockCode, err)
 		} else {
-			debugPrint("debug.intraday.tencentNoData", stockCode)
+			logDebug("log.intraday.tencentNoData", stockCode)
 		}
 
 		// Try Yahoo Finance API (fallback for HK stocks)
 		data, err = tryGetIntradayFromYahoo(stockCode)
 		if err == nil && len(data) > 0 {
-			debugPrint("debug.intraday.yahooSuccess", stockCode, len(data))
+			logDebug("log.intraday.yahooSuccess", stockCode, len(data))
 			return data, nil
 		}
 		if err != nil {
 			lastErr = err
-			debugPrint("debug.intraday.yahooFail", stockCode, err)
+			logDebug("log.intraday.yahooFail", stockCode, err)
 		} else {
-			debugPrint("debug.intraday.yahooNoData", stockCode)
+			logDebug("log.intraday.yahooNoData", stockCode)
 		}
 
 		// Try EastMoney API (secondary fallback)
 		data, err = tryGetIntradayFromEastMoney(stockCode)
 		if err == nil && len(data) > 0 {
-			debugPrint("debug.intraday.eastMoneySuccess", stockCode, len(data))
+			logDebug("log.intraday.eastMoneySuccess", stockCode, len(data))
 			return data, nil
 		}
 		if err != nil {
 			lastErr = err
-			debugPrint("debug.intraday.eastMoneyFail", stockCode, err)
+			logDebug("log.intraday.eastMoneyFail", stockCode, err)
 		} else {
-			debugPrint("debug.intraday.eastMoneyNoData", stockCode)
+			logDebug("log.intraday.eastMoneyNoData", stockCode)
 		}
 
 		return nil, fmt.Errorf("所有港股API失败, 最后错误: %w", lastErr)
 	}
 
 	// China A-shares: Use Chinese APIs (Tencent, EastMoney, Sina)
-	debugPrint("debug.intraday.marketTypeChina", stockCode)
+	logDebug("log.intraday.marketTypeChina", stockCode)
 
 	// Try Tencent API (primary - most reliable for A-shares)
 	data, err := tryGetIntradayFromTencent(stockCode)
 	if err == nil && len(data) > 0 {
-		debugPrint("debug.intraday.tencentSuccess", stockCode, len(data))
+		logDebug("log.intraday.tencentSuccess", stockCode, len(data))
 		return data, nil
 	}
 	if err != nil {
 		lastErr = err
-		debugPrint("debug.intraday.tencentFail", stockCode, err)
+		logDebug("log.intraday.tencentFail", stockCode, err)
 	} else {
-		debugPrint("debug.intraday.tencentNoData", stockCode)
+		logDebug("log.intraday.tencentNoData", stockCode)
 	}
 
 	// Try EastMoney API (secondary)
 	data, err = tryGetIntradayFromEastMoney(stockCode)
 	if err == nil && len(data) > 0 {
-		debugPrint("debug.intraday.eastMoneySuccess", stockCode, len(data))
+		logDebug("log.intraday.eastMoneySuccess", stockCode, len(data))
 		return data, nil
 	}
 	if err != nil {
 		lastErr = err
-		debugPrint("debug.intraday.eastMoneyFail", stockCode, err)
+		logDebug("log.intraday.eastMoneyFail", stockCode, err)
 	} else {
-		debugPrint("debug.intraday.eastMoneyNoData", stockCode)
+		logDebug("log.intraday.eastMoneyNoData", stockCode)
 	}
 
 	// Try Sina Finance API (last fallback - K-line data, may not have today's data)
 	data, err = tryGetIntradayFromSina(stockCode)
 	if err == nil && len(data) > 0 {
-		debugPrint("debug.intraday.sinaSuccess", stockCode, len(data))
+		logDebug("log.intraday.sinaSuccess", stockCode, len(data))
 		return data, nil
 	}
 	if err != nil {
 		lastErr = err
-		debugPrint("debug.intraday.sinaFail", stockCode, err)
+		logDebug("log.intraday.sinaFail", stockCode, err)
 	} else {
-		debugPrint("debug.intraday.sinaNoData", stockCode)
+		logDebug("log.intraday.sinaNoData", stockCode)
 	}
 
 	return nil, fmt.Errorf("所有A股API失败, 最后错误: %w", lastErr)
@@ -1092,7 +1088,7 @@ func isMarketOpen(stockCode string, m *Model) bool {
 	case MarketHongKong:
 		marketConfig = m.config.Markets.HongKong
 	default:
-		debugPrint("debug.market.unknownType", stockCode, market)
+		logDebug("log.market.unknownType", stockCode, market)
 		return false
 	}
 

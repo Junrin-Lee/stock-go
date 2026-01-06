@@ -33,7 +33,7 @@ func (m *Model) getStockPriceFromCache(symbol string) *StockData {
 func (m *Model) startStockPriceUpdates() tea.Cmd {
 	// 检查是否需要开始新的更新周期
 	if time.Since(m.stockPriceUpdateTime) < 5*time.Second {
-		debugPrint("debug.cache.skipUpdate", time.Since(m.stockPriceUpdateTime))
+		logDebug("log.cache.skipUpdate", time.Since(m.stockPriceUpdateTime))
 		return nil // 还未到更新时间
 	}
 
@@ -51,7 +51,7 @@ func (m *Model) startStockPriceUpdates() tea.Cmd {
 	}
 
 	if len(stockCodes) == 0 {
-		debugPrint("debug.cache.noStocks")
+		logDebug("log.cache.noStocks")
 		return nil
 	}
 
@@ -68,7 +68,7 @@ func (m *Model) startStockPriceUpdates() tea.Cmd {
 	// 更新开始时间
 	m.stockPriceUpdateTime = time.Now()
 
-	debugPrint("debug.cache.startAsync", len(uniqueStockCodes))
+	logDebug("log.cache.startAsync", len(uniqueStockCodes))
 
 	// 逐个发起异步获取请求
 	var cmds []tea.Cmd

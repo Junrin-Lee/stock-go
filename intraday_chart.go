@@ -38,12 +38,12 @@ func (m *Model) startIntradayDataCollection() {
 		}
 	}
 
-	debugPrint("debug.intraday.trackStart", len(stocksToTrack))
+	logDebug("log.intraday.trackStart", len(stocksToTrack))
 
 	// 为每只股票启动智能 worker
 	for code, name := range stocksToTrack {
 		if err := m.intradayManager.StartCollection(code, name); err != nil {
-			m.addDebugLog(fmt.Sprintf("Failed to start collection for %s: %v", code, err))
+			logWarnDirect("Failed to start collection for %s: %v", code, err)
 		}
 	}
 }
@@ -53,7 +53,7 @@ func (m *Model) stopIntradayDataCollection() {
 	if m.intradayManager != nil {
 		close(m.intradayManager.cancelChan)
 		m.intradayManager = nil
-		debugPrint("debug.intraday.trackStop")
+		logDebug("log.intraday.trackStop")
 	}
 }
 
@@ -70,7 +70,7 @@ func (m *Model) fetchPrevCloseForStock(code string) float64 {
 		prevClose := entry.Data.PrevClose
 		m.stockPriceMutex.RUnlock()
 		if prevClose > 0 {
-			debugPrint("debug.chart.prevCloseFromCache", code, prevClose)
+			logDebug("log.chart.prevCloseFromCache", code, prevClose)
 			return prevClose
 		}
 	} else {
@@ -78,14 +78,14 @@ func (m *Model) fetchPrevCloseForStock(code string) float64 {
 	}
 
 	// 缓存未命中 - 从API获取
-	debugPrint("debug.chart.fetchingPrevClose", code)
+	logDebug("log.chart.fetchingPrevClose", code)
 	stockData := getStockPrice(code)
 	if stockData != nil && stockData.PrevClose > 0 {
-		debugPrint("debug.chart.prevCloseFromAPI", code, stockData.PrevClose)
+		logDebug("log.chart.prevCloseFromAPI", code, stockData.PrevClose)
 		return stockData.PrevClose
 	}
 
-	debugPrint("debug.chart.prevCloseUnavailable", code)
+	logDebug("log.chart.prevCloseUnavailable", code)
 	return 0.0 // 降级方案
 }
 
@@ -107,7 +107,7 @@ func (m *Model) loadIntradayDataForDate(code, name, date string) (*IntradayData,
 	// 向后兼容：如果 Market 为空，自动识别
 	if data.Market == "" {
 		data.Market = getMarketType(code)
-		debugPrint("debug.chart.marketAutoDetect", code, data.Market)
+		logDebug("log.chart.marketAutoDetect", code, data.Market)
 	}
 
 	// 验证数据
@@ -124,7 +124,7 @@ func (m *Model) loadIntradayDataForDate(code, name, date string) (*IntradayData,
 
 	// NEW: 如果文件缺失 PrevClose，从缓存/API获取
 	if data.PrevClose == 0 {
-		debugPrint("debug.chart.prevCloseMissing", code)
+		logDebug("log.chart.prevCloseMissing", code)
 		data.PrevClose = m.fetchPrevCloseForStock(code)
 
 		// 可选：异步保存更新后的数据（非阻塞，忽略错误）
@@ -132,7 +132,7 @@ func (m *Model) loadIntradayDataForDate(code, name, date string) (*IntradayData,
 			go saveIntradayData(filePath, &data)
 		}
 	} else {
-		debugPrint("debug.chart.prevCloseExists", code, data.PrevClose)
+		logDebug("log.chart.prevCloseExists", code, data.PrevClose)
 	}
 
 	return &data, nil
@@ -315,7 +315,7 @@ func (m *Model) createFixedTimeRange(date string, market MarketType) []TimePoint
 	case MarketHongKong:
 		marketConfig = m.config.Markets.HongKong
 	default:
-		debugPrint("debug.chart.unknownMarket", market)
+		logDebug("log.chart.unknownMarket", market)
 		return nil
 	}
 
@@ -325,13 +325,13 @@ func (m *Model) createFixedTimeRange(date string, market MarketType) []TimePoint
 	for _, session := range marketConfig.TradingSessions {
 		startTime, err := parseTimeInMarket(date, session.StartTime, marketConfig)
 		if err != nil {
-			debugPrint("debug.chart.parseStartFail", session.StartTime, err)
+			logDebug("log.chart.parseStartFail", session.StartTime, err)
 			continue
 		}
 
 		endTime, err := parseTimeInMarket(date, session.EndTime, marketConfig)
 		if err != nil {
-			debugPrint("debug.chart.parseEndFail", session.EndTime, err)
+			logDebug("log.chart.parseEndFail", session.EndTime, err)
 			continue
 		}
 
@@ -356,19 +356,19 @@ func (m *Model) createFixedTimeRange(date string, market MarketType) []TimePoint
 
 // createIntradayChart 从分时数据创建图表（使用普通 linechart 以精确控制数据点）
 func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model {
-	debugPrint("debug.chart.creating", termWidth, termHeight)
+	logDebug("log.chart.creating", termWidth, termHeight)
 
 	if m.chartData == nil {
-		debugPrint("debug.chart.dataNil")
+		logDebug("log.chart.dataNil")
 		return nil
 	}
 
 	if len(m.chartData.Datapoints) == 0 {
-		debugPrint("debug.chart.dataEmpty")
+		logDebug("log.chart.dataEmpty")
 		return nil
 	}
 
-	debugPrint("debug.chart.dataPoints", len(m.chartData.Datapoints))
+	logDebug("log.chart.dataPoints", len(m.chartData.Datapoints))
 
 	// 最小大小检查
 	minWidth := 40
@@ -427,7 +427,7 @@ func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model 
 
 	minPrice, maxPrice, margin := calculateAdaptiveMargin(actualPrices)
 
-	debugPrint("debug.chart.priceRange", minPrice, maxPrice, (maxPrice-minPrice)/minPrice*100, margin)
+	logDebug("log.chart.priceRange", minPrice, maxPrice, (maxPrice-minPrice)/minPrice*100, margin)
 
 	// 设置样式：A股红涨绿跌，非A股绿涨红跌
 	lastPrice := m.chartData.Datapoints[len(m.chartData.Datapoints)-1].Price
@@ -437,7 +437,7 @@ func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model 
 	comparisonBase := prevClose
 	if comparisonBase == 0 {
 		comparisonBase = m.chartData.Datapoints[0].Price // 降级到开盘价
-		debugPrint("debug.chart.colorFallback", m.chartData.Code)
+		logDebug("log.chart.colorFallback", m.chartData.Code)
 	}
 
 	// 判断是否为A股（SH/SZ开头）
@@ -524,7 +524,7 @@ func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model 
 	}
 
 	// === 创建图表 ===
-	debugPrint("debug.chart.dimensions", chartWidth, chartHeight, len(dataPoints), minPrice-margin, maxPrice+margin)
+	logDebug("log.chart.dimensions", chartWidth, chartHeight, len(dataPoints), minPrice-margin, maxPrice+margin)
 
 	lc := linechart.New(chartWidth, chartHeight,
 		0, float64(len(dataPoints)-1), // X 轴范围：0 到数据点数量-1
@@ -544,7 +544,7 @@ func (m *Model) createIntradayChart(termWidth, termHeight int) *linechart.Model 
 
 	lc.DrawXYAxisAndLabel()
 
-	debugPrint("debug.chart.success")
+	logDebug("log.chart.success")
 	return &lc
 }
 
@@ -564,7 +564,7 @@ func (m *Model) triggerIntradayDataCollection(code, name, date string) tea.Cmd {
 
 	// 为此特定股票启动智能 worker
 	if err := m.intradayManager.StartCollection(code, name); err != nil {
-		m.addDebugLog(fmt.Sprintf("Failed to trigger collection for %s: %v", code, err))
+		logWarnDirect("Failed to trigger collection for %s: %v", code, err)
 	}
 
 	// 返回命令每 2 秒检查数据可用性
@@ -840,7 +840,7 @@ func (m *Model) viewIntradayChart(termWidth, termHeight int) string {
 	comparisonBase := prevClose
 	if comparisonBase == 0 {
 		comparisonBase = prices[0] // 降级到开盘价
-		debugPrint("debug.chart.statsFallback", m.chartData.Code)
+		logDebug("log.chart.statsFallback", m.chartData.Code)
 	}
 
 	change := closePrice - comparisonBase
@@ -909,7 +909,7 @@ func (m *Model) startSearchIntradayWorker(code, name, date string) tea.Cmd {
 	m.searchIntradayWorker = make(chan struct{})
 	m.searchIntradayUpdateCh = make(chan struct{}, 10) // 带缓冲，避免阻塞
 
-	debugPrint("debug.search.workerStart", code, date)
+	logDebug("log.search.workerStart", code, date)
 
 	// 启动临时 goroutine
 	go m.runSearchIntradayWorker(code, name, date)
@@ -933,13 +933,13 @@ func (m *Model) runSearchIntradayWorker(code, name, date string) {
 		case <-ticker.C:
 			// 检查是否仍在搜索模式
 			if !m.isSearchMode || m.state != SearchResultWithActions {
-				debugPrint("debug.search.workerAutoStop", code)
+				logDebug("log.search.workerAutoStop", code)
 				return
 			}
 
 			// 检查市场是否开市（闭市时降低频率）
 			if !isMarketOpen(code, m) {
-				debugPrint("debug.search.marketClosed", code)
+				logDebug("log.search.marketClosed", code)
 				// 市场关闭时仍然执行一次获取（获取当日完整数据）
 				// 然后停止 worker
 				m.fetchAndStoreSearchIntradayData(code, name, date)
@@ -951,7 +951,7 @@ func (m *Model) runSearchIntradayWorker(code, name, date string) {
 
 		case <-m.searchIntradayWorker:
 			// 收到停止信号
-			debugPrint("debug.search.workerStop", code)
+			logDebug("log.search.workerStop", code)
 			return
 		}
 	}
@@ -962,13 +962,13 @@ func (m *Model) fetchAndStoreSearchIntradayData(code, name, date string) {
 	// 从 API 获取最新数据
 	datapoints, err := fetchIntradayDataFromAPI(code)
 	if err != nil {
-		debugPrint("debug.search.fetchFail", code, err)
+		logDebug("log.search.fetchFail", code, err)
 		// 不返回错误，继续下次尝试
 		return
 	}
 
 	if len(datapoints) == 0 {
-		debugPrint("debug.search.noData", code)
+		logDebug("log.search.noData", code)
 		return
 	}
 
@@ -992,7 +992,7 @@ func (m *Model) fetchAndStoreSearchIntradayData(code, name, date string) {
 		PrevClose:  prevClose,
 	}
 
-	debugPrint("debug.search.dataUpdated", code, len(datapoints), time.Now().Format("15:04:05"))
+	logDebug("log.search.dataUpdated", code, len(datapoints), time.Now().Format("15:04:05"))
 
 	// 发送更新通知，触发 UI 重新渲染
 	if m.searchIntradayUpdateCh != nil {
@@ -1010,7 +1010,7 @@ func (m *Model) stopSearchIntradayWorker() {
 	if m.searchIntradayWorker != nil {
 		close(m.searchIntradayWorker)
 		m.searchIntradayWorker = nil
-		debugPrint("debug.search.workerClosed")
+		logDebug("log.search.workerClosed")
 	}
 
 	// 关闭更新通知 channel
@@ -1023,7 +1023,7 @@ func (m *Model) stopSearchIntradayWorker() {
 	m.searchIntradayData = nil
 	m.isSearchMode = false
 
-	debugPrint("debug.search.cleanupComplete")
+	logDebug("log.search.cleanupComplete")
 }
 
 // createSearchIntradayChart 为搜索模式创建分时图表
@@ -1032,19 +1032,19 @@ func (m *Model) stopSearchIntradayWorker() {
 // 2. 尺寸: 较小的嵌入式图表 vs 全屏图表
 // 3. 时间轴: 简化的时间标签 vs 完整时间标签
 func (m *Model) createSearchIntradayChart(termWidth, termHeight int) *linechart.Model {
-	debugPrint("debug.search.chartCreate", termWidth, termHeight)
+	logDebug("log.search.chartCreate", termWidth, termHeight)
 
 	if m.searchIntradayData == nil {
-		debugPrint("debug.search.chartDataNil")
+		logDebug("log.search.chartDataNil")
 		return nil
 	}
 
 	if len(m.searchIntradayData.Datapoints) == 0 {
-		debugPrint("debug.search.chartDataEmpty")
+		logDebug("log.search.chartDataEmpty")
 		return nil
 	}
 
-	debugPrint("debug.search.chartDataPoints", len(m.searchIntradayData.Datapoints))
+	logDebug("log.search.chartDataPoints", len(m.searchIntradayData.Datapoints))
 
 	// 最小大小检查（搜索模式使用更小的最小尺寸）
 	minWidth := 40
@@ -1071,7 +1071,7 @@ func (m *Model) createSearchIntradayChart(termWidth, termHeight int) *linechart.
 	)
 
 	if len(timeFramework) == 0 {
-		debugPrint("debug.search.chartNoTimeFramework")
+		logDebug("log.search.chartNoTimeFramework")
 		return nil
 	}
 
@@ -1110,7 +1110,7 @@ func (m *Model) createSearchIntradayChart(termWidth, termHeight int) *linechart.
 
 	minPrice, maxPrice, margin := calculateAdaptiveMargin(actualPrices)
 
-	debugPrint("debug.search.chartPriceRange", minPrice, maxPrice, margin)
+	logDebug("log.search.chartPriceRange", minPrice, maxPrice, margin)
 
 	// === 设置样式：A股红涨绿跌，非A股绿涨红跌 ===
 	lastPrice := m.searchIntradayData.Datapoints[len(m.searchIntradayData.Datapoints)-1].Price
@@ -1239,7 +1239,7 @@ func (m *Model) createSearchIntradayChart(termWidth, termHeight int) *linechart.
 
 	lc.DrawXYAxisAndLabel()
 
-	debugPrint("debug.search.chartSuccess")
+	logDebug("log.search.chartSuccess")
 	return &lc
 }
 
