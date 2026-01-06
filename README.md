@@ -1,6 +1,6 @@
 # Stock Monitor - 股票监控系统
 
-[![Version](https://img.shields.io/badge/version-v5.7-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v5.8-blue.svg)]()
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)]()
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
@@ -595,7 +595,8 @@ A股实时数据:  腾讯 API → 新浪 API → 显示 "-"
 
 | 版本 | 发布时间 | 主要更新 | 文档 |
 |------|----------|----------|------|
-| **v5.7** | 2025年12月 | 🏷️ 自选标签分组系统、位置记忆、边界停留 | [查看详情](doc/changelogs/v5.7.md) |
+| **v5.8** | 2026年1月 | 📊 结构化日志系统、zap集成、日志轮转、i18n支持 | [查看详情](doc/changelogs/v5.8.md) |
+| v5.7 | 2025年12月 | 🏷️ 自选标签分组系统、位置记忆、边界停留 | [查看详情](doc/changelogs/v5.7.md) |
 | v5.6 | 2025年12月 | 🔍 搜索视图增强、实时分时图、自动刷新 | [查看详情](doc/changelogs/v5.6.md) |
 | v5.5 | 2025年12月 | 🏷️ 自选股票市场标签体系、数据自动迁移 | [查看详情](doc/changelogs/v5.5.md) |
 | v5.4 | 2025年12月 | 🔧 港股换手率修复、东方财富API集成 | [查看详情](doc/changelogs/v5.4.md) |
